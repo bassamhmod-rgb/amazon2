@@ -93,7 +93,7 @@ CSRF_FAILURE_VIEW = "accounts.views.csrf_failure"
 #
 
 import dj_database_url
-import os
+
 
 if os.getenv("DATABASE_URL"):
     DATABASES = {
