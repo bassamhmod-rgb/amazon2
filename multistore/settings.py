@@ -28,8 +28,8 @@ LOGGING = {
 }
 
 ALLOWED_HOSTS = [
-    "amazonsyria.pythonanywhere.com",
-    "www.amazonsyria.pythonanywhere.com",
+    "amazon2-dwsb.onrender.com",
+    "www.amazon2-dwsb.onrender.com",
     "127.0.0.1",
     "localhost",
 ]
