@@ -92,17 +92,28 @@ WSGI_APPLICATION = "multistore.wsgi.application"
 CSRF_FAILURE_VIEW = "accounts.views.csrf_failure"
 #
 
-DATABASES = {
-    "default": {
-        "ENGINE": os.getenv("DATABASE_ENGINE", "django.db.backends.postgresql"),
-        "NAME": os.getenv("DATABASE_NAME", "alaman_pos"),
-        "USER": os.getenv("DATABASE_USER", "postgres"),
-        "PASSWORD": os.getenv("DATABASE_PASSWORD", ""),
-        "HOST": os.getenv("DATABASE_HOST", "127.0.0.1"),
-        "PORT": os.getenv("DATABASE_PORT", "5432"),
-        "CONN_MAX_AGE": int(os.getenv("DATABASE_CONN_MAX_AGE", "60")),
+import dj_database_url
+import os
+
+if os.getenv("DATABASE_URL"):
+    DATABASES = {
+        "default": dj_database_url.parse(
+            os.environ["DATABASE_URL"],
+            conn_max_age=600,
+        )
     }
-}
+else:
+    DATABASES = {
+        "default": {
+            "ENGINE": os.getenv("DATABASE_ENGINE", "django.db.backends.postgresql"),
+            "NAME": os.getenv("DATABASE_NAME", "alaman_pos"),
+            "USER": os.getenv("DATABASE_USER", "postgres"),
+            "PASSWORD": os.getenv("DATABASE_PASSWORD", ""),
+            "HOST": os.getenv("DATABASE_HOST", "127.0.0.1"),
+            "PORT": os.getenv("DATABASE_PORT", "5432"),
+            "CONN_MAX_AGE": int(os.getenv("DATABASE_CONN_MAX_AGE", "60")),
+        }
+    }
 DATA_UPLOAD_MAX_NUMBER_FIELDS = 10000
 AUTH_PASSWORD_VALIDATORS = []
 
