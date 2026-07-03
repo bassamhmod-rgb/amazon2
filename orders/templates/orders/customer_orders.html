@@ -1,0 +1,127 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <title>طلباتي – {{ store.slug }}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <!-- Bootstrap RTL -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+
+    <style>
+        :root {
+            --primary-color: #1A2A4A;
+            --light-bg: #F3F5F7;
+        }
+
+        body {
+            background: var(--light-bg);
+            font-family: "Cairo", sans-serif;
+        }
+
+        /* ⭐ نفس ستايل صفحة التاجر */
+        .orders-container {
+            max-width: 850px;
+            margin: 3.5rem auto;
+            background: #fff;
+            padding: 2.2rem 2rem;
+            border-radius: 18px;
+            box-shadow: 0 8px 18px rgba(0,0,0,0.08);
+            border: 1px solid #e4e6eb;
+        }
+
+        .page-title {
+            color: var(--primary-color);
+            font-weight: 700;
+            margin-bottom: 1.5rem;
+        }
+
+        /* كرت الطلب */
+        .order-card {
+            background: #fff;
+            border-radius: 14px;
+            padding: 18px;
+            border: 1px solid #dcdcdc;
+            margin-bottom: 15px;
+            transition: 0.25s;
+        }
+
+        .order-card:hover {
+            background: #f1f6ff;
+            border-color: var(--primary-color);
+        }
+
+        .order-status {
+            font-size: 0.95rem;
+            font-weight: 700;
+            color: var(--primary-color);
+        }
+
+        .btn-back {
+            border-radius: 12px;
+            padding: 10px 18px;
+            margin-bottom: 18px;
+            font-weight: 600;
+        }
+
+        .btn-details {
+            border-radius: 10px;
+            font-weight: 600;
+        }
+
+    </style>
+
+</head>
+<body>
+
+<div class="container">
+
+    <div class="orders-container">
+
+        <h3 class="page-title">📦 طلبـاتـي</h3>
+
+        <a href="{% url 'stores:store_front' store.slug %}"
+           class="btn btn-secondary btn-back">
+            ⇦ الرجوع إلى المتجر
+        </a>
+
+        {% if orders %}
+            {% for order in orders %}
+                <div class="order-card d-flex justify-content-between align-items-start">
+
+                    <div>
+                        <div><strong>رقم الطلب:</strong> #{{ order.id }}</div>
+                        <div><strong>التاريخ:</strong> {{ order.created_at|date:"Y-m-d H:i" }}</div>
+                        <div><strong>المجموع:</strong>
+                            {% if store.pricing_currency == "USD" %}
+                                {{ order.items_total|floatformat:2 }} $
+                                <span class="text-muted">({{ order.items_total_syp|floatformat:0 }} &#1604;.&#1587;)</span>
+                            {% else %}
+                                {{ order.items_total_syp|floatformat:0 }} &#1604;.&#1587;
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <div class="text-end">
+                        <div class="order-status">الحالة: {{ order.get_status_display }}</div>
+
+                        <a href="{% url 'orders:order_detail' store.slug order.id %}" 
+                           class="btn btn-primary btn-sm mt-2 btn-details">
+                           عرض التفاصيل
+                        </a>
+                    </div>
+
+                </div>
+            {% endfor %}
+
+        {% else %}
+            <p class="text-muted text-center fs-5">لا يوجد طلبات حتى الآن.</p>
+        {% endif %}
+
+    </div>
+
+</div>
+
+</body>
+</html>

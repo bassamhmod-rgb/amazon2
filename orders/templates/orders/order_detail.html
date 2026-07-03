@@ -1,0 +1,282 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <title>تفاصيل الطلب – #{{ order.id }}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <!-- Bootstrap RTL -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+
+    <style>
+        :root {
+            --primary-color: #1A2A4A;
+            --light-bg: #F3F5F7;
+        }
+
+        body {
+            background: var(--light-bg);
+            font-family: "Cairo", sans-serif;
+        }
+
+        /* ⭐ نفس ستايل صفحة التاجر */
+        .detail-container {
+            max-width: 900px;
+            margin: 3.5rem auto;
+            background: #fff;
+            padding: 2rem 2rem;
+            border-radius: 18px;
+            box-shadow: 0 8px 18px rgba(0,0,0,0.08);
+            border: 1px solid #e4e6eb;
+        }
+
+        h3 {
+            color: var(--primary-color);
+            font-weight: 700;
+            margin-bottom: 1.3rem;
+        }
+
+        .section-box {
+            background: #fff;
+            border-radius: 14px;
+            padding: 20px;
+            border: 1px solid #e4e4e4;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+            margin-bottom: 24px;
+        }
+
+        .note-box {
+            background: #f3f7ff;
+            padding: 6px 10px;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            color: #005f9e;
+        }
+
+        table th {
+            font-size: 0.95rem;
+        }
+
+        .back-btn {
+            border-radius: 12px;
+            padding: 12px;
+            font-size: 1rem;
+            width: 100%;
+            margin-top: 1rem;
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="container">
+
+    <div class="detail-container">
+
+        <h3>تفاصيل الطلب #{{ order.id }}</h3>
+
+        <!-- ================= معلومات عامة ================= -->
+        <div class="section-box">
+            <div class="row">
+
+                <div class="col-md-6">
+                    <p class="fs-5">
+                        <strong>👤 الزبون:</strong>
+                        {% if order.customer %}
+                            <span class="text-primary">{{ order.customer.name }}</span>
+                            <span class="text-muted fs-6">({{ order.customer.phone }})</span>
+                        {% else %}
+                            <span class="text-muted">زبون غير مسجل</span>
+                        {% endif %}
+                    </p>
+
+                    <p><strong>📍 العنوان:</strong>
+                        {% if order.shipping_address %}
+                            {{ order.shipping_address }}
+                        {% else %}
+                            <span class="text-muted">—</span>
+                        {% endif %}
+                    </p>
+
+                    <p><strong>📅 التاريخ:</strong> {{ order.created_at|date:"Y-m-d H:i" }}</p>
+
+                    <p>
+                        <strong>الحالة:</strong>
+                        {% if order.status == "pending" %}
+                            <span class="badge bg-warning text-dark">قيد الانتظار</span>
+                        {% else %}
+                            <span class="badge bg-success">تم التأكيد</span>
+                        {% endif %}
+                    </p>
+                </div>
+
+                <div class="col-md-6 bg-light p-3 rounded">
+                    <p><strong>مجموع العناصر:</strong>
+                        {% if store.pricing_currency == "USD" %}
+                            {{ order.items_total|floatformat:2 }} $
+                            <span class="text-muted">({{ order.items_total_syp|floatformat:0 }} &#1604;.&#1587;)</span>
+                        {% else %}
+                            {{ order.items_total_syp|floatformat:0 }} &#1604;.&#1587;
+                        {% endif %}
+                    </p>
+                    <p><strong>الحسم:</strong>
+                        {% if store.pricing_currency == "USD" %}
+                            <span class="text-danger">{{ order.discount|floatformat:2 }} $</span>
+                            <span class="text-muted">({{ order.discount_syp|floatformat:0 }} &#1604;.&#1587;)</span>
+                        {% else %}
+                            <span class="text-danger">{{ order.discount_syp|floatformat:0 }} &#1604;.&#1587;</span>
+                        {% endif %}
+                    </p>
+
+                    <p class="fs-5 fw-bold"><strong>الصافي للدفع:</strong>
+                        {% if store.pricing_currency == "USD" %}
+                            {{ order.net_total|floatformat:2 }} $
+                            <span class="text-muted">({{ order.net_total_syp|floatformat:0 }} &#1604;.&#1587;)</span>
+                        {% else %}
+                            {{ order.net_total_syp|floatformat:0 }} &#1604;.&#1587;
+                        {% endif %}
+                    </p>
+
+                    <hr>
+
+                    <p><strong>المدفوع:</strong>
+                        {% if store.pricing_currency == "USD" %}
+                            {{ order.payment|floatformat:2 }} $
+                            <span class="text-muted">({{ order.payment_syp|floatformat:0 }} &#1604;.&#1587;)</span>
+                        {% else %}
+                            {{ order.payment_syp|floatformat:0 }} &#1604;.&#1587;
+                        {% endif %}
+                    </p>
+
+                    <p><strong>المتبقي:</strong>
+                        <span class="{% if order.remaining > 0 %}text-danger{% else %}text-success{% endif %}">
+                            {% if store.pricing_currency == "USD" %}
+                                {{ order.remaining|floatformat:2 }} $
+                                <span class="text-muted">({{ order.remaining_syp|floatformat:0 }} &#1604;.&#1587;)</span>
+                            {% else %}
+                                {{ order.remaining_syp|floatformat:0 }} &#1604;.&#1587;
+                            {% endif %}
+                        </span>
+                    </p>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- ================= عناصر الطلب ================= -->
+        <div class="section-box">
+            <h5 class="mb-3" style="color: var(--primary-color); font-weight:700;">🛒 عناصر الطلب</h5>
+
+            <div class="table-responsive">
+                <table class="table table-striped align-middle table-hover">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>المنتج</th>
+                            <th>الكمية</th>
+                            <th>السعر الإفرادي</th>
+                            <th>المجموع الفرعي</th>
+                            <th>الملاحظات</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in items %}
+                        <tr>
+                            <td>{{ item.product.name }}</td>
+                            <td>{{ item.quantity }}</td>
+                            <td>
+                                {% if store.pricing_currency == "USD" %}
+                                    {{ item.price|floatformat:2 }} $
+                                    <span class="text-muted">({{ item.price_syp|floatformat:0 }} &#1604;.&#1587;)</span>
+                                {% else %}
+                                    {{ item.price_syp|floatformat:0 }} &#1604;.&#1587;
+                                {% endif %}
+                            </td>
+                            <td class="fw-bold">
+                                {% if store.pricing_currency == "USD" %}
+                                    {{ item.subtotal|floatformat:2 }} $
+                                    <span class="text-muted">({{ item.subtotal_syp|floatformat:0 }} &#1604;.&#1587;)</span>
+                                {% else %}
+                                    {{ item.subtotal_syp|floatformat:0 }} &#1604;.&#1587;
+                                {% endif %}
+                            </td>
+
+                            <td>
+                                {% if item.item_note %}
+                                    <div class="note-box">📝 {{ item.item_note }}</div>
+                                {% else %}
+                                    <span class="text-muted">—</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="5" class="text-center text-muted">لا توجد عناصر في هذا الطلب</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- ================= تفاصيل الدفع ================= -->
+        <div class="section-box">
+            <h5 class="mb-3" style="color: var(--primary-color); font-weight:700;">💰 تفاصيل الدفع</h5>
+
+            {% if order.payment_type %}
+                <p>
+                    <strong>طريقة الدفع:</strong>
+                    {% if order.payment_type == "full" %}
+                        تحويل كامل
+                    {% elif order.payment_type == "partial" %}
+                        دفعة مسبقة + باقي عند التسليم
+                    {% else %}
+                        الدفع عند الاستلام
+                    {% endif %}
+                </p>
+            {% endif %}
+
+            {% if order.payment_method_name %}
+                <p><strong>وسيلة الدفع:</strong> {{ order.payment_method_name }}</p>
+            {% endif %}
+
+            {% if order.payment_recipient_name %}
+                <p><strong>اسم المستلم:</strong> {{ order.payment_recipient_name }}</p>
+            {% endif %}
+
+            {% if order.payment_account_info %}
+                <p><strong>رقم الحساب / المحفظة:</strong> {{ order.payment_account_info }}</p>
+            {% endif %}
+
+            {% if order.payment_additional_info %}
+                <p><strong>معلومات إضافية:</strong> {{ order.payment_additional_info }}</p>
+            {% endif %}
+
+            {% if order.payment_proof_image or order.payment_transaction_id %}
+                <hr>
+
+                {% if order.payment_proof_image %}
+                    <p><strong>📸 إشعار التحويل:</strong></p>
+                    <img src="{{ order.payment_proof_image.url }}"
+                         style="max-width:240px; border:1px solid #ccc; border-radius:10px;">
+                {% endif %}
+
+                {% if order.payment_transaction_id %}
+                    <p class="mt-2">
+                        <strong>🔢 رقم عملية الدفع:</strong> {{ order.payment_transaction_id }}
+                    </p>
+                {% endif %}
+            {% endif %}
+        </div>
+
+        <a href="{% url 'orders:customer_orders' store.slug %}" 
+           class="btn btn-secondary back-btn">
+            ← الرجوع لطلباتي
+        </a>
+
+    </div>
+
+</div>
+
+</body>
+</html>

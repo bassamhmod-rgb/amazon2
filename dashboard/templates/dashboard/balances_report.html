@@ -1,0 +1,482 @@
+﻿{% load static %}
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <title>أرصدة العملاء والموردين – {{ store.name }}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+
+    <style>
+        body{
+            background:#f7f9fc;
+            font-family:"Cairo",sans-serif;
+            overflow-x:hidden;
+        }
+
+        /* ===== SIDEBAR ===== */
+        .sidebar{
+            width:230px;
+            background:#fff;
+            height:100vh;
+            position:fixed;
+            top:0;
+            right:0;
+            padding:20px 15px;
+            border-left:1px solid #e0e0e0;
+            transition:.3s;
+            z-index:1000;
+        }
+
+        .sidebar a{
+            display:block;
+            padding:10px 12px;
+            margin-bottom:8px;
+            color:#333;
+            border-radius:8px;
+            text-decoration:none;
+        }
+
+        .sidebar a:hover{
+            background:#e9f2ff;
+            color:#0d6efd;
+        }
+
+        /* ===== CONTENT ===== */
+        .content{
+            margin-right:240px;
+            padding:20px;
+            transition:.3s;
+        }
+
+        /* ===== SUMMARY CARDS ===== */
+        .summary-card{
+            background:#fff;
+            border:1px solid #e9edf3;
+            border-radius:12px;
+            padding:16px;
+            box-shadow:0 4px 12px rgba(0,0,0,.04);
+        }
+        .summary-card .label{
+            color:#6c757d;
+            font-size:14px;
+        }
+        .summary-card .value{
+            font-size:20px;
+            font-weight:700;
+        }
+
+        /* ===== SIDEBAR ARROW ===== */
+        #sidebarArrow{
+            display:none;
+        }
+
+        /* ===== MOBILE ===== */
+        @media (max-width:768px){
+            .sidebar{ right:-260px; }
+            .sidebar.active{ right:0; }
+
+            .content{
+                margin-right:0;
+                padding:15px;
+            }
+
+            #sidebarArrow{
+                display:flex;
+                position:fixed;
+                top:50%;
+                right:0;
+                transform:translateY(-50%);
+                width:26px;
+                height:48px;
+                background:#1A2A4A;
+                color:#fff;
+                border-radius:10px 0 0 10px;
+                align-items:center;
+                justify-content:center;
+                font-size:18px;
+                cursor:pointer;
+                z-index:1001;
+                box-shadow:-3px 0 10px rgba(0,0,0,.15);
+                user-select:none;
+            }
+
+            .table-responsive{
+                overflow-x:auto;
+                -webkit-overflow-scrolling:touch;
+            }
+
+            table{
+                min-width:600px;
+            }
+
+            table th,
+            table td{
+                white-space:nowrap;
+                vertical-align:middle;
+                text-align:center;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+<!-- سهم السايدبار -->
+<div id="sidebarArrow">❯</div>
+
+<!-- Sidebar -->
+{% include "dashboard/sidebar.html" %}
+
+<!-- Content -->
+<div class="content">
+
+    <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+        <h3 class="mb-0">أرصدة العملاء والموردين</h3>
+    </div>
+
+    <div class="card p-3 mb-3 shadow-sm border-0">
+        <label class="form-label fw-bold">نوع العرض</label>
+        <select id="filterType" class="form-select mb-3">
+            <option value="all">الكل</option>
+            <option value="customers">العملاء</option>
+            <option value="suppliers">الموردين</option>
+        </select>
+
+        <div id="filterCustomersBox">
+            <label class="form-label fw-bold">بحث عميل بالاسم</label>
+            <input type="text" id="filterCustomerSearch" class="form-control"
+                   placeholder="ابحث عن عميل بالاسم">
+            <div id="filterCustomerResults" class="list-group mt-1"></div>
+        </div>
+
+        <div id="filterSuppliersBox" style="display:none;">
+            <label class="form-label fw-bold">بحث مورد بالاسم</label>
+            <input type="text" id="filterSupplierSearch" class="form-control"
+                   placeholder="ابحث عن مورد بالاسم">
+            <div id="filterSupplierResults" class="list-group mt-1"></div>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-md-6">
+            <div class="summary-card">
+                <div class="label">إجمالي أرصدة العملاء</div>
+                <div class="value">
+                    {{ customer_total_abs }} ل.س
+                    (
+                    {% if customer_total > 0 %}
+                        مدين
+                    {% elif customer_total < 0 %}
+                        دائن
+                    {% else %}
+                        متوازن
+                    {% endif %}
+                    )
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="summary-card">
+                <div class="label">إجمالي أرصدة الموردين</div>
+                <div class="value">
+                    {{ supplier_total_abs }} ل.س
+                    (
+                    {% if supplier_total > 0 %}
+                        مدين
+                    {% elif supplier_total < 0 %}
+                        دائن
+                    {% else %}
+                        متوازن
+                    {% endif %}
+                    )
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="customersCard" class="card p-3 shadow-sm mb-4">
+        <h5 class="mb-3">أرصدة العملاء</h5>
+        <div class="table-responsive">
+            <table id="customersTable" class="table table-striped align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th>اسم العميل</th>
+                        <th>الهاتف</th>
+                        <th>الرصيد الحالي</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for customer in customers %}
+                    <tr data-id="{{ customer.id }}" data-name="{{ customer.name|lower }}">
+                        <td>{{ customer.name }}</td>
+                        <td>{{ customer.phone }}</td>
+                        <td>
+                            {{ customer.calc_balance_abs }} ل.س
+                            (
+                            {% if customer.calc_balance > 0 %}
+                                مدين
+                            {% elif customer.calc_balance < 0 %}
+                                دائن
+                            {% else %}
+                                متوازن
+                            {% endif %}
+                            )
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="3" class="text-center text-muted">
+                            لا يوجد عملاء بعد
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div id="suppliersCard" class="card p-3 shadow-sm">
+        <h5 class="mb-3">أرصدة الموردين</h5>
+        <div class="table-responsive">
+            <table id="suppliersTable" class="table table-striped align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th>اسم المورد</th>
+                        <th>الهاتف</th>
+                        <th>الرصيد الحالي</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for supplier in suppliers %}
+                    <tr data-id="{{ supplier.id }}" data-name="{{ supplier.name|lower }}">
+                        <td>{{ supplier.name }}</td>
+                        <td>{{ supplier.phone }}</td>
+                        <td>
+                            {{ supplier.calc_balance_abs }} ل.س
+                            (
+                            {% if supplier.calc_balance > 0 %}
+                                مدين
+                            {% elif supplier.calc_balance < 0 %}
+                                دائن
+                            {% else %}
+                                متوازن
+                            {% endif %}
+                            )
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="3" class="text-center text-muted">
+                            لا يوجد موردون بعد
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
+
+<script>
+    const sidebar = document.getElementById("sidebar");
+    const arrow = document.getElementById("sidebarArrow");
+
+    arrow.onclick = () => {
+        sidebar.classList.toggle("active");
+        arrow.innerHTML = sidebar.classList.contains("active") ? "❮" : "❯";
+    };
+</script>
+<script>
+const filterType = document.getElementById("filterType");
+const customersCard = document.getElementById("customersCard");
+const suppliersCard = document.getElementById("suppliersCard");
+const filterCustomersBox = document.getElementById("filterCustomersBox");
+const filterSuppliersBox = document.getElementById("filterSuppliersBox");
+
+let selectedCustomerId = null;
+let selectedSupplierId = null;
+let customerIndex = -1;
+let supplierIndex = -1;
+
+function applyTypeFilter() {
+    const value = filterType.value;
+    customersCard.style.display = value === "suppliers" ? "none" : "block";
+    suppliersCard.style.display = value === "customers" ? "none" : "block";
+
+    filterCustomersBox.style.display = value === "suppliers" ? "none" : "block";
+    filterSuppliersBox.style.display = value === "customers" ? "none" : "block";
+
+    selectedCustomerId = null;
+    selectedSupplierId = null;
+    document.getElementById("filterCustomerSearch").value = "";
+    document.getElementById("filterSupplierSearch").value = "";
+    filterCustomersTable("");
+    filterSuppliersTable("");
+}
+
+function filterCustomersTable(query) {
+    const rows = document.querySelectorAll("#customersTable tbody tr");
+    rows.forEach(row => {
+        const name = row.getAttribute("data-name") || "";
+        const matchesId = selectedCustomerId ? row.getAttribute("data-id") === String(selectedCustomerId) : true;
+        const matchesText = query ? name.includes(query.toLowerCase()) : true;
+        row.style.display = matchesId && matchesText ? "" : "none";
+    });
+}
+
+function filterSuppliersTable(query) {
+    const rows = document.querySelectorAll("#suppliersTable tbody tr");
+    rows.forEach(row => {
+        const name = row.getAttribute("data-name") || "";
+        const matchesId = selectedSupplierId ? row.getAttribute("data-id") === String(selectedSupplierId) : true;
+        const matchesText = query ? name.includes(query.toLowerCase()) : true;
+        row.style.display = matchesId && matchesText ? "" : "none";
+    });
+}
+
+filterType.addEventListener("change", applyTypeFilter);
+applyTypeFilter();
+</script>
+<script>
+document.getElementById("filterCustomerSearch").addEventListener("keyup", function (e) {
+    if (["ArrowDown","ArrowUp","Enter"].includes(e.key)) return;
+    const q = this.value.trim();
+    selectedCustomerId = null;
+    filterCustomersTable(q);
+
+    const box = document.getElementById("filterCustomerResults");
+    if (!q) { box.style.display = "none"; box.innerHTML = ""; return; }
+
+    fetch(`/dashboard/{{ store.slug }}/search-customers/?q=` + encodeURIComponent(q))
+        .then(r => r.json())
+        .then(data => {
+            box.innerHTML = "";
+            customerIndex = -1;
+            data.results.forEach(item => {
+                const a = document.createElement("a");
+                a.className = "list-group-item list-group-item-action";
+                a.textContent = `${item.name} – ${item.phone}`;
+                a.onclick = () => {
+                    selectedCustomerId = item.id;
+                    document.getElementById("filterCustomerSearch").value = item.name;
+                    box.style.display = "none";
+                    filterCustomersTable("");
+                };
+                a.onmouseenter = () => {
+                    const items = document.querySelectorAll("#filterCustomerResults .list-group-item");
+                    items.forEach((el, i) => {
+                        el.classList.toggle("active", el === a);
+                        if (el === a) customerIndex = i;
+                    });
+                };
+                box.appendChild(a);
+            });
+            box.style.display = "block";
+        });
+});
+</script>
+<script>
+document.getElementById("filterCustomerSearch").addEventListener("keydown", function (e) {
+    const items = document.querySelectorAll("#filterCustomerResults .list-group-item");
+    if (!items.length) return;
+
+    if (e.key === "ArrowDown") {
+        e.preventDefault();
+        customerIndex = (customerIndex + 1) % items.length;
+    }
+    else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        customerIndex = (customerIndex - 1 + items.length) % items.length;
+    }
+    else if (e.key === "Enter") {
+        e.preventDefault();
+        if (customerIndex >= 0) {
+            items[customerIndex].click();
+        }
+        return;
+    }
+    else if (e.key === "Escape") {
+        document.getElementById("filterCustomerResults").style.display = "none";
+        customerIndex = -1;
+        return;
+    }
+
+    items.forEach((item, i) => {
+        item.classList.toggle("active", i === customerIndex);
+    });
+});
+</script>
+<script>
+document.getElementById("filterSupplierSearch").addEventListener("keyup", function (e) {
+    if (["ArrowDown","ArrowUp","Enter"].includes(e.key)) return;
+    const q = this.value.trim();
+    selectedSupplierId = null;
+    filterSuppliersTable(q);
+
+    const box = document.getElementById("filterSupplierResults");
+    if (!q) { box.style.display = "none"; box.innerHTML = ""; return; }
+
+    fetch(`/dashboard/{{ store.slug }}/search-suppliers/?q=` + encodeURIComponent(q))
+        .then(r => r.json())
+        .then(data => {
+            box.innerHTML = "";
+            supplierIndex = -1;
+            data.results.forEach(item => {
+                const a = document.createElement("a");
+                a.className = "list-group-item list-group-item-action";
+                a.textContent = `${item.name} – ${item.phone}`;
+                a.onclick = () => {
+                    selectedSupplierId = item.id;
+                    document.getElementById("filterSupplierSearch").value = item.name;
+                    box.style.display = "none";
+                    filterSuppliersTable("");
+                };
+                a.onmouseenter = () => {
+                    const items = document.querySelectorAll("#filterSupplierResults .list-group-item");
+                    items.forEach((el, i) => {
+                        el.classList.toggle("active", el === a);
+                        if (el === a) supplierIndex = i;
+                    });
+                };
+                box.appendChild(a);
+            });
+            box.style.display = "block";
+        });
+});
+</script>
+<script>
+document.getElementById("filterSupplierSearch").addEventListener("keydown", function (e) {
+    const items = document.querySelectorAll("#filterSupplierResults .list-group-item");
+    if (!items.length) return;
+
+    if (e.key === "ArrowDown") {
+        e.preventDefault();
+        supplierIndex = (supplierIndex + 1) % items.length;
+    }
+    else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        supplierIndex = (supplierIndex - 1 + items.length) % items.length;
+    }
+    else if (e.key === "Enter") {
+        e.preventDefault();
+        if (supplierIndex >= 0) {
+            items[supplierIndex].click();
+        }
+        return;
+    }
+    else if (e.key === "Escape") {
+        document.getElementById("filterSupplierResults").style.display = "none";
+        supplierIndex = -1;
+        return;
+    }
+
+    items.forEach((item, i) => {
+        item.classList.toggle("active", i === supplierIndex);
+    });
+});
+</script>
+</body>
+</html>

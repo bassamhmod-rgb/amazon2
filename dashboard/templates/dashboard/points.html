@@ -1,0 +1,339 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <title>الرصيد - {{ store }}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+
+    <style>
+        body{
+            background:#f7f9fc;
+            font-family:"Cairo",sans-serif;
+            overflow-x:hidden;
+        }
+
+        .sidebar{
+            width:230px;
+            background:#fff;
+            height:100vh;
+            position:fixed;
+            top:0;
+            right:0;
+            padding:20px 15px;
+            border-left:1px solid #e0e0e0;
+            transition:.3s;
+            z-index:1000;
+        }
+
+        .sidebar a{
+            display:block;
+            padding:10px 12px;
+            margin-bottom:8px;
+            color:#333;
+            border-radius:8px;
+            text-decoration:none;
+        }
+
+        .sidebar a:hover{
+            background:#e9f2ff;
+            color:#0d6efd;
+        }
+
+        .content{
+            margin-right:240px;
+            padding:20px;
+            transition:.3s;
+        }
+
+        #sidebarArrow{
+            display:none;
+        }
+
+        #customerSearchResults .list-group-item.active{
+            background:#0d6efd;
+            border-color:#0d6efd;
+            color:#fff;
+        }
+
+        @media (max-width:768px){
+            .sidebar{ right:-260px; }
+            .sidebar.active{ right:0; }
+
+            .content{
+                margin-right:0;
+                padding:15px;
+            }
+
+            #sidebarArrow{
+                display:flex;
+                position:fixed;
+                top:50%;
+                right:0;
+                transform:translateY(-50%);
+                width:26px;
+                height:48px;
+                background:#1A2A4A;
+                color:#fff;
+                border-radius:10px 0 0 10px;
+                align-items:center;
+                justify-content:center;
+                font-size:18px;
+                cursor:pointer;
+                z-index:1001;
+                box-shadow:-3px 0 10px rgba(0,0,0,.15);
+                user-select:none;
+            }
+
+            .table-responsive{
+                overflow-x:auto;
+                -webkit-overflow-scrolling:touch;
+            }
+
+            table{
+                min-width:600px;
+            }
+
+            table th,
+            table td{
+                white-space:nowrap;
+                vertical-align:middle;
+                text-align:center;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+<div id="sidebarArrow">❯</div>
+
+{% include "dashboard/sidebar.html" %}
+
+<div class="content">
+
+    <h3 class="mb-4">الرصيد</h3>
+
+    <div class="card p-3 border-0 shadow-sm mb-4">
+        <label class="form-label fw-bold">اختيار زبون</label>
+        <input type="text"
+               id="customerSearchLive"
+               class="form-control mb-2"
+               placeholder="ابحث عن زبون (الأسهم للتنقل و Enter للاختيار)"
+               autocomplete="off"
+               value="{% if selected_customer %}{{ selected_customer }}{% endif %}">
+        <div id="customerSearchResults"
+             class="list-group"
+             style="display:none; max-height:240px; overflow-y:auto;"></div>
+    </div>
+
+    <div class="card p-3 border-0 shadow-sm mb-4">
+        <form method="post" class="d-flex flex-column flex-sm-row gap-2 align-items-sm-center justify-content-between">
+            {% csrf_token %}
+            <input type="hidden" name="rebuild_missing_cashback" value="1">
+            <div>
+                <div class="fw-bold">حساب الكاش باك لجميع الفواتير التي لم احتساب الكاش باك لها</div>
+                <div class="text-muted small"></div>
+            </div>
+            <button type="submit" class="btn btn-warning fw-bold">
+               إضافة
+            </button>
+        </form>
+    </div>
+
+    {% if selected_customer %}
+
+    <div class="card p-4 shadow-sm border-0 mb-4">
+        <h5 class="fw-bold mb-3">تعديل رصيد {{ selected_customer }}</h5>
+
+        <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="customer_id" value="{{ selected_customer.id }}">
+
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <label class="form-label fw-bold">الرصيد الحالي</label>
+                    <input type="text" class="form-control" value="{{ balance }}" readonly>
+                </div>
+
+                <div class="col-md-4">
+                    <label class="form-label fw-bold">تعديل الرصيد (إضافة أو سحب)</label>
+                    <input
+                        type="number"
+                        name="points"
+                        class="form-control"
+                        step="0.01"
+                        inputmode="decimal"
+                        required
+                        placeholder="مثال: 6.20 أو -1.50">
+                </div>
+
+                <div class="col-md-4">
+                    <label class="form-label">ملاحظة (اختياري)</label>
+                    <input type="text" name="note" class="form-control">
+                </div>
+            </div>
+
+            <button class="btn btn-primary mt-3 px-4">حفظ التعديل</button>
+        </form>
+    </div>
+
+    <div class="card p-3 shadow-sm border-0">
+        <h5 class="fw-bold mb-3">سجل الحركات</h5>
+
+        <div class="table-responsive">
+            <table class="table table-bordered mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>النقاط</th>
+                        <th>النوع</th>
+                        <th>ملاحظة</th>
+                        <th>التاريخ</th>
+                        <th>حذف</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for item in history %}
+                    <tr>
+                        <td class="fw-bold {% if item.points > 0 %}text-success{% else %}text-danger{% endif %}">
+                            {{ item.points }}
+                        </td>
+                        <td>
+                            {% if item.transaction_type == "add" %}إضافة{% endif %}
+                            {% if item.transaction_type == "subtract" %}سحب{% endif %}
+                            {% if item.transaction_type == "adjust" %}تعديل{% endif %}
+                        </td>
+                        <td>{{ item.note|default:"—" }}</td>
+                        <td>{{ item.created_at|date:"Y/m/d H:i" }}</td>
+                        <td>
+                            <form method="post"
+                                  action="{% url 'dashboard:delete_points_transaction' store.slug item.id %}"
+                                  onsubmit="return confirm('هل أنت متأكد من حذف هذا السجل؟');">
+                                {% csrf_token %}
+                                <button class="btn btn-sm btn-danger">×</button>
+                            </form>
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="5" class="text-center text-muted">
+                            لا يوجد حركات.
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    {% endif %}
+
+</div>
+
+<script>
+    const sidebar = document.getElementById("sidebar");
+    const arrow = document.getElementById("sidebarArrow");
+
+    arrow.onclick = () => {
+        sidebar.classList.toggle("active");
+        arrow.innerHTML = sidebar.classList.contains("active") ? "❮" : "❯";
+    };
+</script>
+
+<script>
+    const customersData = [
+        {% for c in customers %}
+            { id: "{{ c.id }}", name: "{{ c|escapejs }}" }{% if not forloop.last %},{% endif %}
+        {% endfor %}
+    ];
+
+    const customerSearchInput = document.getElementById("customerSearchLive");
+    const customerResultsBox = document.getElementById("customerSearchResults");
+
+    let filteredCustomers = [...customersData];
+    let activeCustomerIndex = -1;
+
+    function updateActiveCustomer() {
+        const items = customerResultsBox.querySelectorAll(".list-group-item");
+        items.forEach((el, i) => {
+            el.classList.toggle("active", i === activeCustomerIndex);
+        });
+    }
+
+    function openSelectedCustomer() {
+        if (activeCustomerIndex >= 0 && filteredCustomers[activeCustomerIndex]) {
+            location = "?customer=" + filteredCustomers[activeCustomerIndex].id;
+        }
+    }
+
+    function drawCustomerResults() {
+        customerResultsBox.innerHTML = "";
+
+        if (!filteredCustomers.length) {
+            customerResultsBox.style.display = "none";
+            activeCustomerIndex = -1;
+            return;
+        }
+
+        filteredCustomers.forEach((item, index) => {
+            const btn = document.createElement("button");
+            btn.type = "button";
+            btn.className = "list-group-item list-group-item-action";
+            btn.textContent = item.name;
+            btn.addEventListener("mouseenter", () => {
+                activeCustomerIndex = index;
+                updateActiveCustomer();
+            });
+            btn.addEventListener("click", () => {
+                location = "?customer=" + item.id;
+            });
+            customerResultsBox.appendChild(btn);
+        });
+
+        customerResultsBox.style.display = "block";
+        if (activeCustomerIndex < 0 || activeCustomerIndex >= filteredCustomers.length) {
+            activeCustomerIndex = 0;
+        }
+        updateActiveCustomer();
+    }
+
+    function filterCustomers() {
+        const q = (customerSearchInput.value || "").trim().toLowerCase();
+        filteredCustomers = customersData.filter(item => item.name.toLowerCase().includes(q));
+        activeCustomerIndex = -1;
+        drawCustomerResults();
+    }
+
+    customerSearchInput.addEventListener("input", filterCustomers);
+    customerSearchInput.addEventListener("focus", filterCustomers);
+    customerSearchInput.addEventListener("keydown", (e) => {
+        if (!filteredCustomers.length) return;
+
+        if (e.key === "ArrowDown") {
+            e.preventDefault();
+            activeCustomerIndex = (activeCustomerIndex + 1) % filteredCustomers.length;
+            updateActiveCustomer();
+        } else if (e.key === "ArrowUp") {
+            e.preventDefault();
+            activeCustomerIndex = (activeCustomerIndex - 1 + filteredCustomers.length) % filteredCustomers.length;
+            updateActiveCustomer();
+        } else if (e.key === "Enter") {
+            e.preventDefault();
+            openSelectedCustomer();
+        } else if (e.key === "Escape") {
+            customerResultsBox.style.display = "none";
+            activeCustomerIndex = -1;
+        }
+    });
+
+    document.addEventListener("click", (e) => {
+        if (!customerResultsBox.contains(e.target) && e.target !== customerSearchInput) {
+            customerResultsBox.style.display = "none";
+        }
+    });
+</script>
+
+</body>
+</html>

@@ -1,0 +1,370 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <title>جرد المنتجات – {{ store.name }}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+
+    <style>
+        body{
+            background:#f7f9fc;
+            font-family:"Cairo",sans-serif;
+            overflow-x:hidden;
+        }
+
+        /* ===== SIDEBAR ===== */
+        .sidebar{
+            width:230px;
+            background:#fff;
+            height:100vh;
+            position:fixed;
+            top:0;
+            right:0;
+            padding:20px 15px;
+            border-left:1px solid #e0e0e0;
+            transition:.3s;
+            z-index:1000;
+        }
+
+        .sidebar a{
+            display:block;
+            padding:10px 12px;
+            margin-bottom:8px;
+            color:#333;
+            border-radius:8px;
+            text-decoration:none;
+        }
+
+        .sidebar a:hover{
+            background:#e9f2ff;
+            color:#0d6efd;
+        }
+
+        /* ===== CONTENT ===== */
+        .content{
+            margin-right:240px;
+            padding:20px;
+            transition:.3s;
+        }
+
+        /* ===== INVENTORY TABLE ===== */
+        .qty-pos{ color:#198754; font-weight:bold; }
+        .qty-neg{ color:#dc3545; font-weight:bold; }
+        .qty-zero{ color:#6c757d; font-weight:bold; }
+
+        /* ===== SIDEBAR ARROW ===== */
+        #sidebarArrow{ display:none; }
+
+        @media (max-width:768px){
+            .sidebar{ right:-260px; }
+            .sidebar.active{ right:0; }
+
+            .content{
+                margin-right:0;
+                padding:15px;
+            }
+
+            #sidebarArrow{
+                display:flex;
+                position:fixed;
+                top:50%;
+                right:0;
+                transform:translateY(-50%);
+                width:26px;
+                height:48px;
+                background:#1A2A4A;
+                color:#fff;
+                border-radius:10px 0 0 10px;
+                align-items:center;
+                justify-content:center;
+                font-size:18px;
+                cursor:pointer;
+                z-index:1001;
+                box-shadow:-3px 0 10px rgba(0,0,0,.15);
+                user-select:none;
+            }
+
+            .table-responsive{
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+        }
+    </style>
+</head>
+
+<body>
+
+<div id="sidebarArrow">&#8249;</div>
+
+{% include "dashboard/sidebar.html" %}
+
+<div class="content">
+
+    <!-- العنوان -->
+    <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+        <h3 class="mb-0">جرد المنتجات</h3>
+        <a class="btn btn-outline-success"
+           href="?export=excel{% if querystring %}&{{ querystring }}{% endif %}">
+            تصدير إكسل
+        </a>
+    </div>
+
+    <!-- إجمالي قيمة المخزون -->
+    <div class="card p-4 mb-4">
+
+        <!-- Filters -->
+        <form method="get" class="row g-2 mb-3">
+            <div class="col-md-3 position-relative">
+                <input type="text" name="q" id="inventoryNameSearch" class="form-control"
+                       value="{{ q }}" placeholder="&#1576;&#1581;&#1579; &#1576;&#1575;&#1604;&#1575;&#1587;&#1605;" autocomplete="off">
+                <div id="inventorySearchResults" class="list-group mt-1" style="display:none; position:absolute; width:100%; z-index:1000;"></div>
+            </div>
+            <div class="col-md-3">
+                <input type="text" name="barcode" id="inventoryBarcodeSearch" class="form-control"
+                       value="{{ barcode }}" placeholder="&#1576;&#1581;&#1579; &#1576;&#1575;&#1604;&#1576;&#1575;&#1585;&#1603;&#1608;&#1583;">
+            </div>
+            <div class="col-md-3">
+                <select name="category" id="inventoryCategory" class="form-select">
+                    <option value="">كل الكميات</option>
+                    {% for cat in categories %}
+                        <option value="{{ cat.id }}" {% if current_category == cat.id %}selected{% endif %}>
+                            {{ cat.name }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3">
+                <select name="category2" id="inventoryCategory2" class="form-select">
+                    <option value="">&#1575;&#1604;&#1601;&#1574;&#1577; &#1575;&#1604;&#1601;&#1585;&#1593;&#1610;&#1577;</option>
+                    {% for cat in categories %}
+                        <option value="{{ cat.id }}" {% if current_sub_category == cat.id %}selected{% endif %}>
+                            {{ cat.name }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3">
+                <select name="qty_filter" id="inventoryQtyFilter" class="form-select">
+                    <option value="" {% if not current_qty_filter %}selected{% endif %}>كل الكميات</option>
+                    <option value="gt0" {% if current_qty_filter == "gt0" %}selected{% endif %}>أكبر من الصفر</option>
+                    <option value="eq0" {% if current_qty_filter == "eq0" %}selected{% endif %}>يساوي الصفر</option>
+                    <option value="lt0" {% if current_qty_filter == "lt0" %}selected{% endif %}>أصغر من الصفر</option>
+                </select>
+            </div>
+            <div class="col-12 d-flex gap-2">
+                <a class="btn btn-outline-secondary" href="?">&#1573;&#1604;&#1594;&#1575;&#1569;</a>
+            </div>
+        </form>
+
+        <h5 class="mb-2">إجمالي قيمة المنتجات</h5>
+        <h3 class="fw-bold text-success mb-0">
+            {{ total_inventory_value|floatformat:2 }} $
+        </h3>
+    </div>
+
+    <!-- جدول الجرد -->
+    <div class="card p-4 mb-4">
+
+        <div class="table-responsive">
+            <table class="table table-bordered align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>اسم المنتج</th>
+                        <th class="text-center">الكمية المتبقية</th>
+                        <th class="text-center">آخر سعر شراء</th>
+                        <th class="text-center">قيمة المخزون</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for product in page_obj %}
+                    {% with qty=product.remaining_qty %}
+                    <tr>
+                        <td>{{ product.name }}</td>
+
+                        <td class="text-center
+                            {% if qty > 0 %}qty-pos
+                            {% elif qty < 0 %}qty-neg
+                            {% else %}qty-zero{% endif %}
+                        ">
+                            {{ qty }}
+                        </td>
+
+                        <td class="text-center">
+                            {{ product.last_buy_price|floatformat:2 }} $
+                        </td>
+
+                        <td class="text-center fw-bold text-primary">
+                            {{ product.stock_value|floatformat:2 }} $
+                        </td>
+                    </tr>
+                    {% endwith %}
+                {% empty %}
+                    <tr>
+                        <td colspan="4" class="text-center text-muted">لا يوجد منتجات</td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+    </div>
+
+    <!-- Pagination -->
+    {% if page_obj.has_other_pages %}
+    <nav>
+        <ul class="pagination justify-content-center">
+            {% if page_obj.has_previous %}
+            <li class="page-item">
+                <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if querystring %}&{{ querystring }}{% endif %}">السابق</a>
+            </li>
+            {% endif %}
+
+            <li class="page-item active">
+                <span class="page-link">{{ page_obj.number }}</span>
+            </li>
+
+            {% if page_obj.has_next %}
+            <li class="page-item">
+                <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if querystring %}&{{ querystring }}{% endif %}">التالي</a>
+            </li>
+            {% endif %}
+        </ul>
+    </nav>
+    {% endif %}
+
+</div>
+
+<script>
+    const sidebar = document.getElementById("sidebar");
+    const arrow = document.getElementById("sidebarArrow");
+
+    arrow.onclick = () => {
+        sidebar.classList.toggle("active");
+        arrow.innerHTML = sidebar.classList.contains("active") ? "\u203A" : "\u2039";
+    };
+</script>
+
+
+<script>
+(function(){
+    const input = document.getElementById("inventoryNameSearch");
+    const barcodeInput = document.getElementById("inventoryBarcodeSearch");
+    const categorySelect = document.getElementById("inventoryCategory");
+    const category2Select = document.getElementById("inventoryCategory2");
+    const qtyFilterSelect = document.getElementById("inventoryQtyFilter");
+    const list = document.getElementById("inventorySearchResults");
+    const form = input ? input.closest("form") : null;
+    let idx = -1;
+
+    if (!input || !list || !form) return;
+
+    function hideList(){
+        list.style.display = "none";
+        list.innerHTML = "";
+        idx = -1;
+    }
+
+    function renderList(items){
+        list.innerHTML = "";
+        idx = -1;
+        items.forEach(item => {
+            const a = document.createElement("a");
+            a.className = "list-group-item list-group-item-action";
+            a.textContent = item.name;
+            a.onclick = () => {
+                input.value = item.name;
+                hideList();
+                form.submit();
+            };
+            list.appendChild(a);
+        });
+        list.style.display = items.length ? "block" : "none";
+    }
+
+    function fetchSuggestions(q){
+        if (!q){
+            hideList();
+            return;
+        }
+        fetch(`/dashboard/{{ store.slug }}/search-products/?q=` + encodeURIComponent(q))
+            .then(r => r.json())
+            .then(data => {
+                renderList(data.results || []);
+            });
+    }
+
+    input.addEventListener("input", function(){
+        const q = this.value.trim();
+        fetchSuggestions(q);
+    });
+
+    input.addEventListener("keydown", function(e){
+        const items = list.querySelectorAll(".list-group-item");
+        if (e.key === "ArrowDown"){
+            if (!items.length) return;
+            e.preventDefault();
+            idx = (idx + 1) % items.length;
+        } else if (e.key === "ArrowUp"){
+            if (!items.length) return;
+            e.preventDefault();
+            idx = (idx - 1 + items.length) % items.length;
+        } else if (e.key === "Enter"){
+            if (idx >= 0 && items[idx]){
+                e.preventDefault();
+                items[idx].click();
+                return;
+            }
+            // submit with whatever typed
+            if (input.value.trim()){
+                e.preventDefault();
+                form.submit();
+            }
+            return;
+        } else if (e.key === "Escape"){
+            hideList();
+            return;
+        }
+
+        items.forEach((el,i)=>el.classList.toggle("active", i===idx));
+    });
+
+    document.addEventListener("click", (e) => {
+        if (!list.contains(e.target) && e.target !== input){
+            hideList();
+        }
+    });
+
+    if (barcodeInput){
+        barcodeInput.addEventListener("keydown", function(e){
+            if (e.key !== "Enter") return;
+            e.preventDefault();
+            form.submit();
+        });
+    }
+
+    if (categorySelect){
+        categorySelect.addEventListener("change", function(){
+            form.submit();
+        });
+    }
+
+    if (category2Select){
+        category2Select.addEventListener("change", function(){
+            form.submit();
+        });
+    }
+
+    if (qtyFilterSelect){
+        qtyFilterSelect.addEventListener("change", function(){
+            form.submit();
+        });
+    }
+})();
+</script>
+
+</body>
+</html>

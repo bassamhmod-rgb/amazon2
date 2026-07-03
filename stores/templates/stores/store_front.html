@@ -1,0 +1,711 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8" />
+    <title>{{ store.slug }} | أمازون سوريا</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="apple-mobile-web-app-title" content="{{ store.slug }}">
+    <link rel="manifest" href="{% url 'stores:store_manifest' store.slug %}">
+    <meta name="theme-color" content="#0d6efd">
+    {% if store.logo %}
+    <link rel="apple-touch-icon" href="{{ store.logo.url }}">
+    <link rel="icon" href="{{ store.logo.url }}">
+    {% else %}
+    <link rel="apple-touch-icon" href="{% static 'pwa/icon-192.png' %}">
+    <link rel="icon" href="{% static 'pwa/icon-192.png' %}">
+    {% endif %}
+
+    <link rel="stylesheet" href="{% static 'css/themes/' %}theme{{ store.theme }}.css">
+
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+<style>
+/* ================= BASE ================= */
+body {
+    font-family: "Cairo", sans-serif;
+    background: var(--soft-bg);
+    color: var(--text-dark);
+    overflow-x: hidden;
+}
+
+.main-header {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+}
+
+.brand-title-en { 
+    font-size:1.6rem; 
+    font-weight:700; 
+    color:var(--primary-color); 
+}
+.brand-title-ar { 
+    font-size:0.9rem; 
+    font-weight:600; 
+    color:var(--text-light); 
+}
+.brand-subtitle { 
+    font-size:0.8rem; 
+    color:var(--text-light); 
+}
+
+/* ================= HERO ================= */
+.hero-section { 
+    padding: 3rem 0 2rem; 
+    color:#fff; 
+}
+
+.store-title-display { 
+    font-size:2.4rem; 
+    font-weight:700; 
+    margin-bottom:1rem;
+    word-break: break-word;
+}
+
+.hero-text { 
+    max-width:32rem; 
+    word-break: break-word;
+}
+
+.hero-image-placeholder {
+    border-radius: 24px;
+    overflow: hidden;
+    box-shadow: var(--hero-shadow);
+    background: radial-gradient(
+        circle at top left,
+        #FFB400 0,
+        rgba(255,180,0,0.2) 30%,
+        transparent 60%
+    ),
+    radial-gradient(
+        circle at bottom right,
+        #1A2A4A 0,
+        rgba(26,42,74,0.2) 35%,
+        transparent 70%
+    );
+}
+
+.hero-image-placeholder img {
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+
+/* ================= FORMS ================= */
+input.form-control,
+select.form-select {
+    border-radius: 12px;
+    border: 1px solid var(--soft-border);
+}
+
+button.btn-primary {
+    border-radius: 12px;
+}
+
+/* ================= STORE CARD ================= */
+.store-card {
+    border-radius: 16px;
+    padding: 1.1rem 1rem 1.3rem;
+}
+
+.store-logo-circle {
+    width:60px;
+    height:60px;
+    border-radius:50%;
+    font-weight:700;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    margin:0 auto 0.7rem;
+}
+
+.product-image-link {
+    display: block;
+    color: inherit;
+    text-decoration: none;
+}
+
+.product-name {
+    font-weight: 700;
+    margin-top: 0.2rem;
+    /* Prevent long unbroken names (e.g. "AAAAAA...") from overflowing the card */
+    overflow-wrap: anywhere;
+    word-break: break-word;
+}
+
+.product-price {
+    font-weight: 700;
+    color: var(--primary-color);
+    margin-bottom: 0.6rem;
+}
+
+.qty-control {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+}
+
+.qty-input {
+    width: 52px;
+    text-align: center;
+    border-radius: 10px;
+    border: 1px solid var(--soft-border);
+    padding: 0.2rem 0.4rem;
+}
+
+.qty-btn {
+    width: 32px;
+    height: 32px;
+    border-radius: 10px;
+    border: 1px solid var(--soft-border);
+    background: #fff;
+    font-weight: 700;
+    line-height: 1;
+}
+
+.qty-btn:active {
+    transform: translateY(1px);
+}
+
+.cart-btn {
+    position: relative;
+}
+
+.cart-badge {
+    position: absolute;
+    top: -6px;
+    inset-inline-start: -6px;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 4px;
+    border-radius: 999px;
+    background: var(--primary-color);
+    color: #fff;
+    font-size: 0.7rem;
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.cart-badge.is-hidden {
+    display: none;
+}
+
+/* ================= OTHER ================= */
+.notice-box {
+    border-radius:12px;
+    padding:1rem;
+}
+
+.main-footer {
+    padding: 1.5rem 0;
+    margin-top: 2rem;
+}
+
+.product-image-square{
+    width: min(200px, 100%);
+    aspect-ratio: 1 / 1;
+    height: auto;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    margin: 0 auto 0.7rem;
+    border-radius:14px;
+    background: transparent;
+    overflow: hidden;
+}
+
+.product-image-square img{
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    object-position: center;
+    display:block;
+}
+
+.main-header {
+    z-index: 2000;
+}
+
+.dropdown-menu {
+    z-index: 3000;
+}
+
+.install-app-btn {
+    border-radius: 12px;
+    font-weight: 700;
+}
+
+.install-help {
+    font-size: 0.85rem;
+    opacity: 0.9;
+}
+
+.brand-trigger {
+    cursor: pointer;
+    display: inline-block;
+    text-decoration: none;
+}
+</style>
+</head>
+
+<body>
+{% if messages %}
+<div class="container mt-3">
+    {% for message in messages %}
+        <div class="alert alert-{{ message.tags }} mb-2">{{ message }}</div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<header class="main-header">
+    <div class="container py-2 d-flex justify-content-between align-items-center">
+        <div>
+            <a href="{% url 'core:index' %}" class="brand-title-en" style="text-decoration:none;">
+                Amazon Syria
+            </a><br>
+            <span class="brand-title-ar">أمازون سوريا</span><br>
+            <span class="brand-subtitle">منصة التجارة الإلكترونية</span>
+        </div>
+
+
+        <div class="d-flex align-items-center gap-3">
+            <a href="{% url 'stores:store_contact_links' store.slug %}" class="btn btn-outline-primary d-none d-md-inline">&#1578;&#1608;&#1575;&#1589;&#1604; &#1605;&#1593;&#1606;&#1575;
+            </a>
+
+            <a href="{% url 'cart:cart_detail' store.slug %}" class="btn btn-outline-primary cart-btn">
+                &#128722;
+                <span id="cart-count" class="cart-badge{% if not cart_count %} is-hidden{% endif %}">
+                    {{ cart_count|default:0 }}
+                </span>
+            </a>
+
+            <a href="{% url 'accounts:customer_points' store.slug %}" class="btn btn-outline-primary">
+                &#128176;
+            </a>
+
+            {% if customer %}
+                <a href="{% url 'orders:customer_orders' store.slug %}" class="btn btn-outline-primary d-none d-md-inline">
+                   &#128230; 
+                </a>
+            {% endif %}
+
+            <div class="dropdown d-md-none">
+                <button class="btn btn-outline-primary dropdown-toggle" 
+                        type="button" 
+                        id="mobileMenuBtn" 
+                        data-bs-toggle="dropdown" 
+                        aria-expanded="false">
+                    &#9776;
+                </button>
+                
+                <ul class="dropdown-menu dropdown-menu-end text-end">
+                    <li>
+                        <a class="dropdown-item" href="{% url 'stores:store_contact_links' store.slug %}">&#1578;&#1608;&#1575;&#1589;&#1604; &#1605;&#1593;&#1606;&#1575;
+                        </a>
+                    </li>
+                    <li><hr class="dropdown-divider"></li>
+                    {% if customer %}
+                    <li>
+                        <a class="dropdown-item" href="{% url 'orders:customer_orders' store.slug %}">
+                            &#128230; طلباتي
+                        </a>
+                    </li>
+                    {% endif %}
+
+                    {% if can_access_dashboard %}
+                    <li>
+                        <a class="dropdown-item" href="/dashboard/{{ store.slug }}/">
+                            &#9881; لوحة التحكم
+                        </a>
+                    </li>
+                    <li>
+                        <span class="dropdown-item-text">
+                            &#128666; طلبات للترحيل ({{ unexported_orders_count }})
+                        </span>
+                    </li>
+                    {% endif %}
+
+                    {% if customer %}
+                    <li><hr class="dropdown-divider"></li>
+                    <li>
+                        <a class="dropdown-item text-danger"
+                           href="{% url 'accounts:customer_logout' %}?next={{ request.path }}">
+                            &#128682; تسجيل الخروج
+                        </a>
+                    </li>
+                    {% endif %}
+                </ul>
+            </div>
+
+            {% if customer %}
+                <a href="{% url 'accounts:customer_logout' %}?next={{ request.path }}"
+                   class="btn btn-outline-danger d-none d-md-inline">
+                    &#128682; تسجيل الخروج
+                </a>
+            {% endif %}
+            
+            {% if can_access_dashboard %}
+                <a href="/dashboard/{{ store.slug }}/" class="btn btn-outline-danger d-none d-md-inline">
+                    &#9881; لوحة التحكم
+                </a>
+                
+                {% if unexported_orders_count > 0 %}
+                    <span class="badge bg-danger fs-6 d-none d-md-inline">
+                        &#128666; طلبات للترحيل ({{ unexported_orders_count }})
+                    </span>
+                {% else %}
+                    <span class="badge bg-secondary fs-6 d-none d-md-inline">
+                        &#128666; طلبات للترحيل (0)
+                    </span>
+                {% endif %}
+            {% endif %}
+        </div>
+    </div>
+</header>
+
+<section class="hero-section">
+    <div class="container">
+        <div class="row align-items-center">
+
+            <div class="col-md-6 mb-4">
+                {% if request.user.is_authenticated %}
+                <div class="dropdown d-inline-block">
+                    <div class="store-title-display brand-trigger"
+                         data-bs-toggle="dropdown"
+                         aria-expanded="false"
+                         role="button"
+                         tabindex="0">{{ store.slug }}</div>
+                    <ul class="dropdown-menu text-end">
+                        {% if can_access_dashboard %}
+                        <li>
+                            <a class="dropdown-item" href="/dashboard/{{ store.slug }}/">&#9881; لوحة التحكم</a>
+                        </li>
+                        <li><hr class="dropdown-divider"></li>
+                        {% endif %}
+                        <li>
+                            <form method="post" action="{% url 'accounts:logout' %}" class="px-3 py-1">
+                                {% csrf_token %}
+                                <input type="hidden" name="next" value="{{ request.path }}">
+                                <button type="submit" class="btn btn-outline-danger btn-sm w-100">&#128682; تسجيل خروج التاجر</button>
+                            </form>
+                        </li>
+                    </ul>
+                </div>
+                {% else %}
+                <div class="store-title-display brand-trigger"
+                     data-bs-toggle="modal"
+                     data-bs-target="#merchantLoginModal"
+                     role="button"
+                     tabindex="0">{{ store.slug }}</div>
+                {% endif %}
+                <h1 class="hero-title">{{ store.description }}</h1>
+                <p class="hero-text">{{ store.description2 }}</p>
+
+                <div class="mt-3 mb-2">
+                    <button id="install-app-btn" type="button" class="btn btn-warning install-app-btn d-none">
+                        تثبيت المتجر على الشاشة الرئيسية
+                    </button>
+                    <div id="install-help" class="install-help text-light mt-2 d-none"></div>
+                </div>
+
+                <form method="get" class="mt-3">
+                    <input type="text" name="q" value="{{ q }}" class="form-control mb-2"
+                           placeholder="ابحث عن منتج...">
+
+                    <div class="row g-2">
+                        <div class="col-6">
+                            <select name="category" class="form-select">
+                                <option value="">— الفئة الرئيسية —</option>
+                                {% for c in categories %}
+                                    <option value="{{ c.id }}"
+                                        {% if c.id|stringformat:"s" == current_category %}selected{% endif %}>
+                                        {{ c.name }}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div class="col-6">
+                            <select name="category2" class="form-select">
+                                <option value="">— الفئة الفرعية —</option>
+                                {% for c in categories %}
+                                    <option value="{{ c.id }}"
+                                        {% if c.id|stringformat:"s" == current_category2 %}selected{% endif %}>
+                                        {{ c.name }}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+
+                    <button class="btn btn-primary mt-3">بحث</button>
+                </form>
+            </div>
+
+            <div class="col-md-6">
+                <div class="hero-image-placeholder"
+                     style="height: {{ store.hero_height }}px;">
+                    {% if store.logo %}
+                        <img src="{{ store.logo.url }}"
+                             style="object-fit: {{ store.hero_fit }};">
+                    {% else %}
+                        <img src="https://via.placeholder.com/600x350">
+                    {% endif %}
+                </div>
+            </div>
+
+        </div>
+    </div>
+</section>
+
+<section class="stores-section">
+    <div class="container text-center">
+        <h2 class="section-title">{{ store.description3 }}</h2>
+        <p class="section-subtitle">{{ store.description4 }}</p>
+
+        <div class="row g-3 mt-3">
+            {% for p in products %}
+            <div class="col-6 col-md-3">
+                <div class="store-card">
+                    <a href="{% url 'stores:product_public' store.slug p.id %}" class="product-image-link" aria-label="{{ p.name }}">
+                        {% if p.main_image %}
+                            <div class="product-image-square">
+                                <img src="{{ p.main_image.url }}" alt="{{ p.name }}">
+                            </div>
+                        {% else %}
+                            <div class="store-logo-circle">
+                                {{ p.name|slice:":2" }}
+                            </div>
+                        {% endif %}
+                    </a>
+
+                    <div class="product-name">{{ p.name }}</div>
+                    {% if p.show_price %}
+                      {% if store.pricing_currency == "USD" %}
+                          <div class="product-price">{{ p.price|floatformat:2 }} $</div>
+                          <div class="product-price text-muted" style="font-size:0.85rem;">
+                              {{ p.price_syp|floatformat:0 }} ل.س
+                          </div>
+                      {% else %}
+                          <div class="product-price">{{ p.price_syp|floatformat:0 }} ل.س</div>
+                      {% endif %}
+                    {% endif %}
+
+                    <form method="POST" action="{% url 'cart:add_to_cart' store.slug p.id %}" class="add-to-cart-form">
+                        {% csrf_token %}
+                        <div class="qty-control" data-qty>
+                            <button type="button" class="qty-btn" data-qty-dec aria-label="نقص الكمية">-</button>
+                            <input type="number" name="quantity" value="1" min="1" class="qty-input" inputmode="numeric">
+                            <button type="button" class="qty-btn" data-qty-inc aria-label="زيادة الكمية">+</button>
+                        </div>
+                        <button type="submit" class="btn btn-primary w-100 mt-2">أضف إلى السلة</button>
+                    </form>
+                </div>
+            </div>
+            {% empty %}
+                <p class="text-muted mt-3">لا توجد منتجات متاحة.</p>
+            {% endfor %}
+        </div>
+
+        <div class="notice-box mt-4">
+            {{ store.description5 }}
+        </div>
+    </div>
+</section>
+
+<footer class="main-footer">
+    <div class="container text-center">
+        © <span id="year"></span> Amazon Syria - جميع الحقوق محفوظة.
+    </div>
+</footer>
+
+
+{% if not request.user.is_authenticated %}
+<div class="modal fade" id="merchantLoginModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">تسجيل دخول التاجر</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form method="post" action="{% url 'accounts:store_login' store.slug %}">
+                <div class="modal-body">
+                    {% csrf_token %}
+                    <input type="hidden" name="next" value="{% url 'dashboard:home' store.slug %}">
+                    <div class="mb-3">
+                        <label class="form-label">اسم المستخدم</label>
+                        <input type="text" name="username" class="form-control" required>
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label">كلمة المرور</label>
+                        <input type="password" name="password" class="form-control" required>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إغلاق</button>
+                    <button type="submit" class="btn btn-primary">دخول</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endif %}
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+    document.getElementById("year").textContent = new Date().getFullYear();
+    var deferredInstallPrompt = null;
+    var installBtn = document.getElementById("install-app-btn");
+    var installHelp = document.getElementById("install-help");
+
+    function isIosSafari() {
+        var ua = window.navigator.userAgent;
+        var isIOS = /iPad|iPhone|iPod/.test(ua);
+        var isSafari = /Safari/.test(ua) && !/CriOS|FxiOS|EdgiOS/.test(ua);
+        return isIOS && isSafari;
+    }
+
+    function isStandalone() {
+        return window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true;
+    }
+
+    function showInstallHelp(message) {
+        if (!installHelp) return;
+        installHelp.textContent = message;
+        installHelp.classList.remove("d-none");
+    }
+
+    if (installBtn && !isStandalone()) {
+        if (isIosSafari()) {
+            installBtn.classList.remove("d-none");
+            installBtn.addEventListener("click", function () {
+                showInstallHelp("على iPhone: اضغط زر المشاركة ثم اختر \"Add to Home Screen\".");
+            });
+        }
+    }
+
+    window.addEventListener("beforeinstallprompt", function (e) {
+        e.preventDefault();
+        deferredInstallPrompt = e;
+        if (installBtn && !isStandalone()) {
+            installBtn.classList.remove("d-none");
+        }
+    });
+
+    if (installBtn) {
+        installBtn.addEventListener("click", async function () {
+            if (!deferredInstallPrompt) return;
+            deferredInstallPrompt.prompt();
+            try {
+                await deferredInstallPrompt.userChoice;
+            } catch (err) {
+                // Ignore user dismissal.
+            }
+            deferredInstallPrompt = null;
+        });
+    }
+
+    window.addEventListener("appinstalled", function () {
+        if (installBtn) {
+            installBtn.classList.add("d-none");
+        }
+        showInstallHelp("تم تثبيت المتجر على الشاشة الرئيسية.");
+    });
+
+    document.querySelectorAll("[data-qty]").forEach(function (wrapper) {
+        var input = wrapper.querySelector("input[type='number']");
+        var dec = wrapper.querySelector("[data-qty-dec]");
+        var inc = wrapper.querySelector("[data-qty-inc]");
+        var min = parseInt(input.min || "1", 10);
+
+        dec.addEventListener("click", function () {
+            var value = parseInt(input.value, 10);
+            if (isNaN(value)) value = min;
+            input.value = Math.max(min, value - 1);
+        });
+
+        inc.addEventListener("click", function () {
+            var value = parseInt(input.value, 10);
+            if (isNaN(value)) value = min;
+            input.value = value + 1;
+        });
+    });
+
+    function updateCartBadge(count) {
+        var badge = document.getElementById("cart-count");
+        if (!badge) return;
+        var value = parseInt(count, 10) || 0;
+        badge.textContent = value;
+        if (value > 0) {
+            badge.classList.remove("is-hidden");
+        } else {
+            badge.classList.add("is-hidden");
+        }
+    }
+
+    document.querySelectorAll(".add-to-cart-form").forEach(function (form) {
+        form.addEventListener("submit", function (e) {
+            e.preventDefault();
+
+            var submitBtn = form.querySelector("button[type='submit']");
+            if (submitBtn) submitBtn.disabled = true;
+
+            var csrfInput = form.querySelector("input[name='csrfmiddlewaretoken']");
+            var headers = { "X-Requested-With": "XMLHttpRequest" };
+            if (csrfInput) headers["X-CSRFToken"] = csrfInput.value;
+
+            fetch(form.action, {
+                method: "POST",
+                headers: headers,
+                credentials: "same-origin",
+                body: new FormData(form)
+            })
+            .then(function (res) {
+                return res.json()
+                    .catch(function () { return {}; })
+                    .then(function (data) {
+                        if (!res.ok) {
+                            var err = new Error(data.error || "");
+                            err.hasMessage = !!data.error;
+                            throw err;
+                        }
+                        return data;
+                    });
+            })
+            .then(function (data) {
+                updateCartBadge(data.cart_count);
+            })
+            .catch(function (err) {
+                if (err && err.hasMessage) {
+                    alert(err.message);
+                    return;
+                }
+                form.submit();
+            })
+            .finally(function () {
+                if (submitBtn) submitBtn.disabled = false;
+            });
+        });
+    });
+</script>
+
+</body>
+</html>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -1,0 +1,175 @@
+﻿{% load static %}
+
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <title>المستودعات – {{ current_store.name }}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+
+    <style>
+        body{
+            background:#f7f9fc;
+            font-family:"Cairo",sans-serif;
+            overflow-x:hidden;
+        }
+        /* ===== SIDEBAR ===== */
+        .sidebar{
+            width:230px;
+            background:#fff;
+            height:100vh;
+            position:fixed;
+            top:0;
+            right:0;
+            padding:20px 15px;
+            border-left:1px solid #e0e0e0;
+            transition:.3s;
+            z-index:1000;
+        }
+
+        .sidebar a{
+            display:block;
+            padding:10px 12px;
+            margin-bottom:8px;
+            color:#333;
+            border-radius:8px;
+            text-decoration:none;
+        }
+
+        .sidebar a:hover{
+            background:#e9f2ff;
+            color:#0d6efd;
+        }
+        .content{
+            margin-right:240px;
+            padding:25px;
+        }
+        /* ===== ARROW ===== */
+        #sidebarArrow{
+            display:none;
+        }
+
+        /* ===== MOBILE ===== */
+        @media (max-width:768px){
+            .sidebar{ right:-260px; }
+            .sidebar.active{ right:0; }
+            .content{ margin-right:0; }
+
+            #sidebarArrow{
+                display:flex;
+                position:fixed;
+                top:50%;
+                right:0;
+                transform:translateY(-50%);
+                width:26px;
+                height:48px;
+                background:#1A2A4A;
+                color:#fff;
+                border-radius:10px 0 0 10px;
+                align-items:center;
+                justify-content:center;
+                font-size:18px;
+                cursor:pointer;
+                z-index:1001;
+                box-shadow:-3px 0 10px rgba(0,0,0,.15);
+                user-select:none;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+<div id="sidebarArrow">❯</div>
+{% include "dashboard/sidebar.html" %}
+
+<div class="content">
+    <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+        <h3 class="mb-0">🏬 المستودعات</h3>
+        <a class="btn btn-primary" href="{% url 'dashboard:warehouse_create' store.slug %}">+ إضافة مستودع</a>
+    </div>
+
+    {% if messages %}
+        <div class="mb-3">
+            {% for message in messages %}
+                <div class="alert alert-{{ message.tags }} mb-2">{{ message }}</div>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    <div class="card shadow-sm">
+        <div class="table-responsive">
+            <table class="table table-striped mb-0 align-middle">
+                <thead>
+                    <tr>
+                        <th>الاسم</th>
+                        <th>المعرف</th>
+                        <th>الهاتف</th>
+                        <th>النسبة</th>
+                        <th>الحالة</th>
+                        <th class="text-end">إجراءات</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for w in warehouses %}
+                    <tr>
+                        <td>
+                            {{ w.name }}
+                            {% if w.is_main %}
+                                <span class="badge bg-success ms-2">رئيسي</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ w.identifier }}</td>
+                        <td>{{ w.phone|default:"-" }}</td>
+                        <td>{{ w.percentage }}</td>
+                        <td>
+                            {% if w.is_active %}
+                                <span class="badge bg-primary">فعال</span>
+                            {% else %}
+                                <span class="badge bg-secondary">غير فعال</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-end">
+                            <a class="btn btn-sm btn-outline-secondary"
+                               href="{% url 'dashboard:warehouse_update' store.slug w.id %}">تعديل</a>
+
+                            {% if not w.is_main %}
+                                <form method="post"
+                                      action="{% url 'dashboard:warehouse_delete' store.slug w.id %}"
+                                      class="d-inline">
+                                    {% csrf_token %}
+                                    <button class="btn btn-sm btn-outline-danger"
+                                            onclick="return confirm('حذف المستودع؟');"
+                                            type="submit">حذف</button>
+                                </form>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="6" class="text-center text-muted py-4">لا يوجد مستودعات.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+    const sidebar = document.getElementById("sidebar");
+    const arrow = document.getElementById("sidebarArrow");
+    if (arrow && sidebar) {
+        arrow.onclick = () => {
+            sidebar.classList.toggle("active");
+            arrow.textContent = sidebar.classList.contains("active") ? "❮" : "❯";
+        };
+    }
+</script>
+
+</body>
+</html>
+
+

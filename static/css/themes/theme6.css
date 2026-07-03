@@ -1,0 +1,108 @@
+/* ===========================
+   🦅 Eagle Blnack Gold – Theme 6
+   =========================== */
+
+:root {
+    --primary-color: #000000;          /* black */
+    --accent-color: #FFD700;           /* gold */
+    --soft-bg: #0a0a0a;                /* dark background */
+    --text-dark: #f1f1f1;
+    --text-light: #cfcfcf;
+
+    --gradient-start: #000000;
+    --gradient-end: #1a1a1a;
+
+    --soft-border: #2a2a2a;
+
+    --card-border: #3a3a3a;
+    --card-shadow: 0 8px 18px rgba(255, 215, 0, 0.08);
+    --card-shadow-hover: 0 12px 26px rgba(255, 215, 0, 0.20);
+
+    --notice-bg: #111;
+    --notice-border: #FFD700;
+
+    --hero-shadow: 0 10px 26px rgba(255, 215, 0, 0.15);
+}
+
+/* ===== HEADER ===== */
+.main-header {
+    background: #000;
+    border-bottom: 1px solid #444;
+}
+
+.brand-title-en,
+.brand-title-ar,
+.brand-subtitle {
+    color: #FFD700 !important;
+}
+
+/* ===== HERO SECTION ===== */
+.hero-section {
+    background: linear-gradient(135deg, #000000, #1a1a1a);
+    color: #FFD700;
+}
+
+.hero-title,
+.store-title-display {
+    color: #FFD700 !important;
+}
+
+/* ===== PRODUCT CARDS ===== */
+.store-card {
+    background: #0f0f0f;
+    border: 1px solid #2a2a2a;
+    box-shadow: var(--card-shadow);
+}
+
+.store-card:hover {
+    transform: translateY(-4px);
+    border-color: #FFD700;
+    box-shadow: var(--card-shadow-hover);
+}
+
+.store-logo-circle {
+    background: linear-gradient(135deg, #000, #2a2a2a);
+    color: #FFD700;
+    border: 2px solid #FFD700;
+}
+
+/* ===== TEXT COLORS ===== */
+.store-name {
+    color: #FFD700;
+}
+
+.store-category {
+    color: #cfcfcf;
+}
+
+/* ===== BUTTONS ===== */
+.btn-outline-primary {
+    border-color: #FFD700;
+    color: #FFD700;
+}
+
+.btn-outline-primary:hover {
+    background: #FFD700;
+    color: #000;
+}
+
+.btn-primary {
+    background: #FFD700 !important;
+    color: #000 !important;
+}
+.btn-primary:hover {
+    background: #d4b100 !important;
+}
+
+/* ===== FOOTER ===== */
+.main-footer {
+    background: #000;
+    color: #FFD700;
+}
+
+/* ===== NOTICE BOX ===== */
+.notice-box {
+    background: #0f0f0f;
+    border-color: #FFD700;
+    color: #FFD700;
+}

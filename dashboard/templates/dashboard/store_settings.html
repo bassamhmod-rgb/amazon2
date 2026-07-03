@@ -1,0 +1,370 @@
+﻿{% load static %}
+
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>إعدادات المتجر – {{ store.slug }}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+    <style>
+        body {
+            background: #f7f9fc;
+            font-family: "Cairo", sans-serif;
+            overflow-x: hidden;
+        }
+        .settings-card {
+            background: #fff;
+            border-radius: 14px;
+            padding: 22px;
+            box-shadow: 0 4px 14px rgba(0,0,0,0.08);
+            margin-bottom: 20px;
+        }
+        .nav-tabs .nav-link.active {
+            background-color: #0d6efd;
+            color: #fff !important;
+            border-radius: 8px 8px 0 0;
+        }
+        .nav-tabs .nav-link {
+            color: #333;
+            font-weight: 600;
+        }
+        .form-label {
+            font-weight: 600;
+        }
+        .theme-preview {
+            width: 55px;
+            height: 35px;
+            border-radius: 6px;
+            display: inline-block;
+            border: 2px solid #ccc;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+        .theme-selected {
+            border: 3px solid #0d6efd !important;
+        }
+        @media (max-width: 768px) {
+            .container {
+                max-width: 100%;
+                padding-left: 12px;
+                padding-right: 12px;
+            }
+            h2 {
+                font-size: 1.2rem;
+                text-align: center;
+            }
+            a.btn.btn-secondary {
+                display: block;
+                width: 100%;
+                margin-bottom: 8px;
+                text-align: center;
+            }
+            .nav-tabs {
+                flex-wrap: wrap;
+            }
+            .nav-tabs .nav-item {
+                width: 33.333%;
+                text-align: center;
+            }
+            .nav-tabs .nav-link {
+                font-size: 0.85rem;
+                padding: 8px 4px;
+            }
+            .settings-card {
+                padding: 16px;
+            }
+            .form-control,
+            .form-select {
+                font-size: 0.9rem;
+            }
+            textarea.form-control {
+                min-height: 80px;
+            }
+            .theme-preview {
+                width: 44px;
+                height: 30px;
+            }
+            button.btn-primary {
+                width: 100%;
+                padding: 12px;
+                font-size: 1rem;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="container mt-4">
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags }} mb-3">{{ message }}</div>
+        {% endfor %}
+    {% endif %}
+
+    <h2 class="mb-2">⚙️ إعدادات المتجر – <span class="text-primary">{{ store.slug }}</span></h2>
+
+    <a href="/store/{{ store.slug }}/" class="btn btn-secondary mb-3">
+        ← الرجوع إلى صفحة المتجر
+    </a>
+    <a href="/dashboard/{{ store.slug }}/" class="btn btn-secondary mb-3">
+        ← الرجوع إلى لوحة التحكم
+    </a>
+
+    <ul class="nav nav-tabs mb-3" id="settingsTabs">
+        <li class="nav-item">
+            <a class="nav-link active" data-bs-toggle="tab" href="#gen">الإعدادات العامة</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" data-bs-toggle="tab" href="#theme">الستايل والثيم</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" data-bs-toggle="tab" href="#security">الأمان</a>
+        </li>
+    </ul>
+
+    <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+
+        <div class="tab-content">
+            <div class="tab-pane fade show active" id="gen">
+                <div class="settings-card">
+                    <h4 class="mb-3">🧾 الإعدادات العامة</h4>
+
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">اسم النظام (غير قابل للتعديل)</label>
+                            <input type="text" class="form-control" value="{{ store.name }}" disabled>
+                            <p class="text-danger mt-1" style="font-size:13px;">⚠️ تعديل الاسم يتم حصريًا عبر التواصل مع إدارة المنصة.</p>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label">العلامة التجارية (Slug) – غير قابل للتعديل</label>
+                            <input type="text" class="form-control" value="{{ store.slug }}" disabled>
+                            <p class="text-danger mt-1" style="font-size:13px;">⚠️ تعديل العلامة التجارية يتم حصريًا عبر التواصل مع إدارة المنصة.</p>
+                            <input type="hidden" name="slug" value="{{ store.slug }}">
+                        </div>
+
+                        <div class="col-md-6">
+                            <input type="text" class="form-control" value="{{ store.mobile }}" disabled>
+                            <p class="text-danger mt-1" style="font-size:13px;">⚠️ تعديل رقم الهاتف يتم حصريًا عبر التواصل مع إدارة المنصة.</p>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label">رابط فيسبوك</label>
+                            <input type="url" class="form-control" name="facebook_url" value="{{ store.facebook_url }}" placeholder="https://facebook.com/...">
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label">رابط انستغرام</label>
+                            <input type="url" class="form-control" name="instagram_url" value="{{ store.instagram_url }}" placeholder="https://instagram.com/...">
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label">رابط تلغرام</label>
+                            <input type="url" class="form-control" name="telegram_url" value="{{ store.telegram_url }}" placeholder="https://t.me/...">
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label">رابط واتساب</label>
+                            <input type="url" class="form-control" name="whatsapp_url" value="{{ store.whatsapp_url }}" placeholder="https://wa.me/...">
+                        </div>
+
+                        <div class="mb-3">
+                          <label class="form-label">النسبة المطلوبة للدفع المسبق (%)</label>
+                          <input type="number" name="payment_required_percentage" value="{{ store.payment_required_percentage }}" min="0" max="100" class="form-control">
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">طرق الدفع المسموحة</label>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="allow_full_payment" {% if store.allow_full_payment %}checked{% endif %}>
+                                <label class="form-check-label">تحويل كامل المبلغ</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="allow_partial_payment" {% if store.allow_partial_payment %}checked{% endif %}>
+                                <label class="form-check-label">دفع جزء من المبلغ + باقي عند التسليم</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="allow_cash_on_delivery" {% if store.allow_cash_on_delivery %}checked{% endif %}>
+                                <label class="form-check-label">الدفع عند الاستلام</label>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">حالة البيع</label>
+                            <div class="form-check mb-2">
+                                <input class="form-check-input" type="checkbox" name="sales_paused" id="sales_paused" {% if store.sales_paused %}checked{% endif %}>
+                                <label class="form-check-label" for="sales_paused">إيقاف البيع مؤقتًا</label>
+                            </div>
+                            <label class="form-label">رسالة إيقاف البيع (تظهر للزبون)</label>
+                            <textarea class="form-control" name="sales_pause_message" rows="2" placeholder="مثال: البيع متوقف مؤقتًا بسبب جرد المستودع.">{{ store.sales_pause_message }}</textarea>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">نسبة الكاش باك من ربح الطلب (%)</label>
+                            <input type="number" name="cashback_percentage" value="{{ store.cashback_percentage }}" min="0" max="100" step="0.01" class="form-control">
+                            <div class="text-muted mt-1" style="font-size:13px;">
+                                مثال: 2.5 = 2.5% من ربح الطلب يتم إرجاعها كاش باك.
+                            </div>
+                        </div>
+
+                        <!-- طريقة التسعير + سعر الصرف -->
+                        <div class="mb-3">
+                            <label class="form-label">عملة التسعير</label>
+                            <select class="form-select" name="pricing_currency">
+                                <option value="SYP" {% if store.pricing_currency == "SYP" %}selected{% endif %}>ليرة سورية</option>
+                                <option value="USD" {% if store.pricing_currency == "USD" %}selected{% endif %}>دولار</option>
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">سعر الصرف (1 دولار = ؟ ل.س)</label>
+                            <input type="number" name="exchange_rate" value="{{ store.exchange_rate }}" min="0" step="0.01" class="form-control">
+                            <div class="text-muted mt-1" style="font-size:13px;">
+                                عند اختيار الدولار سيتم عرض السعر بالدولار وبالليرة السورية حسب هذا السعر.
+                            </div>
+                        </div>
+
+                        {% if store.accounting_clients.exists %}
+                            <div class="alert alert-warning py-2" style="font-size:13px;">
+                                ملاحظة: المتجر مرتبط ببرنامج الأمان للمحاسبة، وطريقة التسعير تُحدد من البرنامج.
+                                هذا الإعداد للعرض فقط.
+                            </div>
+                        {% endif %}
+
+                        <div class="col-md-12">
+                            <label class="form-label">وصف 1</label>
+                            <textarea class="form-control" name="description" rows="2">{{ store.description }}</textarea>
+                        </div>
+                        <div class="col-md-12">
+                            <label class="form-label">وصف 2</label>
+                            <textarea class="form-control" name="description2" rows="2">{{ store.description2 }}</textarea>
+                        </div>
+                        <div class="col-md-12">
+                            <label class="form-label">وصف 3</label>
+                            <textarea class="form-control" name="description3" rows="2">{{ store.description3 }}</textarea>
+                        </div>
+                        <div class="col-md-12">
+                            <label class="form-label">وصف 4</label>
+                            <textarea class="form-control" name="description4" rows="2">{{ store.description4 }}</textarea>
+                        </div>
+                        <div class="col-md-12">
+                            <label class="form-label">وصف 5</label>
+                            <textarea class="form-control" name="description5" rows="2">{{ store.description5 }}</textarea>
+                        </div>
+
+                        <div class="col-md-12">
+                            <label class="form-label">الشعار (Logo)</label>
+                            <input type="file" class="form-control" name="logo">
+                            {% if store.logo %}
+                                <img src="{{ store.logo.url }}" width="120" class="mt-2 rounded shadow-sm">
+                            {% endif %}
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label">ارتفاع مساحة صورة الهيرو (px)</label>
+                            <input type="number" class="form-control" name="hero_height" value="{{ store.hero_height }}" min="180" max="700" step="10">
+                            <div class="text-muted mt-1" style="font-size:13px;">
+                                مثال: 280 / 350 / 420 — كل ما زاد الرقم بتكبر مساحة البانر.
+                            </div>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label">طريقة عرض صورة الهيرو</label>
+                            <select class="form-select" name="hero_fit">
+                                <option value="cover" {% if store.hero_fit == "cover" %}selected{% endif %}>ملء (مع قص)</option>
+                                <option value="contain" {% if store.hero_fit == "contain" %}selected{% endif %}>احتواء (بدون قص)</option>
+                            </select>
+                            <div class="text-muted mt-1" style="font-size:13px;">
+                                احتواء = يحافظ على الصورة كاملة. ملء = يملأ الإطار لكنه قد يقص الأطراف.
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mt-4 p-3" style="background:#fdfdfd; border:1px solid #e5e7eb; border-radius:12px;">
+                        <h5 class="mb-2">💳 وسائل الدفع الخاصة بالمتجر</h5>
+                        <p class="text-muted mb-3">قم بإدارة وسائل الدفع التي يستطيع الزبائن استخدامها عند الشراء.</p>
+                        <a href="{% url 'stores:payment_methods' store.slug %}" class="btn btn-outline-primary">إدارة وسائل الدفع</a>
+                    </div>
+                </div>
+            </div>
+
+            <div class="tab-pane fade" id="theme">
+                <div class="settings-card">
+                    <h4 class="mb-3">🎨 الستايل والثيم</h4>
+                    <p class="text-muted">اختر الثيم الخاص بمتجرك:</p>
+                    <div class="d-flex gap-3 flex-wrap">
+                        <label>
+                            <input type="radio" name="theme" value="1" {% if store.theme == 1 %}checked{% endif %} hidden>
+                            <span class="theme-preview {% if store.theme == 1 %}theme-selected{% endif %}" style="background:#5B21B6;"></span>
+                        </label>
+                        <label>
+                            <input type="radio" name="theme" value="2" {% if store.theme == 2 %}checked{% endif %} hidden>
+                            <span class="theme-preview {% if store.theme == 2 %}theme-selected{% endif %}" style="background:#0A3D62;"></span>
+                        </label>
+                        <label>
+                            <input type="radio" name="theme" value="3" {% if store.theme == 3 %}checked{% endif %} hidden>
+                            <span class="theme-preview {% if store.theme == 3 %}theme-selected{% endif %}" style="background:#065F46;"></span>
+                        </label>
+                        <label>
+                            <input type="radio" name="theme" value="4" {% if store.theme == 4 %}checked{% endif %} hidden>
+                            <span class="theme-preview {% if store.theme == 4 %}theme-selected{% endif %}" style="background:#D9480F;"></span>
+                        </label>
+                        <label>
+                            <input type="radio" name="theme" value="5" {% if store.theme == 5 %}checked{% endif %} hidden>
+                            <span class="theme-preview {% if store.theme == 5 %}theme-selected{% endif %}" style="background:#000;"></span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <div class="tab-pane fade" id="security">
+                <div class="settings-card">
+                    <h4 class="mb-3">🔒 الإعدادات الأمنية</h4>
+                    <label class="form-label">كلمة مرور جديدة (اختياري)</label>
+                    <input type="password" class="form-control" name="new_password">
+                </div>
+
+                <div class="settings-card border border-danger">
+                    <h4 class="mb-3 text-danger">تفريغ بيانات المتجر</h4>
+                    <p class="text-muted mb-2">
+                        هذا الإجراء يحذف كل بيانات المتجر الحالية (المنتجات، الطلبات، الزبائن، الموردين،
+                        الصرفيات، وسائل الدفع، الكاش باك، السلات...) مع الاحتفاظ ببيانات المتجر نفسه.
+                    </p>
+                    <div class="mb-2">
+                        <label class="form-label">تأكيد كلمة المرور</label>
+                        <input type="password" class="form-control" name="reset_password" form="reset-form" placeholder="كلمة مرور التاجر">
+                    </div>
+                    <button type="submit" class="btn btn-danger" form="reset-form">تفريغ البيانات الآن</button>
+                </div>
+            </div>
+        </div>
+
+        <button class="btn btn-primary px-4 mt-3">💾 حفظ التعديلات</button>
+    </form>
+
+    <form id="reset-form" method="post" action="{% url 'dashboard:reset_store_data' store.slug %}">
+        {% csrf_token %}
+    </form>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+    const themeLabels = document.querySelectorAll("label > input[name='theme']");
+    themeLabels.forEach(input => {
+        input.addEventListener("change", () => {
+            document.querySelectorAll(".theme-preview").forEach(span => {
+                span.classList.remove("theme-selected");
+            });
+            const preview = input.parentElement.querySelector(".theme-preview");
+            if (preview) {
+                preview.classList.add("theme-selected");
+            }
+        });
+    });
+</script>
+
+</body>
+</html>

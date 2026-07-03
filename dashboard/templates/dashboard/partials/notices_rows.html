@@ -1,0 +1,39 @@
+﻿{% for notice in notices %}
+<tr>
+    <td>{{ notice.id }}</td>
+
+    <td>
+        {% if notice.transaction_type == "sale" or notice.transaction_type == -1 or notice.transaction_type == "-1" %}
+            <span class="type-in">قبض</span>
+        {% else %}
+            <span class="type-out">صرف</span>
+        {% endif %}
+    </td>
+
+    <td>
+        {% if notice.transaction_type == "sale" or notice.transaction_type == -1 or notice.transaction_type == "-1" %}
+            {{ notice.customer }}
+        {% else %}
+            {{ notice.supplier }}
+        {% endif %}
+    </td>
+
+    <td>{{ notice.amount|floatformat:2 }} $</td>
+    <td>{{ notice.payment|floatformat:2 }} $</td>
+    <td>{{ notice.created_at|date:"Y-m-d H:i" }}</td>
+    {% if can_delete_notice %}
+        <td>
+            <form method="post" action="{% url 'dashboard:notice_delete' store.slug notice.id %}" style="display:inline;">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('هل تريد حذف الإشعار؟');">حذف</button>
+            </form>
+        </td>
+    {% endif %}
+</tr>
+{% empty %}
+<tr>
+    <td colspan="{% if can_delete_notice %}7{% else %}6{% endif %}" class="text-center text-muted">
+        لا يوجد نتائج
+    </td>
+</tr>
+{% endfor %}

@@ -1,0 +1,261 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <title>تفاصيل المنتج – {{ store.name }}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+
+    <style>
+        body{
+            background:#f7f9fc;
+            font-family:"Cairo",sans-serif;
+            overflow-x:hidden;
+        }
+
+        /* ===== SIDEBAR ===== */
+        .sidebar{
+            width:230px;
+            background:#fff;
+            height:100vh;
+            position:fixed;
+            top:0;
+            right:0;
+            padding:20px 15px;
+            border-left:1px solid #e0e0e0;
+            transition:.3s;
+            z-index:1000;
+        }
+
+        .sidebar a{
+            display:block;
+            padding:10px 12px;
+            margin-bottom:8px;
+            color:#333;
+            border-radius:8px;
+            text-decoration:none;
+        }
+
+        .sidebar a:hover{
+            background:#e9f2ff;
+            color:#0d6efd;
+        }
+
+        /* ===== CONTENT ===== */
+        .content{
+            margin-right:240px;
+            padding:20px;
+            transition:.3s;
+        }
+
+        /* ===== PRODUCT MAIN IMAGE (LOGO-LIKE SQUARE) ===== */
+        .product-main-img-wrapper{
+            width:180px;
+            height:180px;
+            border-radius:14px;
+            background:#fff;
+            margin:0 auto;
+
+            display:flex;
+            align-items:center;
+            justify-content:center;
+
+            overflow:hidden;
+        }
+
+        .product-main-img{
+            max-width:100%;
+            max-height:100%;
+            width:auto;
+            height:auto;
+            display:block;
+            object-fit:contain;
+            object-position:center;
+        }
+
+        /* ===== GALLERY IMAGE (SAME LOGIC) ===== */
+        .gallery-img-wrapper{
+            width:100%;
+            height:100px;
+            border-radius:10px;
+            background:#fff;
+
+            display:flex;
+            align-items:center;
+            justify-content:center;
+
+            overflow:hidden;
+        }
+
+        .gallery-img{
+            max-width:100%;
+            max-height:100%;
+            width:auto;
+            height:auto;
+            display:block;
+            object-fit:contain;
+            object-position:center;
+        }
+
+        /* ===== SIDEBAR ARROW ===== */
+        #sidebarArrow{
+            display:none;
+        }
+
+        /* ===== MOBILE ===== */
+        @media (max-width:768px){
+            .sidebar{ right:-260px; }
+            .sidebar.active{ right:0; }
+
+            .content{
+                margin-right:0;
+                padding:15px;
+            }
+
+            #sidebarArrow{
+                display:flex;
+                position:fixed;
+                top:50%;
+                right:0;
+                transform:translateY(-50%);
+                width:26px;
+                height:48px;
+                background:#1A2A4A;
+                color:#fff;
+                border-radius:10px 0 0 10px;
+                align-items:center;
+                justify-content:center;
+                font-size:18px;
+                cursor:pointer;
+                z-index:1001;
+                box-shadow:-3px 0 10px rgba(0,0,0,.15);
+                user-select:none;
+            }
+
+            .product-main-img-wrapper{
+                width:100%;
+                height:220px;
+            }
+
+            .gallery-grid{
+                display:grid;
+                grid-template-columns:repeat(3,1fr);
+                gap:10px;
+            }
+
+            .table-responsive{
+                overflow-x:auto;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+<div id="sidebarArrow">❯</div>
+
+{% include "dashboard/sidebar.html" %}
+
+<div class="content">
+
+    <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+        <h3 class="mb-0">تفاصيل المنتج</h3>
+        <a href="{% url 'dashboard:product_update' store.slug product.id %}"
+           class="btn btn-warning w-100 w-md-auto">
+            تعديل المنتج ✏️
+        </a>
+    </div>
+
+    <!-- معلومات أساسية -->
+    <div class="card p-4 mb-4">
+        <div class="row g-4 align-items-center">
+            <div class="col-md-4 text-center">
+                <div class="product-main-img-wrapper">
+                    {% if product.main_image %}
+                        <img src="{{ product.main_image.url }}" class="product-main-img">
+                    {% else %}
+                        <img src="https://via.placeholder.com/300x220" class="product-main-img">
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="col-md-8">
+                <h4 class="mb-3">{{ product.name }}</h4>
+
+                <p><strong>السعر:</strong> {{ product.price|floatformat:2 }} $</p>
+                <p><strong>الكمية المتوفرة:</strong> {{ product.real_stock }}</p>
+
+                <p><strong>الفئة:</strong>
+                    {% if product.category %}{{ product.category.name }}{% else %}——{% endif %}
+                </p>
+
+                <p><strong>الفئة الفرعية:</strong>
+                    {% if product.category2 %}{{ product.category2.name }}{% else %}——{% endif %}
+                </p>
+
+                <p><strong>الوصف:</strong><br>{{ product.description|linebreaks }}</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- المواصفات -->
+    <div class="card p-4 mb-4">
+        <h5 class="mb-3">مواصفات المنتج</h5>
+
+        {% if product.details.all %}
+        <div class="table-responsive">
+            <table class="table table-bordered mb-0">
+                <thead>
+                    <tr>
+                        <th>الخاصية</th>
+                        <th>القيمة</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for d in product.details.all %}
+                    <tr>
+                        <td>{{ d.title }}</td>
+                        <td>{{ d.value }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+            <p class="text-muted text-center">لا توجد مواصفات</p>
+        {% endif %}
+    </div>
+
+    <!-- معرض الصور -->
+    <div class="card p-4">
+        <h5 class="mb-3">معرض الصور</h5>
+
+        {% if product.gallery.all %}
+        <div class="gallery-grid d-md-flex flex-wrap gap-2">
+            {% for img in product.gallery.all %}
+                <div class="gallery-img-wrapper">
+                    <img src="{{ img.image.url }}" class="gallery-img">
+                </div>
+            {% endfor %}
+        </div>
+        {% else %}
+            <p class="text-muted">لا توجد صور إضافية</p>
+        {% endif %}
+    </div>
+
+</div>
+
+<script>
+    const sidebar = document.getElementById("sidebar");
+    const arrow = document.getElementById("sidebarArrow");
+
+    arrow.onclick = () => {
+        sidebar.classList.toggle("active");
+        arrow.innerHTML = sidebar.classList.contains("active") ? "❮" : "❯";
+    };
+</script>
+
+</body>
+</html>

@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <title>تأكيد إنشاء الحساب | Amazon Syria</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <!-- Google Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap" rel="stylesheet">
+
+    <!-- Bootstrap RTL -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+
+    <style>
+        :root {
+            --primary-color: #1A2A4A;
+            --accent-color: #FFB400;
+            --light-bg: #F3F5F7;
+        }
+
+        body {
+            background-color: var(--light-bg);
+            font-family: "Cairo", sans-serif;
+        }
+
+        /* 🔵 نفس تنسيق صفحة التاجر تماماً */
+        .confirm-container {
+            max-width: 440px;
+            margin: 4rem auto;
+            background: #fff;
+            padding: 2.2rem 2rem;
+            border-radius: 18px;
+            box-shadow: 0 8px 18px rgba(0,0,0,0.08);
+            border: 1px solid #dfe3e8;
+            text-align: center;
+        }
+
+        .title {
+            font-size: 1.6rem;
+            font-weight: 700;
+            color: var(--primary-color);
+            margin-bottom: 1.5rem;
+        }
+
+        .msg-box {
+            background: #e9f4ff;
+            border: 1px solid #bcdcff;
+            padding: 1rem;
+            border-radius: 12px;
+            margin-bottom: 1.4rem;
+            font-size: 1rem;
+        }
+
+        /* الأزرار */
+        .primary-btn {
+            width: 100%;
+            background-color: var(--primary-color);
+            color: #fff;
+            padding: .75rem;
+            border: none;
+            border-radius: 12px;
+            font-size: 1rem;
+            font-weight: 700;
+            margin-top: .7rem;
+        }
+
+        .primary-btn:hover {
+            background-color: #111e36;
+        }
+
+        .secondary-btn {
+            width: 100%;
+            padding: .75rem;
+            background: #ddd;
+            color: #333;
+            border-radius: 12px;
+            font-size: 1rem;
+            font-weight: 600;
+            display: block;
+            text-decoration: none;
+            margin-top: .7rem;
+        }
+
+    </style>
+</head>
+
+<body>
+
+<div class="container">
+    <div class="confirm-container">
+
+        <div class="title">تأكيد إنشاء الحساب</div>
+
+        <div class="msg-box">
+            📱 الرقم <strong>{{ phone }}</strong><br>
+            غير مسجل مسبقاً.<br>
+            سيتم إنشاء حساب جديد بهذا الرقم.
+        </div>
+
+        <form method="POST" action="{% url 'accounts:quick_register' store.slug %}">
+            {% csrf_token %}
+            <button class="primary-btn">متابعة</button>
+        </form>
+
+        <a href="{% url 'accounts:customer_login' store.slug %}" class="secondary-btn">تراجع</a>
+
+    </div>
+</div>
+
+</body>
+</html>

@@ -1,0 +1,297 @@
+﻿{% load static %}
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <title>رصيدي</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <!-- Bootstrap (إذا عندك أساساً بالمشروع لا تعيد تحميله) -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    <style>
+    /* =====================
+       Base Layout
+    ===================== */
+    body {
+        background: #f9fafb;
+    }
+
+    .points-page {
+        max-width: 1000px;
+        margin: 24px auto;
+        padding: 20px;
+        font-family: "Segoe UI", Tahoma, sans-serif;
+    }
+
+    .page-title {
+        text-align: center;
+        margin-bottom: 24px;
+        font-size: 26px;
+    }
+
+    .section-title {
+        margin-bottom: 14px;
+        font-size: 20px;
+    }
+
+    /* =====================
+       Back Button
+    ===================== */
+    .back-to-store {
+        display: inline-block;
+        margin-bottom: 20px;
+    }
+
+    @media (max-width: 768px) {
+        .back-to-store {
+            display: block;
+            width: 100%;
+            text-align: center;
+        }
+    }
+
+    /* =====================
+       Summary Cards
+    ===================== */
+    .points-summary {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 20px;
+        margin-bottom: 36px;
+    }
+
+    .card {
+        padding: 18px;
+        border-radius: 14px;
+        color: #fff;
+        text-align: center;
+        box-shadow: 0 6px 16px rgba(0,0,0,0.12);
+        border: none;
+    }
+
+    .card .label {
+        display: block;
+        font-size: 14px;
+        opacity: 0.9;
+    }
+
+    .card .value {
+        font-size: 28px;
+        font-weight: bold;
+        margin-top: 8px;
+    }
+
+    .card.total {
+        background: linear-gradient(135deg, #3b82f6, #2563eb);
+    }
+
+    .card.blocked {
+        background: linear-gradient(135deg, #f59e0b, #d97706);
+    }
+
+    .card.withdrawable {
+        background: linear-gradient(135deg, #22c55e, #16a34a);
+    }
+
+    /* =====================
+       Table
+    ===================== */
+    .table-wrapper {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .points-table {
+        width: 100%;
+        border-collapse: collapse;
+        background: #fff;
+        border-radius: 12px;
+        overflow: hidden;
+        min-width: 600px;
+    }
+
+    .points-table thead {
+        background: #f3f4f6;
+    }
+
+    .points-table th,
+    .points-table td {
+        padding: 12px 14px;
+        text-align: center;
+        font-size: 14px;
+        white-space: nowrap;
+    }
+
+    .points-table tbody tr {
+        border-bottom: 1px solid #e5e7eb;
+    }
+
+    .points-table tbody tr:hover {
+        background: #f9fafb;
+    }
+
+    .plus {
+        color: #16a34a;
+        font-weight: bold;
+    }
+
+    .minus {
+        color: #dc2626;
+        font-weight: bold;
+    }
+
+    .empty {
+        padding: 24px;
+        color: #6b7280;
+        text-align: center;
+    }
+
+    /* =====================
+       Tablet & Mobile
+    ===================== */
+    @media (max-width: 768px) {
+
+        .points-page {
+            margin: 16px 8px;
+            padding: 16px;
+        }
+
+        .page-title {
+            font-size: 22px;
+        }
+
+        .section-title {
+            font-size: 18px;
+        }
+
+        .points-summary {
+            grid-template-columns: 1fr;
+            gap: 14px;
+        }
+
+        .card {
+            padding: 16px;
+        }
+
+        .card .value {
+            font-size: 24px;
+        }
+
+        .points-table th,
+        .points-table td {
+            font-size: 13px;
+            padding: 10px 8px;
+        }
+    }
+
+    @media (max-width: 480px) {
+        h3 {
+            font-size: 16px;
+        }
+
+        .page-title {
+            font-size: 20px;
+        }
+
+        .card .label {
+            font-size: 13px;
+        }
+
+        .card .value {
+            font-size: 22px;
+        }
+
+        .points-table {
+            min-width: 520px;
+        }
+    }
+    </style>
+</head>
+
+<body>
+
+<div class="points-page">
+
+    <!-- زر الرجوع -->
+    <a href="{% url 'stores:store_front' store_slug %}"
+       class="btn btn-primary back-to-store">
+        ← العودة إلى المتجر
+    </a>
+
+    <!-- ترحيب -->
+    <h3 class="text-center mb-2">
+        أهلاً {{ customer.name|default:customer.phone }} 👋
+    </h3>
+
+    <h2 class="page-title">💎 رصيدي</h2>
+
+    <!-- Summary -->
+    <div class="points-summary">
+    <div class="card total">
+        <span class="label">الرصيد الكلي</span>
+        <span class="value">
+            {{ total_points|floatformat:2 }}
+            {% if store.pricing_currency == "USD" %}$ {% else %}ل.س{% endif %}
+        </span>
+    </div>
+
+    <div class="card blocked">
+        <span class="label">رصيد معلق</span>
+        <span class="value">
+            {{ blocked_points|floatformat:2 }}
+            {% if store.pricing_currency == "USD" %}$ {% else %}ل.س{% endif %}
+        </span>
+        <small>يمكنك سحب رصيدك بعد 3 طلبات  من آخر سحب</small>
+    </div>
+
+    <div class="card withdrawable">
+        <span class="label">القابل للسحب</span>
+        <span class="value">
+            {{ withdrawable_points|floatformat:2 }}
+            {% if store.pricing_currency == "USD" %}$ {% else %}ل.س{% endif %}
+        </span>
+    </div>
+</div>
+
+
+    <!-- Transactions -->
+    <h3 class="section-title">📋 سجل العمليات</h3>
+
+    <div class="table-wrapper">
+        <table class="points-table">
+            <thead>
+                <tr>
+                    <th>التاريخ</th>
+                    <th>النوع</th>
+                    <th>القيمة</th>
+                    <th>ملاحظة</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for t in transactions %}
+                <tr>
+                    <td>{{ t.created_at|date:"Y-m-d H:i" }}</td>
+                    <td>{{ t.get_transaction_type_display }}</td>
+                    <td class="{% if t.points < 0 %}minus{% else %}plus{% endif %}">
+    {{ t.points|floatformat:2 }}
+    {% if store.pricing_currency == "USD" %}$ {% else %}ل.س{% endif %}
+</td>
+
+                    <td>{{ t.note|default:"—" }}</td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="4" class="empty">
+                        لا يوجد عمليات حتى الآن
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+</div>
+
+</body>
+</html>

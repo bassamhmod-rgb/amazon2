@@ -1,0 +1,242 @@
+﻿{% load static %}
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <title>العملاء – {{ store.name }}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+
+    <style>
+        body{
+            background:#f7f9fc;
+            font-family:"Cairo",sans-serif;
+            overflow-x:hidden;
+        }
+
+        .sidebar{
+            width:230px;
+            background:#fff;
+            height:100vh;
+            position:fixed;
+            top:0;
+            right:0;
+            padding:20px 15px;
+            border-left:1px solid #e0e0e0;
+            transition:.3s;
+            z-index:1000;
+        }
+
+        .sidebar a{
+            display:block;
+            padding:10px 12px;
+            margin-bottom:8px;
+            color:#333;
+            border-radius:8px;
+            text-decoration:none;
+        }
+
+        .sidebar a:hover{
+            background:#e9f2ff;
+            color:#0d6efd;
+        }
+
+        .content{
+            margin-right:240px;
+            padding:20px;
+            transition:.3s;
+        }
+
+        #sidebarArrow{ display:none; }
+
+        @media (max-width:768px){
+            .sidebar{ right:-260px; }
+            .sidebar.active{ right:0; }
+
+            .content{
+                margin-right:0;
+                padding:15px;
+            }
+
+            #sidebarArrow{
+                display:flex;
+                position:fixed;
+                top:50%;
+                right:0;
+                transform:translateY(-50%);
+                width:26px;
+                height:48px;
+                background:#1A2A4A;
+                color:#fff;
+                border-radius:10px 0 0 10px;
+                align-items:center;
+                justify-content:center;
+                font-size:18px;
+                cursor:pointer;
+                z-index:1001;
+                box-shadow:-3px 0 10px rgba(0,0,0,.15);
+                user-select:none;
+            }
+
+            .table-responsive{
+                overflow-x:auto;
+                -webkit-overflow-scrolling:touch;
+            }
+
+            table{ min-width:500px; }
+
+            table th,
+            table td{
+                white-space:nowrap;
+                vertical-align:middle;
+                text-align:center;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+<div id="sidebarArrow">❯</div>
+
+{% include "dashboard/sidebar.html" %}
+
+<div class="content">
+
+    <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+        <h3 class="mb-0">العملاء</h3>
+        <a href="{% url 'dashboard:customer_create' store.slug %}" class="btn btn-primary w-100 w-md-auto">
+            + إضافة عميل جديد
+        </a>
+    </div>
+
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags|default:'info' }} mb-3">{{ message }}</div>
+        {% endfor %}
+    {% endif %}
+
+    <div class="card p-3 shadow-sm mb-3">
+        <input type="text"
+               id="liveSearchCustomers"
+               class="form-control"
+               placeholder="ابحث بالاسم أو الموبايل (الأسهم للتنقل و Enter للاختيار)"
+               autocomplete="off">
+    </div>
+
+    <div class="card p-3 shadow-sm">
+        <div class="table-responsive">
+            <table class="table table-striped align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th>اسم العميل</th>
+                        <th>رقم الهاتف</th>
+                        <th class="text-center" style="min-width:120px;">خيارات</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for customer in customers %}
+                    <tr class="customer-row" data-search="{{ customer.name|default:'' }} {{ customer.phone|default:'' }}">
+                        <td>{{ customer.name }}</td>
+                        <td>{{ customer.phone }}</td>
+                        <td class="text-center">
+                            <a href="{% url 'dashboard:customer_update' store.slug customer.id %}" class="btn btn-warning">تعديل</a>
+                            <form method="post" action="{% url 'dashboard:delete_customer' store.slug customer.id %}" style="display:inline;">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-danger js-confirm-delete">حذف</button>
+                            </form>
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr class="empty-initial-row">
+                        <td colspan="3" class="text-center text-muted">لا يوجد عملاء بعد</td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+            <div id="noCustomerResults" class="text-center text-muted py-3 d-none">لا توجد نتائج مطابقة</div>
+        </div>
+    </div>
+
+</div>
+
+<script>
+    const sidebar = document.getElementById("sidebar");
+    const arrow = document.getElementById("sidebarArrow");
+
+    arrow.onclick = () => {
+        sidebar.classList.toggle("active");
+        arrow.innerHTML = sidebar.classList.contains("active") ? "❮" : "❯";
+    };
+
+    const customerSearchInput = document.getElementById("liveSearchCustomers");
+    const customerRows = Array.from(document.querySelectorAll(".customer-row"));
+    const noCustomerResults = document.getElementById("noCustomerResults");
+    let customerVisibleRows = [...customerRows];
+    let customerActiveIndex = -1;
+
+    function updateCustomerHighlight() {
+        customerRows.forEach((row) => row.classList.remove("table-active"));
+        if (customerActiveIndex >= 0 && customerVisibleRows[customerActiveIndex]) {
+            customerVisibleRows[customerActiveIndex].classList.add("table-active");
+            customerVisibleRows[customerActiveIndex].scrollIntoView({ block: "nearest" });
+        }
+    }
+
+    function filterCustomers() {
+        const q = (customerSearchInput.value || "").trim().toLowerCase();
+        customerVisibleRows = [];
+
+        customerRows.forEach((row) => {
+            const haystack = (row.dataset.search || "").toLowerCase();
+            const matched = !q || haystack.includes(q);
+            row.style.display = matched ? "" : "none";
+            if (matched) customerVisibleRows.push(row);
+        });
+
+        customerActiveIndex = customerVisibleRows.length ? 0 : -1;
+        updateCustomerHighlight();
+
+        if (q && customerRows.length && !customerVisibleRows.length) {
+            noCustomerResults.classList.remove("d-none");
+        } else {
+            noCustomerResults.classList.add("d-none");
+        }
+    }
+
+    customerSearchInput.addEventListener("input", filterCustomers);
+    customerSearchInput.addEventListener("keydown", (e) => {
+        if (!customerVisibleRows.length) {
+            if (e.key === "Escape") {
+                customerSearchInput.value = "";
+                filterCustomers();
+            }
+            return;
+        }
+
+        if (e.key === "ArrowDown") {
+            e.preventDefault();
+            customerActiveIndex = (customerActiveIndex + 1) % customerVisibleRows.length;
+            updateCustomerHighlight();
+        } else if (e.key === "ArrowUp") {
+            e.preventDefault();
+            customerActiveIndex = (customerActiveIndex - 1 + customerVisibleRows.length) % customerVisibleRows.length;
+            updateCustomerHighlight();
+        } else if (e.key === "Enter") {
+            e.preventDefault();
+            if (customerActiveIndex >= 0) {
+                const editBtn = customerVisibleRows[customerActiveIndex].querySelector("a.btn-warning");
+                if (editBtn) editBtn.click();
+            }
+        } else if (e.key === "Escape") {
+            customerSearchInput.value = "";
+            filterCustomers();
+        }
+    });
+
+    filterCustomers();
+</script>
+<script src="{% static 'js/confirm_delete.js' %}"></script>
+</body>
+</html>

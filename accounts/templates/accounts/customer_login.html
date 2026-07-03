@@ -1,0 +1,118 @@
+﻿<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <title>تسجيل دخول الزبون | Amazon Syria</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <!-- Google Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap" rel="stylesheet">
+
+    <!-- Bootstrap RTL -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+
+    <style>
+        :root {
+            --primary-color: #1A2A4A;
+            --accent-color: #FFB400;
+            --light-bg: #F3F5F7;
+        }
+
+        body {
+            background-color: var(--light-bg);
+            font-family: "Cairo", sans-serif;
+        }
+
+        .login-container {
+            max-width: 440px;
+            margin: 4rem auto;
+            background: #fff;
+            padding: 2.2rem 2rem;
+            border-radius: 18px;
+            box-shadow: 0 8px 18px rgba(0,0,0,0.08);
+            border: 1px solid #dfe3e8;
+        }
+
+        .login-title {
+            font-size: 1.7rem;
+            font-weight: 700;
+            color: var(--primary-color);
+        }
+
+        .login-container input {
+            width: 100%;
+            border-radius: 12px !important;
+            padding: .65rem 1rem !important;
+            border: 1px solid #ccc;
+            font-size: 1rem;
+        }
+
+        .login-btn {
+            width: 100%;
+            background-color: var(--primary-color);
+            color: #fff;
+            padding: .75rem;
+            border: none;
+            border-radius: 12px;
+            font-size: 1rem;
+            font-weight: 700;
+            margin-top: .7rem;
+        }
+
+        .login-btn:hover {
+            background-color: #111e36;
+        }
+
+        .error-box {
+            background: #ffecec;
+            border: 1px solid #ffb3b3;
+            padding: 10px;
+            color: #a70000;
+            border-radius: 12px;
+            font-size: .9rem;
+            margin-bottom: 10px;
+        }
+
+        .back-link {
+            display: block;
+            margin-top: 12px;
+            text-align: center;
+            color: #1A2A4A;
+            text-decoration: none;
+            font-weight: 600;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="container">
+
+        <div class="login-container">
+
+            <h2 class="text-center login-title mb-3">يرجى إدخال رقم الموبايل للمتابعة</h2>
+
+            {% if message %}
+            <div class="error-box">
+                {{ message }}
+            </div>
+            {% endif %}
+
+            <form method="POST">
+                {% csrf_token %}
+
+                <input type="hidden" name="next" value="{{ next }}">
+
+                <input type="text" name="phone" placeholder="الرقم" required>
+
+                <button type="submit" class="login-btn">متابعة</button>
+
+                <a href="{% url 'stores:store_front' store.slug %}" class="back-link">رجوع للمتجر</a>
+            </form>
+
+        </div>
+
+    </div>
+
+</body>
+</html>

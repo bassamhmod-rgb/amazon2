@@ -1,0 +1,32 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <title>حذف طلب – {{ store.name }}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+</head>
+
+<body class="p-4" style="font-family: 'Cairo', sans-serif;">
+    <div class="container">
+
+        <h3 class="mb-3">حذف الطلب</h3>
+
+        <p>
+            هل أنت متأكد أنك تريد حذف الطلب رقم:
+            <strong>#{{ order.id }}</strong> ؟
+        </p>
+
+        <form method="post">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-danger">نعم، حذف</button>
+
+            <a href="{% url 'dashboard:orders_list' store.slug %}" 
+               class="btn btn-secondary">
+               إلغاء
+            </a>
+        </form>
+
+    </div>
+</body>
+</html>

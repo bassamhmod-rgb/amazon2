@@ -1,0 +1,355 @@
+﻿{% load static %}
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <title>الإشعارات – {{ store.name }}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+
+    <style>
+        body{
+            background:#f7f9fc;
+            font-family:"Cairo",sans-serif;
+            overflow-x:hidden;
+        }
+
+        .sidebar{
+            width:230px;
+            background:#fff;
+            height:100vh;
+            position:fixed;
+            top:0;
+            right:0;
+            padding:20px 15px;
+            border-left:1px solid #e0e0e0;
+            transition:.3s;
+            z-index:1000;
+        }
+
+        .sidebar a{
+            display:block;
+            padding:10px 12px;
+            margin-bottom:8px;
+            color:#333;
+            border-radius:8px;
+            text-decoration:none;
+        }
+
+        .sidebar a:hover{
+            background:#e9f2ff;
+            color:#0d6efd;
+        }
+
+        .content{
+            margin-right:240px;
+            padding:20px;
+            transition:.3s;
+        }
+
+        .type-in{
+            color:#2a9d8f;
+            font-weight:700;
+        }
+        .type-out{
+            color:#d90429;
+            font-weight:700;
+        }
+
+        @media (max-width:768px){
+            .sidebar{ right:-260px; }
+            .sidebar.active{ right:0; }
+            .content{ margin-right:0; }
+        }
+
+        #sidebarArrow{
+            display:none;
+        }
+
+        @media (max-width:768px){
+            #sidebarArrow{
+                display:flex;
+                position:fixed;
+                top:50%;
+                right:0;
+                transform:translateY(-50%);
+                width:26px;
+                height:48px;
+                background:#1A2A4A;
+                color:#fff;
+                border-radius:10px 0 0 10px;
+                align-items:center;
+                justify-content:center;
+                font-size:18px;
+                cursor:pointer;
+                z-index:1001;
+                box-shadow:-3px 0 10px rgba(0,0,0,.15);
+                user-select:none;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+<!-- سهم السايدبار -->
+<div id="sidebarArrow">❯</div>
+
+{% include "dashboard/sidebar.html" %}
+
+<div class="content">
+
+    <!-- ===== Header ===== -->
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h3 class="mb-0">💰 إشعارات العملاء والموردين</h3>
+
+        {% if can_create_notice %}
+            <a href="{% url 'dashboard:notice_create' store.slug %}" class="btn btn-success">
+                ➕ إشعار جديد
+            </a>
+        {% endif %}
+    </div>
+<div class="card p-3 mb-3 shadow-sm border-0">
+
+    <label class="form-label fw-bold">نوع الإشعار</label>
+    <select id="filter_type" class="form-select mb-3" onchange="onFilterTypeChange()">
+        <option value="">الكل</option>
+        <option value="in">عميل</option>
+        <option value="out">مورد</option>
+    </select>
+
+    <!-- زبون -->
+    <div id="filterCustomerBox" style="display:none;">
+        <label class="form-label fw-bold">الزبون</label>
+        <input type="text" id="filterCustomerSearch" class="form-control"
+               placeholder="ابحث عن زبون">
+        <div id="filterCustomerResults" class="list-group mt-1"></div>
+    </div>
+
+    <!-- مورد -->
+    <div id="filterSupplierBox" style="display:none;">
+        <label class="form-label fw-bold">المورد</label>
+        <input type="text" id="filterSupplierSearch" class="form-control"
+               placeholder="ابحث عن مورد">
+        <div id="filterSupplierResults" class="list-group mt-1"></div>
+    </div>
+
+</div>
+    <!-- ===== جدول الإشعارات ===== -->
+    <div class="card p-3 shadow-sm">
+        <div class="table-responsive">
+            <table class="table table-striped align-middle mb-0">
+                <thead>
+      <tr>
+          <th>#</th>
+          <th>النوع</th>
+          <th>الطرف</th>
+          <th>مبلغ (صرف)</th>
+          <th>دفعة (قبض)</th>
+          <th>التاريخ</th>
+          {% if can_delete_notice %}
+              <th>حذف</th>
+          {% endif %}
+      </tr>
+  </thead>
+
+                <tbody id="noticesTable">
+
+
+                    {% include "dashboard/partials/notices_rows.html" %}
+
+
+                </tbody>
+
+            </table>
+        </div>
+    </div>
+
+</div>
+
+<script>
+let filterCustomerId = null;
+let filterSupplierId = null;
+let filterCustomerIndex = -1;
+let filterSupplierIndex = -1;
+
+function onFilterTypeChange() {
+    const type = document.getElementById("filter_type").value;
+
+    document.getElementById("filterCustomerBox").style.display =
+        type === "in" ? "block" : "none";
+
+    document.getElementById("filterSupplierBox").style.display =
+        type === "out" ? "block" : "none";
+
+    filterCustomerId = null;
+    filterSupplierId = null;
+
+    document.getElementById("filterCustomerSearch").value = "";
+    document.getElementById("filterSupplierSearch").value = "";
+
+    applyNoticeFilter();
+}
+
+function applyNoticeFilter() {
+    let url = `/dashboard/store/{{ store.slug }}/notices/filter/?`;
+
+    const type = document.getElementById("filter_type").value;
+    if (type) url += `transaction_type=${type}&`;
+    if (filterCustomerId) url += `customer_id=${filterCustomerId}&`;
+    if (filterSupplierId) url += `supplier_id=${filterSupplierId}`;
+
+    fetch(url)
+        .then(r => r.text())
+        .then(html => {
+            document.getElementById("noticesTable").innerHTML = html;
+        });
+}
+</script>
+<script>
+    const sidebar = document.getElementById("sidebar");
+    const arrow = document.getElementById("sidebarArrow");
+
+    arrow.onclick = () => {
+        sidebar.classList.toggle("active");
+        arrow.innerHTML = sidebar.classList.contains("active") ? "❮" : "❯";
+    };
+</script>
+<script>
+document.getElementById("filterCustomerSearch").addEventListener("keyup", function (e) {
+    if (["ArrowDown","ArrowUp","Enter"].includes(e.key)) return;
+    const q = this.value.trim();
+    const box = document.getElementById("filterCustomerResults");
+    if (!q) { box.style.display = "none"; return; }
+
+    fetch(`/dashboard/{{ store.slug }}/search-customers/?q=` + encodeURIComponent(q))
+        .then(r => r.json())
+        .then(data => {
+            box.innerHTML = "";
+            filterCustomerIndex = -1;
+            data.results.forEach(item => {
+                const a = document.createElement("a");
+                a.className = "list-group-item list-group-item-action";
+                a.textContent = `${item.name} – ${item.phone}`;
+                a.onclick = () => {
+                    filterCustomerId = item.id;
+                    document.getElementById("filterCustomerSearch").value = item.name;
+                    box.style.display = "none";
+                    applyNoticeFilter();
+                };
+                a.onmouseenter = () => {
+                    const items = document.querySelectorAll("#filterCustomerResults .list-group-item");
+                    items.forEach((el, i) => {
+                        el.classList.toggle("active", el === a);
+                        if (el === a) filterCustomerIndex = i;
+                    });
+                };
+                box.appendChild(a);
+            });
+            box.style.display = "block";
+        });
+});
+</script>
+<script>
+/* ===== الأسهم + Enter ===== */
+document.getElementById("filterCustomerSearch").addEventListener("keydown", function (e) {
+    const items = document.querySelectorAll("#filterCustomerResults .list-group-item");
+    if (!items.length) return;
+
+    if (e.key === "ArrowDown") {
+        e.preventDefault();
+        filterCustomerIndex = (filterCustomerIndex + 1) % items.length;
+    }
+    else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        filterCustomerIndex = (filterCustomerIndex - 1 + items.length) % items.length;
+    }
+    else if (e.key === "Enter") {
+        e.preventDefault();
+        if (filterCustomerIndex >= 0) {
+            items[filterCustomerIndex].click();
+        }
+        return;
+    }
+    else if (e.key === "Escape") {
+        document.getElementById("filterCustomerResults").style.display = "none";
+        filterCustomerIndex = -1;
+        return;
+    }
+
+    items.forEach((item, i) => {
+        item.classList.toggle("active", i === filterCustomerIndex);
+    });
+});
+</script>
+<script>
+document.getElementById("filterSupplierSearch").addEventListener("keyup", function (e) {
+    if (["ArrowDown","ArrowUp","Enter"].includes(e.key)) return;
+    const q = this.value.trim();
+    const box = document.getElementById("filterSupplierResults");
+    if (!q) { box.style.display = "none"; return; }
+
+    fetch(`/dashboard/{{ store.slug }}/search-suppliers/?q=` + encodeURIComponent(q))
+        .then(r => r.json())
+        .then(data => {
+            box.innerHTML = "";
+            filterSupplierIndex = -1;
+            data.results.forEach(item => {
+                const a = document.createElement("a");
+                a.className = "list-group-item list-group-item-action";
+                a.textContent = `${item.name} – ${item.phone}`;
+                a.onclick = () => {
+                    filterSupplierId = item.id;
+                    document.getElementById("filterSupplierSearch").value = item.name;
+                    box.style.display = "none";
+                    applyNoticeFilter();
+                };
+                a.onmouseenter = () => {
+                    const items = document.querySelectorAll("#filterSupplierResults .list-group-item");
+                    items.forEach((el, i) => {
+                        el.classList.toggle("active", el === a);
+                        if (el === a) filterSupplierIndex = i;
+                    });
+                };
+                box.appendChild(a);
+            });
+            box.style.display = "block";
+        });
+});
+</script>
+<script>
+/* ===== الأسهم + Enter ===== */
+document.getElementById("filterSupplierSearch").addEventListener("keydown", function (e) {
+    const items = document.querySelectorAll("#filterSupplierResults .list-group-item");
+    if (!items.length) return;
+
+    if (e.key === "ArrowDown") {
+        e.preventDefault();
+        filterSupplierIndex = (filterSupplierIndex + 1) % items.length;
+    }
+    else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        filterSupplierIndex = (filterSupplierIndex - 1 + items.length) % items.length;
+    }
+    else if (e.key === "Enter") {
+        e.preventDefault();
+        if (filterSupplierIndex >= 0) {
+            items[filterSupplierIndex].click();
+        }
+        return;
+    }
+    else if (e.key === "Escape") {
+        document.getElementById("filterSupplierResults").style.display = "none";
+        filterSupplierIndex = -1;
+        return;
+    }
+
+    items.forEach((item, i) => {
+        item.classList.toggle("active", i === filterSupplierIndex);
+    });
+});
+</script>
+
+</body>
+</html>

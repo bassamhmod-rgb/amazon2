@@ -1,0 +1,315 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <title>تفاصيل الطلب – {{ store.name }}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+
+    <style>
+        body{
+            background:#f7f9fc;
+            font-family:"Cairo",sans-serif;
+            overflow-x:hidden;
+        }
+
+        /* ===== SIDEBAR ===== */
+        .sidebar{
+            width:230px;
+            background:#fff;
+            height:100vh;
+            position:fixed;
+            top:0;
+            right:0;
+            padding:20px 15px;
+            border-left:1px solid #e0e0e0;
+            transition:.3s;
+            z-index:1000;
+        }
+
+        .sidebar a{
+            display:block;
+            padding:10px 12px;
+            margin-bottom:8px;
+            color:#333;
+            border-radius:8px;
+            text-decoration:none;
+        }
+
+        .sidebar a:hover{
+            background:#e9f2ff;
+            color:#0d6efd;
+        }
+
+        /* ===== CONTENT ===== */
+        .content{
+            margin-right:240px;
+            padding:20px;
+            transition:.3s;
+        }
+
+        .note-box{
+            background:#f3f7ff;
+            padding:5px 10px;
+            border-radius:8px;
+            font-size:0.85rem;
+            color:#005f9e;
+            display:inline-block;
+            margin-top:4px;
+        }
+
+        /* ===== SIDEBAR ARROW ===== */
+        #sidebarArrow{ display:none; }
+
+        @media (max-width:768px){
+            .sidebar{ right:-260px; }
+            .sidebar.active{ right:0; }
+
+            .content{
+                margin-right:0;
+                padding:15px;
+            }
+
+            #sidebarArrow{
+                display:flex;
+                position:fixed;
+                top:50%;
+                right:0;
+                transform:translateY(-50%);
+                width:26px;
+                height:48px;
+                background:#1A2A4A;
+                color:#fff;
+                border-radius:10px 0 0 10px;
+                align-items:center;
+                justify-content:center;
+                font-size:18px;
+                cursor:pointer;
+                z-index:1001;
+                box-shadow:-3px 0 10px rgba(0,0,0,.15);
+                user-select:none;
+            }
+
+            .table-responsive{
+                overflow-x:auto;
+                -webkit-overflow-scrolling:touch;
+            }
+
+            table{
+                min-width:700px;
+            }
+
+            table th,
+            table td{
+                white-space:nowrap;
+                vertical-align:middle;
+                text-align:center;
+            }
+
+            .order-actions{
+                flex-direction:column;
+            }
+
+            .order-actions .btn,
+            .order-actions form{
+                width:100%;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+<div id="sidebarArrow">❯</div>
+{% include "dashboard/sidebar.html" %}
+
+<div class="content">
+
+    <h3 class="mb-4">تفاصيل الطلب #{{ order.id }}</h3>
+
+    <div class="alert alert-light border py-2 px-3 mb-3 d-flex flex-wrap gap-3 align-items-center">
+        <div>
+            <strong>المستخدم:</strong>
+            {% if order.created_by_store_user %}
+                {{ order.created_by_store_user.name }}
+            {% elif order.created_by %}
+                {{ order.created_by.username }}
+            {% else %}
+                -
+            {% endif %}
+        </div>
+        <div>
+            <strong>المستودع:</strong>
+            {% if order.warehouse %}
+                {{ order.warehouse.name }}
+            {% elif order.created_by_store_user and order.created_by_store_user.warehouse %}
+                {{ order.created_by_store_user.warehouse.name }}
+            {% else %}
+                -
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- معلومات عامة -->
+    <div class="card p-3 mb-4 shadow-sm border-0">
+        <div class="row g-3">
+
+            <div class="col-md-6">
+                {% if order.transaction_type == "sale" %}
+                    <p class="fs-5"><strong>👤 الزبون:</strong>
+                        <span class="text-primary">{{ order.customer.name }}</span>
+                    </p>
+                {% else %}
+                    <p class="fs-5"><strong>🏭 المورد:</strong>
+                        <span class="text-primary">{{ order.supplier.name }}</span>
+                    </p>
+                {% endif %}
+
+                <p><strong>📅 التاريخ:</strong> {{ order.created_at|date:"Y-m-d H:i" }}</p>
+
+                <p>
+                    <strong>الحالة:</strong>
+                    {% if order.status == "pending" %}
+                        <span class="badge bg-warning text-dark">قيد الانتظار</span>
+                    {% else %}
+                        <span class="badge bg-success">تم التأكيد</span>
+                    {% endif %}
+                </p>
+            </div>
+
+            <div class="col-md-6 bg-light p-3 rounded">
+                <p><strong>مجموع العناصر:</strong> {{ order.items_total|floatformat:2 }} $</p>
+                <p><strong>الحسم:</strong>
+                    <span class="text-danger">{{ order.discount|floatformat:2 }} $</span>
+                </p>
+
+                <p class="fs-5 fw-bold">
+                    <strong>الصافي للدفع:</strong> {{ order.net_total|floatformat:2 }} $
+                </p>
+
+                <hr>
+
+                <p><strong>المدفوع:</strong> {{ order.payment|floatformat:2 }} $</p>
+
+                <p>
+                    <strong>المتبقي:</strong>
+                    <span class="{% if order.remaining > 0 %}text-danger{% else %}text-success{% endif %}">
+                        {{ order.remaining|floatformat:2 }} $
+                    </span>
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- عناصر الطلب -->
+    <div class="card p-3 mb-4 shadow-sm border-0">
+        <h5 class="mb-3">🛒 عناصر الطلب</h5>
+        <div class="table-responsive">
+            <table class="table table-striped align-middle table-hover">
+                <thead class="table-dark">
+                    <tr>
+                        <th>المنتج</th>
+                        <th>الكمية</th>
+                        <th>السعر</th>
+                        <th>المجموع</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in order.items.all %}
+                    <tr>
+                        <td>{{ item.product.name }}</td>
+                        <td>{{ item.quantity }}</td>
+                        <td>{{ item.price|floatformat:2 }} $</td>
+                        <td class="fw-bold">{{ item.subtotal|floatformat:2 }} $</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- ملاحظة الدفع للتاجر -->
+    <div class="card p-3 mb-4 shadow-sm border-0">
+        <h5 class="mb-2">💰 ملاحظة الدفع</h5>
+        {% if required_payment_text %}
+            <p class="mb-1"><strong>المطلوب:</strong> {{ required_payment_text }}</p>
+        {% else %}
+            <p class="mb-1 text-muted">لا توجد معلومات دفع.</p>
+        {% endif %}
+
+        {% if order.payment_transaction_id %}
+            <p class="mb-1"><strong>رقم العملية:</strong> {{ order.payment_transaction_id }}</p>
+        {% endif %}
+
+        {% if order.payment_proof_image %}
+            <div class="mt-2">
+                <strong>إشعار الدفع:</strong><br>
+                <a href="{{ order.payment_proof_image.url }}" target="_blank">
+                    عرض صورة الإشعار
+                </a>
+            </div>
+        {% endif %}
+    </div>
+
+    <!-- 🎁 الكاش باك -->
+    {% if order.status == "pending" and order.transaction_type == "sale" and order.customer and not has_cashback %}
+    <form method="post" action="{% url 'dashboard:confirm_order' store.slug order.id %}">
+        {% csrf_token %}
+        <div class="card p-3 mb-4 shadow-sm border-success">
+            <h5 class="text-success">🎁 الكاش باك المقترح</h5>
+            <p class="text-muted">يمكنك تعديل القيمة قبل تأكيد الطلب</p>
+
+            <input type="number"
+                   name="cashback_amount"
+                   step="0.01"
+                   class="form-control"
+                   value="{{ suggested_cashback }}">
+
+            <button class="btn btn-success mt-3">
+                ✔ تأكيد الطلب وحفظ الكاش باك
+            </button>
+        </div>
+    </form>
+    {% endif %}
+
+    <!-- الأزرار -->
+    <div class="d-flex gap-2 order-actions">
+        {% if order.status == "pending" %}
+            {% if order.transaction_type == "sale" and order.customer and not has_cashback %}
+            {% else %}
+                <form method="post" action="{% url 'dashboard:confirm_order' store.slug order.id %}">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-success">
+                    ✔ تأكيد الطلب
+                    </button>
+                </form>
+            {% endif %}
+        {% endif %}
+        <form method="post" action="{% url 'dashboard:delete_order' store.slug order.id %}">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-danger"
+                    onclick="return confirm('هل أنت متأكد من حذف الطلب؟');">
+                🗑 حذف الطلب
+            </button>
+        </form>
+
+        <a href="{% url 'dashboard:orders_list' store.slug %}" class="btn btn-secondary">
+            ← العودة
+        </a>
+    </div>
+
+</div>
+
+<script>
+    const sidebar = document.getElementById("sidebar");
+    const arrow = document.getElementById("sidebarArrow");
+    arrow.onclick = () => {
+        sidebar.classList.toggle("active");
+        arrow.innerHTML = sidebar.classList.contains("active") ? "❮" : "❯";
+    };
+</script>
+
+</body>
+</html>

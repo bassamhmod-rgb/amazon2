@@ -1,0 +1,583 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <title>إضافة طلب – {{ store.name }}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+
+    <style>
+        body{
+            background:#f7f9fc;
+            font-family:"Cairo",sans-serif;
+            overflow-x:hidden;
+        }
+
+        /* ===== SIDEBAR ===== */
+        .sidebar{
+            width:230px;
+            background:#fff;
+            height:100vh;
+            position:fixed;
+            top:0;
+            right:0;
+            padding:20px 15px;
+            border-left:1px solid #e0e0e0;
+            transition:.3s;
+            z-index:1000;
+        }
+
+        .sidebar a{
+            display:block;
+            padding:10px 12px;
+            margin-bottom:8px;
+            color:#333;
+            border-radius:8px;
+            text-decoration:none;
+        }
+        .sidebar a:hover{
+            background:#e9f2ff;
+            color:#0d6efd;
+        }
+
+        /* ===== CONTENT ===== */
+        .content{
+            margin-right:240px;
+            padding:20px;
+            transition:.3s;
+        }
+
+        #sidebarArrow{ display:none; }
+
+        @media (max-width:768px){
+            .sidebar{ right:-260px; }
+            .sidebar.active{ right:0; }
+            .content{ margin-right:0; }
+
+            #sidebarArrow{
+                display:flex;
+                position:fixed;
+                top:50%;
+                right:0;
+                transform:translateY(-50%);
+                width:26px;
+                height:48px;
+                background:#1A2A4A;
+                color:#fff;
+                border-radius:10px 0 0 10px;
+                align-items:center;
+                justify-content:center;
+                font-size:18px;
+                cursor:pointer;
+                z-index:1001;
+                box-shadow:-3px 0 10px rgba(0,0,0,.15);
+                user-select:none;
+            }
+        }
+
+        #searchResults,
+        #customerResults,
+        #supplierResults{
+            max-height:200px;
+            overflow-y:auto;
+            box-shadow:0 4px 6px rgba(0,0,0,0.15);
+            display:none;
+            background:#fff;
+            z-index:1000;
+            position:absolute;
+            width:100%;
+        }
+
+        .list-group-item.active{
+            background:#0d6efd;
+            color:#fff !important;
+        }
+
+        .en-num{
+            direction:ltr !important;
+            unicode-bidi:plaintext !important;
+        }
+
+        /* ===== التعديل الوحيد (تحريك الجدول) ===== */
+        @media (max-width:768px){
+            .table-responsive{
+                overflow-x:auto;
+                -webkit-overflow-scrolling:touch;
+            }
+            table{
+                min-width:600px;
+            }
+            table th,
+            table td{
+                white-space:nowrap;
+                text-align:center;
+                vertical-align:middle;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+<div id="sidebarArrow">❯</div>
+
+{% include "dashboard/sidebar.html" %}
+
+<div class="content">
+
+<h3 class="mb-4">إضافة طلب جديد</h3>
+{% if warehouse %}
+    <div class="alert alert-light border d-inline-block py-2 px-3 mb-3">
+        <strong>المستودع:</strong> {{ warehouse.name }}
+    </div>
+{% endif %}
+
+<form method="post">
+{% csrf_token %}
+<input type="hidden" name="customer_id" id="customer_id">
+<input type="hidden" name="supplier_id" id="supplier_id">
+
+<div class="card p-3 mb-3 shadow-sm border-0">
+    <label class="form-label fw-bold">نوع العملية</label>
+    <select id="transaction_type" name="transaction_type"
+            class="form-select" onchange="toggleTransactionFields()">
+        <option value="sale">بيع</option>
+        <option value="purchase">شراء</option>
+    </select>
+</div>
+
+<div id="customerBox" class="card p-3 mb-3 border-0 shadow-sm">
+    <label class="form-label fw-bold">الزبون</label>
+    <div id="customerSearchContainer" class="position-relative">
+        <input type="text" id="customerSearch" class="form-control"
+               placeholder="ابحث عن زبون..." autocomplete="off">
+        <div id="customerResults" class="list-group mt-1"></div>
+    </div>
+    <div id="selectedCustomerCard"
+         class="alert alert-success d-flex justify-content-between align-items-center m-0"
+         style="display:none;">
+        <span id="selectedCustomerName" class="fw-bold"></span>
+        <button type="button" class="btn btn-sm btn-outline-danger bg-white"
+                onclick="removeCustomer()">❌</button>
+    </div>
+</div>
+
+<div id="supplierBox" class="card p-3 mb-3 border-0 shadow-sm" style="display:none;">
+    <label class="form-label fw-bold">المورد</label>
+    <div class="position-relative">
+        <input type="text" id="supplierSearch" class="form-control"
+               placeholder="ابحث عن مورد..." autocomplete="off">
+        <div id="supplierResults" class="list-group mt-1"></div>
+    </div>
+</div>
+
+<div class="card p-3 mb-3 border-0 shadow-sm">
+    <label class="form-label fw-bold">بحث عن منتج</label>
+    <div class="position-relative">
+        <input type="text" id="productSearch" class="form-control"
+               placeholder="اكتب اسم المنتج..." autocomplete="off">
+        <div id="searchResults" class="list-group mt-1"></div>
+    </div>
+
+<div class="card p-3 mb-3 border-0 shadow-sm">
+    <label class="form-label fw-bold">&#1576;&#1575;&#1585;&#1603;&#1608;&#1583; &#1575;&#1604;&#1605;&#1606;&#1578;&#1580;</label>
+    <div class="position-relative">
+        <input type="text" id="barcodeSearch" class="form-control"
+               placeholder="&#1575;&#1587;&#1581;&#1576; &#1575;&#1604;&#1576;&#1575;&#1585;&#1603;&#1608;&#1583; &#1607;&#1606;&#1575..." autocomplete="off">
+        <div class="invalid-feedback">Barcode not found</div>
+    </div>
+</div>
+</div>
+
+<div class="card border-0 shadow-sm p-3">
+
+    <!-- 🔑 التغليف فقط -->
+    <div class="table-responsive">
+        <table class="table table-bordered">
+            <thead class="table-light">
+            <tr>
+                <th>المنتج</th>
+                <th width="150">السعر</th>
+                <th width="100">الكمية</th>
+                <th>المجموع</th>
+                <th>حذف</th>
+            </tr>
+            </thead>
+            <tbody id="orderItems"></tbody>
+        </table>
+    </div>
+
+    <hr>
+
+    <div class="row g-3">
+        <div class="col-md-4">
+            <label>الحسم</label>
+            <input type="number" name="discount" step="0.01"
+                   class="form-control en-num" value="0"
+                   oninput="calculateTotal()">
+        </div>
+
+        <div class="col-md-4">
+            <label>المدفوع</label>
+            <input type="number" name="payment" step="0.01"
+                   class="form-control en-num" value="0">
+        </div>
+
+        <div class="col-md-4">
+            <label>المجموع الكلي</label>
+            <input type="text" id="totalDisplay"
+                   class="form-control fw-bold fs-5 text-success en-num"
+                   readonly value="0">
+        </div>
+    </div>
+<!-- ⭐ خانة الكاش باك -->
+<div class="row g-3 mt-3" id="cashbackBox" style="display:none;">
+<div class="col-md-4">
+<label class="fw-bold text-primary">الكاش باك (نقاط)</label>
+<input type="number" name="cashback_amount"
+       step="0.01" class="form-control en-num"
+       placeholder="محسوب تلقائياً ويمكن التعديل">
+</div>
+</div>
+    <button class="btn btn-primary mt-4 px-4">💾 حفظ الطلب</button>
+    <a href="{% url 'dashboard:orders_list' store.slug %}"
+       class="btn btn-secondary mt-4 px-4">إلغاء</a>
+
+</div>
+</form>
+</div>
+
+<!-- ===== كل السكربتات بدون أي نقص ===== -->
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    toggleTransactionFields();
+});
+</script>
+<script>
+function toggleTransactionFields() {
+    let type = document.getElementById("transaction_type").value;
+    document.getElementById("customerBox").style.display = type === "sale" ? "block" : "none";
+    document.getElementById("supplierBox").style.display = type === "purchase" ? "block" : "none";
+    document.getElementById("cashbackBox").style.display = type === "sale" ? "block" : "none";
+
+}
+toggleTransactionFields();
+
+/* ============================ البحث عن المنتجات ============================ */
+let productIndex = -1;
+
+document.getElementById("productSearch").addEventListener("keyup", function (e) {
+    if (["ArrowDown", "ArrowUp", "Enter"].includes(e.key)) return;
+
+    let q = this.value.trim();
+    let box = document.getElementById("searchResults");
+
+    if (!q) {
+        box.style.display = "none";
+        box.innerHTML = "";
+        return;
+    }
+
+    fetch(`/dashboard/{{ store.slug }}/search-products/?q=` + encodeURIComponent(q))
+        .then(r => r.json())
+        .then(data => {
+            box.innerHTML = "";
+            productIndex = -1;
+
+            data.results.forEach(item => {
+                let a = document.createElement("a");
+                a.className = "list-group-item list-group-item-action";
+                a.innerText = `${item.name} – ${item.price} $`;
+                a.onclick = () => selectProduct(item);
+                box.appendChild(a);
+            });
+
+            box.style.display = "block";
+        });
+});
+
+/* الأسهم + Enter */
+document.getElementById("productSearch").addEventListener("keydown", function (e) {
+    let items = document.querySelectorAll("#searchResults .list-group-item");
+    if (items.length === 0) return;
+
+    if (e.key === "ArrowDown") {
+        e.preventDefault();
+        productIndex = (productIndex + 1) % items.length;
+    }
+    else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        productIndex = (productIndex - 1 + items.length) % items.length;
+    }
+    else if (e.key === "Enter") {
+        e.preventDefault();
+        if (productIndex >= 0) {
+            items[productIndex].click();
+        }
+        return;
+    }
+
+    items.forEach((item, i) => {
+        item.classList.toggle("active", i === productIndex);
+    });
+});
+
+
+const barcodeSearchEl = document.getElementById("barcodeSearch");
+if (barcodeSearchEl){
+    barcodeSearchEl.addEventListener("keydown", function(e){
+        if (e.key !== "Enter") return;
+        e.preventDefault();
+
+        const code = this.value.trim();
+        if (!code) return;
+
+        fetch(`/dashboard/{{ store.slug }}/search-products-by-barcode/?barcode=` + encodeURIComponent(code))
+            .then(r => r.json())
+            .then(data => {
+                if (data.results && data.results.length){
+                    selectProduct(data.results[0]);
+                    barcodeSearchEl.value = "";
+                } else {
+                    barcodeSearchEl.classList.add("is-invalid");
+                }
+            });
+    });
+
+    barcodeSearchEl.addEventListener("input", function(){
+        barcodeSearchEl.classList.remove("is-invalid");
+    });
+}
+
+function selectProduct(item) {
+    let tbody = document.getElementById("orderItems");
+    let row = document.createElement("tr");
+
+    row.innerHTML = `
+        <td>${item.name}<input type="hidden" name="product_id[]" value="${item.id}"></td>
+        <td><input type="number" name="price[]" value="${item.price}"
+                   class="form-control price en-num" step="0.01" oninput="calculateTotal()"></td>
+        <td><input type="number" name="quantity[]" value="1"
+                   class="form-control quantity en-num" step="0.01" min="0.01"
+                   oninput="calculateTotal()"></td>
+        <td class="subtotal fw-bold en-num">${item.price}</td>
+        <td><button class="btn btn-danger btn-sm"
+                    onclick="this.closest('tr').remove(); calculateTotal()">×</button></td>
+    `;
+
+    tbody.appendChild(row);
+
+    document.getElementById("productSearch").value = "";
+    document.getElementById("searchResults").style.display = "none";
+
+    calculateTotal();
+}
+
+/* ============================ البحث عن زبون ============================ */
+let customerIndex = -1;
+
+document.getElementById("customerSearch").addEventListener("keyup", function (e) {
+    if (["ArrowDown", "ArrowUp", "Enter"].includes(e.key)) return;
+
+    let q = this.value.trim();
+    let box = document.getElementById("customerResults");
+
+    if (!q) {
+        box.style.display = "none";
+        return;
+    }
+
+    fetch(`/dashboard/{{ store.slug }}/search-customers/?q=` + encodeURIComponent(q))
+        .then(r => r.json())
+        .then(data => {
+            customerIndex = -1;
+            box.innerHTML = "";
+
+            data.results.forEach(item => {
+                let a = document.createElement("a");
+                a.className = "list-group-item list-group-item-action";
+                a.innerText = `${item.name} – ${item.phone}`;
+                a.onclick = () => selectCustomer(item);
+                box.appendChild(a);
+            });
+
+            box.style.display = "block";
+        });
+});
+
+/* الأسهم + Enter للزبائن */
+document.getElementById("customerSearch").addEventListener("keydown", function (e) {
+    let items = document.querySelectorAll("#customerResults .list-group-item");
+    if (!items.length) return;
+
+    if (e.key === "ArrowDown") {
+        e.preventDefault();
+        customerIndex = (customerIndex + 1) % items.length;
+    }
+    else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        customerIndex = (customerIndex - 1 + items.length) % items.length;
+    }
+    else if (e.key === "Enter") {
+        e.preventDefault();
+        if (customerIndex >= 0) items[customerIndex].click();
+        return;
+    }
+
+    items.forEach((item, i) => item.classList.toggle("active", i === customerIndex));
+});
+
+function selectCustomer(item) {
+    document.getElementById("customer_id").value = item.id;
+    document.getElementById("selectedCustomerName").innerText = item.name;
+
+    document.getElementById("customerSearchContainer").style.display = "none";
+    document.getElementById("selectedCustomerCard").style.display = "flex";
+    document.getElementById("customerResults").style.display = "none";
+}
+
+function removeCustomer() {
+    document.getElementById("customer_id").value = "";
+    document.getElementById("customerSearchContainer").style.display = "block";
+    document.getElementById("selectedCustomerCard").style.display = "none";
+}
+
+/* ============================ البحث عن مورد ============================ */
+let supplierIndex = -1;
+
+document.getElementById("supplierSearch").addEventListener("keyup", function (e) {
+    if (["ArrowDown", "ArrowUp", "Enter"].includes(e.key)) return;
+
+    let q = this.value.trim();
+    let box = document.getElementById("supplierResults");
+    if (!q) return box.style.display = "none";
+
+    fetch(`/dashboard/{{ store.slug }}/search-suppliers/?q=` + encodeURIComponent(q))
+    .then(r => r.json())
+    .then(data => {
+        supplierIndex = -1;
+        box.innerHTML = "";
+
+        data.results.forEach(item => {
+            let a = document.createElement("a");
+            a.className = "list-group-item list-group-item-action";
+            a.innerText = `${item.name} – ${item.phone}`;
+            a.onclick = () => selectSupplier(item);
+            box.appendChild(a);
+        });
+
+        box.style.display = "block";
+    });
+});
+
+/* الأسهم + Enter للموردين */
+document.getElementById("supplierSearch").addEventListener("keydown", function (e) {
+    let items = document.querySelectorAll("#supplierResults .list-group-item");
+    if (!items.length) return;
+
+    if (e.key === "ArrowDown") {
+        e.preventDefault();
+        supplierIndex = (supplierIndex + 1) % items.length;
+    }
+    else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        supplierIndex = (supplierIndex - 1 + items.length) % items.length;
+    }
+    else if (e.key === "Enter") {
+        e.preventDefault();
+        if (supplierIndex >= 0) items[supplierIndex].click();
+        return;
+    }
+
+    items.forEach((item, i) => item.classList.toggle("active", i === supplierIndex));
+});
+
+function selectSupplier(item) {
+    document.getElementById("supplier_id").value = item.id;
+    document.getElementById("supplierSearch").value = item.name;
+    document.getElementById("supplierResults").style.display = "none";
+}
+
+/* ============================ حساب المجاميع ============================ */
+function calculateTotal() {
+    let total = 0;
+
+    document.querySelectorAll("#orderItems tr").forEach(row => {
+        let price = parseFloat(row.querySelector(".price").value) || 0;
+        let qty   = parseFloat(row.querySelector(".quantity").value) || 0;
+        let sub   = price * qty;
+
+        row.querySelector(".subtotal").innerText = sub.toLocaleString();
+        total += sub;
+
+    });
+
+    let discount = parseFloat(document.querySelector("input[name='discount']").value) || 0;
+    document.getElementById("totalDisplay").value = (total - discount).toLocaleString();
+    updateCashbackPreview();
+
+}
+</script>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    const form = document.querySelector("form");
+    if (!form) return;
+
+    form.addEventListener("keydown", function (e) {
+        if (e.key === "Enter") {
+            const tag = e.target.tagName.toLowerCase();
+            if (tag !== "textarea") {
+                e.preventDefault();
+            }
+        }
+    });
+});
+</script>
+
+<script>
+const sidebar = document.getElementById("sidebar");
+const arrow = document.getElementById("sidebarArrow");
+arrow.onclick = () => {
+    sidebar.classList.toggle("active");
+    arrow.innerHTML = sidebar.classList.contains("active") ? "❮" : "❯";
+};
+</script>
+
+<script>
+function updateCashbackPreview() {
+    const rows = document.querySelectorAll("#orderItems tr");
+    let items = [];
+
+    rows.forEach(row => {
+        items.push({
+            product_id: row.querySelector("input[name='product_id[]']").value,
+            price: row.querySelector("input[name='price[]']").value,
+            quantity: row.querySelector("input[name='quantity[]']").value
+        });
+    });
+
+    if (items.length === 0) return;
+
+    fetch("/dashboard/stores/{{ store.slug }}/cashback-preview/", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            "X-CSRFToken": "{{ csrf_token }}"
+        },
+        body: JSON.stringify({ items: items })
+    })
+    .then(r => r.json())
+    .then(data => {
+        const input = document.querySelector("input[name='cashback_amount']");
+        if (input) {
+            input.value = data.cashback;
+        }
+    });
+}
+</script>
+
+</body>
+</html>

@@ -1,0 +1,339 @@
+﻿{% load static %}
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <title>إضافة إشعار – {{ store.name }}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+
+    <style>
+        body{
+            background:#f7f9fc;
+            font-family:"Cairo",sans-serif;
+            overflow-x:hidden;
+        }
+
+        .sidebar{
+            width:230px;
+            background:#fff;
+            height:100vh;
+            position:fixed;
+            top:0;
+            right:0;
+            padding:20px 15px;
+            border-left:1px solid #e0e0e0;
+            transition:.3s;
+            z-index:1000;
+        }
+
+        .sidebar a{
+            display:block;
+            padding:10px 12px;
+            margin-bottom:8px;
+            color:#333;
+            border-radius:8px;
+            text-decoration:none;
+        }
+
+        .sidebar a:hover{
+            background:#e9f2ff;
+            color:#0d6efd;
+        }
+
+        .content{
+            margin-right:240px;
+            padding:20px;
+            transition:.3s;
+        }
+
+        @media (max-width:768px){
+            .sidebar{ right:-260px; }
+            .sidebar.active{ right:0; }
+            .content{ margin-right:0; }
+        }
+
+        #sidebarArrow{
+            display:none;
+        }
+
+        @media (max-width:768px){
+            #sidebarArrow{
+                display:flex;
+                position:fixed;
+                top:50%;
+                right:0;
+                transform:translateY(-50%);
+                width:26px;
+                height:48px;
+                background:#1A2A4A;
+                color:#fff;
+                border-radius:10px 0 0 10px;
+                align-items:center;
+                justify-content:center;
+                font-size:18px;
+                cursor:pointer;
+                z-index:1001;
+                box-shadow:-3px 0 10px rgba(0,0,0,.15);
+                user-select:none;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+<!-- سهم السايدبار -->
+<div id="sidebarArrow">❯</div>
+
+{% include "dashboard/sidebar.html" %}
+
+<div class="content">
+
+    <!-- الهيدر -->
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h3 class="mb-0">➕ إضافة إشعار عميل / مورد</h3>
+        <a href="{% url 'dashboard:notices_list' store.slug %}" class="btn btn-secondary">رجوع</a>
+    </div>
+
+    <form method="post">
+        {% csrf_token %}
+        <input type="hidden" name="customer_id" id="customer_id">
+        <input type="hidden" name="supplier_id" id="supplier_id">
+
+        <!-- نوع الإشعار -->
+        <div class="card p-3 mb-3 shadow-sm border-0">
+            <label class="form-label fw-bold">نوع الإشعار</label>
+            <select id="transaction_type" name="transaction_type"
+                    class="form-select" onchange="toggleTransactionFields()" required>
+                <option value="">اختر النوع</option>
+                <option value="sale">عميل</option>
+                {% if can_add_purchase_notice %}
+                    <option value="purchase">مورد</option>
+                {% endif %}
+            </select>
+            {% if not can_add_purchase_notice %}
+                <div class="form-text mt-2">هذه الصلاحية مخصصة لإشعار القبض فقط.</div>
+            {% endif %}
+        </div>
+
+        <!-- الطرف -->
+        <div class="card p-3 mb-3 shadow-sm border-0">
+
+            <!-- زبون -->
+            <div id="customerBox" style="display:none;">
+                <label class="form-label fw-bold">العميل</label>
+                <div class="position-relative">
+                    <input type="text" id="customerSearch" class="form-control"
+                           placeholder="ابحث عن زبون..." autocomplete="off">
+                    <div id="customerResults" class="list-group mt-1"></div>
+                </div>
+            </div>
+
+            <!-- مورد -->
+            <div id="supplierBox" style="display:none;">
+                <label class="form-label fw-bold">المورد</label>
+                <div class="position-relative">
+                    <input type="text" id="supplierSearch" class="form-control"
+                           placeholder="ابحث عن مورد..." autocomplete="off">
+                    <div id="supplierResults" class="list-group mt-1"></div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- المبالغ -->
+        <div class="card p-3 mb-3 shadow-sm border-0">
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="fw-bold">المقبوض من عميل/المدفوع الى مورد</label>
+                    <input type="number" name="payment" step="0.01"
+                           class="form-control" placeholder="0">
+                </div>
+                <div class="col-md-6">
+                    <label class="fw-bold">المدفوع الى عميل/المقبوض من مورد</label>
+                    <input type="number" name="amount" step="0.01"
+                           class="form-control" placeholder="0">
+                </div>
+            </div>
+        </div>
+
+        <!-- حفظ -->
+        <div class="d-flex justify-content-end">
+            <button class="btn btn-success px-4">💾 حفظ الإشعار</button>
+        </div>
+
+    </form>
+</div>
+
+<!-- ================== سكربتات ================== -->
+<script>
+let customerIndex = -1;
+let supplierIndex = -1;
+</script>
+
+<script>
+function toggleTransactionFields() {
+    const type = document.getElementById("transaction_type").value;
+
+    document.getElementById("customerBox").style.display =
+        type === "sale" ? "block" : "none";
+
+    document.getElementById("supplierBox").style.display =
+        type === "purchase" ? "block" : "none";
+
+    document.getElementById("customer_id").value = "";
+    document.getElementById("supplier_id").value = "";
+}
+</script>
+
+<script>
+/* ===== بحث الزبائن ===== */
+document.getElementById("customerSearch").addEventListener("keyup", function (e) {
+    if (["ArrowDown","ArrowUp","Enter"].includes(e.key)) return;
+
+    const q = this.value.trim();
+    const box = document.getElementById("customerResults");
+    if (!q) { box.style.display = "none"; return; }
+
+    fetch(`/dashboard/{{ store.slug }}/search-customers/?q=` + encodeURIComponent(q))
+        .then(r => r.json())
+        .then(data => {
+            box.innerHTML = "";
+            customerIndex = -1;
+            data.results.forEach(item => {
+                const a = document.createElement("a");
+                a.className = "list-group-item list-group-item-action";
+                a.textContent = `${item.name} – ${item.phone}`;
+                a.onclick = () => {
+                    document.getElementById("customer_id").value = item.id;
+                    document.getElementById("customerSearch").value = item.name;
+                    box.style.display = "none";
+                };
+                a.onmouseenter = () => {
+                    const items = document.querySelectorAll("#customerResults .list-group-item");
+                    items.forEach((el, i) => {
+                        el.classList.toggle("active", el === a);
+                        if (el === a) customerIndex = i;
+                    });
+                };
+                box.appendChild(a);
+            });
+            box.style.display = "block";
+        });
+});
+</script>
+<script>
+/* ===== الأسهم + Enter للزبائن ===== */
+document.getElementById("customerSearch").addEventListener("keydown", function (e) {
+    const items = document.querySelectorAll("#customerResults .list-group-item");
+    if (!items.length) return;
+
+    if (e.key === "ArrowDown") {
+        e.preventDefault();
+        customerIndex = (customerIndex + 1) % items.length;
+    }
+    else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        customerIndex = (customerIndex - 1 + items.length) % items.length;
+    }
+    else if (e.key === "Enter") {
+        e.preventDefault();
+        if (customerIndex >= 0) {
+            items[customerIndex].click();
+        }
+        return;
+    }
+    else if (e.key === "Escape") {
+        document.getElementById("customerResults").style.display = "none";
+        customerIndex = -1;
+        return;
+    }
+
+    items.forEach((item, i) => {
+        item.classList.toggle("active", i === customerIndex);
+    });
+});
+</script>
+
+<script>
+/* ===== بحث الموردين ===== */
+document.getElementById("supplierSearch").addEventListener("keyup", function (e) {
+    if (["ArrowDown","ArrowUp","Enter"].includes(e.key)) return;
+
+    const q = this.value.trim();
+    const box = document.getElementById("supplierResults");
+    if (!q) { box.style.display = "none"; return; }
+
+    fetch(`/dashboard/{{ store.slug }}/search-suppliers/?q=` + encodeURIComponent(q))
+        .then(r => r.json())
+        .then(data => {
+            box.innerHTML = "";
+            supplierIndex = -1;
+            data.results.forEach(item => {
+                const a = document.createElement("a");
+                a.className = "list-group-item list-group-item-action";
+                a.textContent = `${item.name} – ${item.phone}`;
+                a.onclick = () => {
+                    document.getElementById("supplier_id").value = item.id;
+                    document.getElementById("supplierSearch").value = item.name;
+                    box.style.display = "none";
+                };
+                a.onmouseenter = () => {
+                    const items = document.querySelectorAll("#supplierResults .list-group-item");
+                    items.forEach((el, i) => {
+                        el.classList.toggle("active", el === a);
+                        if (el === a) supplierIndex = i;
+                    });
+                };
+                box.appendChild(a);
+            });
+            box.style.display = "block";
+        });
+});
+</script>
+<script>
+/* ===== الأسهم + Enter للموردين ===== */
+document.getElementById("supplierSearch").addEventListener("keydown", function (e) {
+    const items = document.querySelectorAll("#supplierResults .list-group-item");
+    if (!items.length) return;
+
+    if (e.key === "ArrowDown") {
+        e.preventDefault();
+        supplierIndex = (supplierIndex + 1) % items.length;
+    }
+    else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        supplierIndex = (supplierIndex - 1 + items.length) % items.length;
+    }
+    else if (e.key === "Enter") {
+        e.preventDefault();
+        if (supplierIndex >= 0) {
+            items[supplierIndex].click();
+        }
+        return;
+    }
+    else if (e.key === "Escape") {
+        document.getElementById("supplierResults").style.display = "none";
+        supplierIndex = -1;
+        return;
+    }
+
+    items.forEach((item, i) => {
+        item.classList.toggle("active", i === supplierIndex);
+    });
+});
+</script>
+<script>
+    const sidebar = document.getElementById("sidebar");
+    const arrow = document.getElementById("sidebarArrow");
+
+    arrow.onclick = () => {
+        sidebar.classList.toggle("active");
+        arrow.innerHTML = sidebar.classList.contains("active") ? "❮" : "❯";
+    };
+</script>
+
+</body>
+</html>

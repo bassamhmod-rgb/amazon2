@@ -1,0 +1,373 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8" />
+    <title>Amazon Syria | أمازون سوريا</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+
+    <style>
+        :root {
+            --primary-color: #1A2A4A;
+            --accent-color: #FFB400;
+            --light-bg: #F3F5F7;
+        }
+
+        body {
+            font-family: "Cairo", sans-serif;
+            background-color: var(--light-bg);
+            color: #222;
+        }
+
+        .main-header {
+            background-color: #3a1177;
+            border-bottom: 1px solid #93afea;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .brand-title-en {
+            font-size: 1.6rem;
+            font-weight: 700;
+            color: #f5f1f1;
+        }
+
+        .brand-title-ar {
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: #f5f1f1;
+        }
+
+        .brand-subtitle {
+            font-size: 0.8rem;
+            color: #f9f5f5;
+        }
+
+        .merchant-login-btn {
+            border-radius: 999px;
+            border: 1px solid var(--primary-color);
+            color: var(--primary-color);
+            font-weight: 600;
+            padding: 0.35rem 1.3rem;
+            background-color: #fff;
+        }
+
+        .merchant-login-btn:hover {
+            background-color: var(--primary-color);
+            color: #fff;
+        }
+
+        .hero-section {
+            padding: 3rem 0 2rem;
+            background: linear-gradient(135deg,#FFEBBB 0%,#FFD98A 15%,#9DD6FF 55%,#b9c2d4 100%);
+        }
+
+        .hero-title {
+            font-size: 1.9rem;
+            font-weight: 700;
+            color: var(--primary-color);
+            margin-bottom: 1rem;
+        }
+
+        .hero-text {
+            font-size: 1rem;
+            color: #555;
+            max-width: 32rem;
+        }
+
+        .hero-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            background-color: rgba(255, 180, 0, 0.09);
+            color: #b77906;
+            border-radius: 999px;
+            padding: 0.25rem 0.9rem;
+            font-size: 0.85rem;
+            margin-bottom: 0.7rem;
+        }
+
+        .stores-section {
+            padding: 2.5rem 0 2rem;
+        }
+
+        .store-card {
+            background-color: #ffffff;
+            border-radius: 16px;
+            padding: 1.1rem 1rem 1.3rem;
+            box-shadow: 0 8px 18px rgba(15,23,42,0.06);
+            border: 1px solid #5070af;
+            transition: .18s ease-out;
+        }
+
+        .store-card:hover {
+            transform: translateY(-4px);
+            border-color: var(--accent-color);
+        }
+
+        .store-logo-circle {
+    width: 100px;          /* كان 60 */
+    height: 100px;         /* كان 60 */
+    border-radius: 999px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 0.7rem;
+    background: radial-gradient(circle, #FFB400, #fde68a);
+    font-weight: 700;
+    color: #111;
+}
+
+
+        .notice-box {
+            background-color: #fefce8;
+            border: 1px solid #fbbf24;
+            color: #78350f;
+            border-radius: 12px;
+            padding: 1rem;
+        }
+
+        .main-footer {
+            background-color: var(--primary-color);
+            padding: 1.5rem 0;
+            color: #e5e7eb;
+        }
+    </style>
+<link rel="manifest" href="{% static 'manifest.json' %}">
+<link rel="icon" href="{% static 'pwa/icon-192.png' %}">
+<meta name="theme-color" content="#0d6efd">
+</head>
+
+<body>
+
+<header class="main-header">
+    <div class="container py-2 d-flex justify-content-between align-items-center">
+        
+        <div class="d-flex align-items-center gap-2">
+            <div class="dropdown">
+                <button class="btn btn-outline-light dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                    
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end">
+                    <li><a class="dropdown-item" href="{% url 'core:contact' %}">تواصل معنا</a></li>
+                    <li><a class="dropdown-item" href="{% url 'core:about' %}">حول المنصة</a></li>
+                    <li><a class="dropdown-item" href="{% url 'core:terms' %}">الشروط والأحكام</a></li>
+                </ul>
+            </div>
+
+            <div>
+                <span class="brand-title-en">Amazon Syria</span><br>
+                <span class="brand-title-ar">أمازون سوريا</span><br>
+                <span class="brand-subtitle">منصّة المتاجر الإلكترونية</span>
+            </div>
+        </div>
+
+        <div class="d-flex align-items-center gap-2">
+            {% if request.user.is_staff %}
+            <a href="/admin/" class="btn btn-dark">
+                ⚙️ لوحة تحكم الأدمن
+            </a>
+            {% endif %}
+
+            <a href="{% url 'accounts:login' %}" class="merchant-login-btn btn">
+                🔐 تسجيل دخول التاجر
+            </a>
+        </div>
+
+    </div>
+</header>
+
+<section class="hero-section">
+    <div class="container">
+
+        <div class="row align-items-center">
+
+            <div class="col-md-6 mb-4">
+
+                <div class="hero-badge">🌟 كل المتاجر بمكان واحد</div>
+
+                <h1 class="hero-title">اختار المتجر يلي بناسب احتياجاتك… وبلّش تسوّق بكل سهولة!</h1>
+
+                <p class="hero-text">
+                    منصة <strong>Amazon Syria</strong> تجمع المتاجر السورية بمكان واحد،
+                    اختار المتجر أو ابحث مباشرة عن متجر أو منتج.
+                </p>
+
+                <!-- FORM -->
+                <form method="get" action="" class="mb-4">
+                    <div class="input-group">
+
+                        <select name="type" class="form-select" style="max-width:95px;">
+                            <option value="products" {% if type == "products" %}selected{% endif %}>منتجات</option>
+                            <option value="stores" {% if type == "stores" %}selected{% endif %}>متاجر</option>
+                        </select>
+
+                        <input type="text" name="q" value="{{ query }}" class="form-control"
+                               placeholder="ابحث عن متجر أو منتج...">
+
+                        <button class="btn btn-primary">بحث</button>
+                    </div>
+                </form>
+
+                <!-- RESULTS -->
+                {% if query %}
+                    <div class="mt-4 p-3 bg-white rounded shadow-sm">
+                        <h5>نتائج البحث لـ: <strong>{{ query }}</strong></h5>
+
+                        <!-- 🔴 منتجات -->
+                        {% if type == "products" %}
+                            {% if results %}
+                                <div class="row mt-3">
+                                    {% for product in results %}
+                                    <div class="col-6 col-md-4 col-lg-3 mb-3">
+                                        <div class="card shadow-sm" style="border-radius:14px;overflow:hidden;">
+
+                                            <a href="{% url 'stores:product_public' product.store.slug product.id %}"
+                                               class="text-decoration-none text-dark">
+
+                                                {% if product.image %}
+                                                <img src="{{ product.image.url }}" class="card-img-top"
+                                                     style="height:180px; object-fit:cover;">
+                                                {% else %}
+                                                <div style="height:180px; background:#eee;"></div>
+                                                {% endif %}
+
+                                                <div class="card-body">
+
+                                                    <h6 class="card-title">{{ product.name }}</h6>
+
+                                                    <p class="fw-bold text-primary mb-1">
+                                                        {{ product.price }} ل.س
+                                                    </p>
+
+                                                    <p class="text-muted mb-1" style="font-size:0.85rem;">
+                                                        المتجر:
+                                                        <a href="{% url 'stores:store_front' product.store.slug %}"
+                                                           class="text-decoration-none">
+                                                            {{ product.store.slug }}
+                                                        </a>
+                                                    </p>
+
+                                                     
+                                                </div>
+                                            </a>
+                                        </div>
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                            {% else %}
+                                <div class="alert alert-warning mt-2">لا يوجد منتجات مطابقة.</div>
+                            {% endif %}
+                        {% endif %}
+
+                        <!-- 🔵 متاجر -->
+                        {% if type == "stores" %}
+                            {% if stores %}
+                                {% for st in stores %}
+                                <div class="alert alert-primary mt-2">
+                                    🏪 <strong>
+                                        <a href="{% url 'stores:store_front' st.slug %}"
+                                           class="text-decoration-none text-light">
+                                            {{ st.slug }}
+                                        </a>
+                                    </strong>
+                                   
+                                </div>
+                                {% endfor %}
+                            {% else %}
+                                <div class="alert alert-warning mt-2">لا يوجد متاجر مطابقة.</div>
+                            {% endif %}
+                        {% endif %}
+
+                    </div>
+                {% endif %}
+
+            </div>
+
+            <div class="col-md-6">
+                <div class="hero-image-placeholder"
+                     style="background: radial-gradient(circle at top left,#FFB400 0,rgba(255,180,0,0.2) 30%,transparent 60%),
+                                    radial-gradient(circle at bottom right,#1A2A4A 0,rgba(26,42,74,0.2) 35%,transparent 70%);
+                            border-radius: 24px; height: 350px; overflow: hidden;">
+                    <img src="{% static 'image/logo1.jpg' %}" alt="Logo"
+                         style="width:100%; height:100%; object-fit:cover;">
+                </div>
+            </div>
+
+        </div>
+
+    </div>
+</section>
+
+
+<section id="stores" class="stores-section">
+    <div class="container text-center">
+
+        <h2 class="section-title">اختر المتجر الذي يناسبك</h2>
+        <p class="section-subtitle">شبكة متاجر مستقلة — لكل متجر صفحته الخاصة</p>
+
+        <div class="row g-3 mt-2">
+           {% for store in stores %}
+<div class="col-6 col-md-3">
+    <div class="store-card">
+
+        {% if store.logo %}
+            <div class="store-logo-circle p-0">
+                <img src="{{ store.logo.url }}"
+                     alt="{{ store.name }}"
+                     style="width:100%; height:100%; object-fit:cover; border-radius:50%;">
+            </div>
+        {% else %}
+            <div class="store-logo-circle">
+                {{ store.slug|slice:":2"|upper }}
+            </div>
+        {% endif %}
+
+        <div class="store-slug">{{ store.slug }}</div>
+
+        {% if store.description %}
+            <div class="store-category">{{ store.description }}</div>
+        {% endif %}
+
+        <a href="{% url 'stores:store_front' store.slug %}"
+           class="btn btn-outline-primary mt-2">
+            زيارة المتجر
+        </a>
+
+    </div>
+</div>
+{% endfor %}
+
+        </div>
+
+        <div class="notice-box mt-4">
+            <strong>تنويه:</strong>
+            كل متجر مسؤول عن أسعاره وسياسة التوصيل.  
+            دورنا فقط تسهيل الوصول لكل المتاجر السورية بمكان واحد.
+        </div>
+
+    </div>
+</section>
+
+<footer class="main-footer">
+    <div class="container d-flex flex-column flex-md-row justify-content-between">
+        <div>© <span id="year"></span> Amazon Syria – جميع الحقوق محفوظة.</div>
+        <div>
+            <a href="{% url 'core:about' %}" class="footer-link">حول المنصّة</a> |
+            <a href="{% url 'core:contact' %}" class="footer-link">تواصل معنا</a> |
+            <a href="{% url 'core:terms' %}" class="footer-link">الشروط والأحكام</a>
+        </div>
+    </div>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+document.getElementById("year").textContent = new Date().getFullYear();
+</script>
+
+</body>
+</html>

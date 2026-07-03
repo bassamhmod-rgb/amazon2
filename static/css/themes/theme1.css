@@ -1,0 +1,114 @@
+/* ==========================
+   🎨 THEME 1 – Purple Style
+   ========================== */
+
+:root {
+    --primary-color: #5B21B6;
+    --accent-color: #9333EA;
+    --soft-bg: #F3E8FF;
+
+    --text-dark: #1E1B4B;
+    --text-light: #6D28D9;
+
+    --header-bg: #ffffff;
+    --header-border: #E9D5FF;
+
+    --footer-bg: #5B21B6;
+    --footer-text: #e5e7eb;
+
+    --hero-gradient-start: #7C3AED;
+    --hero-gradient-end: #5B21B6;
+    --hero-shadow: 0 10px 22px rgba(92, 28, 176, 0.25);
+
+    --white: #ffffff;
+
+    --card-bg: #FAF5FF;
+    --card-border: #E9D5FF;
+    --card-shadow: 0 8px 18px rgba(92, 28, 176, 0.10);
+    --card-shadow-hover: 0 12px 26px rgba(92, 28, 176, 0.20);
+
+    --notice-bg: #F5EBFF;
+    --notice-border: #E9D5FF;
+
+    --soft-border: #E9D5FF;
+}
+
+/* HERO */
+.hero-section {
+    background: linear-gradient(135deg, var(--hero-gradient-start), var(--hero-gradient-end));
+    color: #fff;
+}
+
+/* HEADER */
+.main-header {
+    background: var(--header-bg);
+    border-bottom: 1px solid var(--header-border);
+}
+
+/* STORE CARD */
+.store-card {
+    background-color: var(--card-bg);
+    border: 1px solid var(--card-border);
+    box-shadow: var(--card-shadow);
+}
+.store-card:hover {
+    border-color: var(--accent-color);
+    box-shadow: var(--card-shadow-hover);
+}
+
+/* LOGO CIRCLE */
+.store-logo-circle {
+    background: linear-gradient(135deg, var(--hero-gradient-start), var(--hero-gradient-end));
+    color: #fff;
+}
+
+/* BUTTONS */
+.btn-outline-primary {
+    border-color: var(--accent-color);
+    color: var(--accent-color);
+}
+.btn-outline-primary:hover {
+    background: var(--accent-color);
+    color: #fff;
+}
+.btn-primary {
+    background: var(--accent-color);
+}
+.btn-primary:hover {
+    background: var(--primary-color);
+}
+
+/* TEXTS */
+.section-title {
+    color: var(--primary-color);
+}
+.section-subtitle {
+    color: var(--text-light);
+}
+
+/* NOTICE */
+.notice-box {
+    background: var(--notice-bg);
+    border: 1px solid var(--notice-border);
+    color: var(--text-dark);
+}
+
+/* FOOTER */
+.main-footer {
+    background-color: var(--footer-bg);
+    color: var(--footer-text);
+}
+.store-card {
+    background-color: #ffffff;
+    border-radius: 16px;
+    padding: 1.1rem 1rem 1.3rem;
+    border: 1px solid var(--card-border, #e7d9ff);
+    box-shadow: var(--card-shadow, 0 8px 18px rgba(76, 29, 149, 0.10));
+    transition: 0.22s ease-out;  /* 🔥 هاد اللي بيخلي الحركة ناعمة */
+}
+
+.store-card:hover {
+    transform: translateY(-4px);  /* 🔥 هاد اللي بيرفع الكرت لفوق */
+    border-color: var(--accent-color);
+    box-shadow: var(--card-shadow-hover, 0 10px 26px rgba(124, 58, 237, 0.20));
+}

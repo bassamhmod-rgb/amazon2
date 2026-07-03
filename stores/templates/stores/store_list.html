@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Our Stores</title>
+</head>
+<body>
+  <h1>Available Stores</h1>
+  <ul>
+    {% for store in stores %}
+      <li>
+        <a href="{% url 'stores:store_front' store.slug %}">
+          {% if store.logo %}
+            <img src="{{ store.logo.url }}" alt="{{ store.slug }}" style="height:50px;">
+          {% endif %}
+          {{ store.slug }} - {{ store.mobile }}
+        </a>
+      </li>
+    {% empty %}
+      <li>No stores yet.</li>
+    {% endfor %}
+  </ul>
+</body>
+</html>

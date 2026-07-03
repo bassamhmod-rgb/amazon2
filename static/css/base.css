@@ -1,0 +1,97 @@
+/* إجبار الأرقام تظهر إنكليزية بكل الموقع */
+.en-num {
+    direction: ltr !important;
+    unicode-bidi: plaintext !important;
+}
+.customer-points-box {
+    background: var(--notice-bg);         /* نفس ستايل الصناديق البنفسجية الناعمة */
+    border: 1px solid var(--notice-border);
+    padding: 12px 18px;
+    border-radius: 14px;
+
+    color: var(--text-dark);
+    box-shadow: 0 4px 10px rgba(92, 28, 176, 0.08);
+}
+
+.customer-points-box .points-title {
+    font-weight: 700;
+    font-size: 1rem;
+    color: var(--primary-color);          /* البنفسجي الغامق */
+}
+
+.customer-points-box p {
+    margin-top: 6px;
+    font-size: 0.86rem;
+    color: var(--text-light);             /* بنفسجي فاتح */
+}
+
+.customer-points-box a {
+    margin-top: 4px;
+    display: inline-block;
+    font-size: 0.9rem;
+    color: #c50d0d;                       /* لون تسجيل الخروج ❗ */
+    text-decoration: underline;
+    font-weight: 600;
+}
+
+.customer-points-box a:hover {
+    color: #9b0000;
+}
+.customer-points-box {
+    background: var(--notice-bg);
+    border: 1px solid var(--notice-border);
+    padding: 14px 18px;
+    border-radius: 14px;
+    color: var(--text-dark);
+    box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+}
+
+.customer-points-box .welcome-title {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--accent-color);
+    margin-bottom: 6px;
+}
+
+.customer-points-box .points-title {
+    font-weight: 700;
+    font-size: 1rem;
+    color: var(--primary-color);
+}
+
+.customer-points-box p {
+    margin-top: 6px;
+    font-size: 0.86rem;
+    color: var(--text-light);
+}
+
+.customer-points-box a {
+    margin-top: 6px;
+    display: inline-block;
+    font-size: 0.9rem;
+    color: #c50d0d;
+    text-decoration: underline;
+    font-weight: 600;
+}
+
+.customer-points-box a:hover {
+    color: #9b0000;
+}
+.cart-btn-theme {
+    padding: 0.45rem 1rem;
+    border-radius: 12px;
+    border: 1px solid var(--primary-color);
+    color: var(--primary-color);
+    background: transparent;
+    text-decoration: none;
+    transition: 0.25s;
+}
+
+.cart-btn-theme:hover {
+    background: var(--primary-color);
+    color: #fff;
+}
+.sidebar {
+    right: 0 !important;
+    left: auto !important;
+}

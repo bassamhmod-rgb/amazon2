@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>MultiStore Platform</title>
+</head>
+<body>
+  <header>
+    <h1>Welcome to MultiStore Platform</h1>
+    <p>We create customized online stores for merchants.</p>
+
+    {% if user.is_authenticated %}
+      <p>Hello, {{ user.username }} – <a href="{% url 'accounts:logout' %}">Logout</a></p>
+    {% else %}
+      <a href="{% url 'accounts:login' %}">Merchant Login</a> |
+      <a href="{% url 'accounts:signup' %}">Create Customer Account</a>
+    {% endif %}
+  </header>
+
+  <section>
+    <h2>Our Stores</h2>
+    <ul>
+      {% for store in stores %}
+        <li>
+          <a href="{% url 'stores:store_front' store.slug %}">
+            {{ store.name }}
+          </a>
+        </li>
+      {% empty %}
+        <li>No stores yet.</li>
+      {% endfor %}
+    </ul>
+
+    <p><a href="{% url 'stores:store_list' %}">View all stores</a></p>
+  </section>
+
+  <footer>
+    <p>Contact us: info@example.com | +00 123 456 789</p>
+  </footer>
+</body>
+</html>

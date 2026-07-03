@@ -1,0 +1,249 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <title>الصرفيات – {{ store.name }}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+
+    <style>
+        body{
+            background:#f7f9fc;
+            font-family:"Cairo",sans-serif;
+            overflow-x:hidden;
+        }
+        .sidebar{
+            width:230px;
+            background:#fff;
+            height:100vh;
+            position:fixed;
+            top:0;
+            right:0;
+            padding:20px 15px;
+            border-left:1px solid #e0e0e0;
+            transition:.3s;
+            z-index:1000;
+        }
+        .sidebar a{
+            display:block;
+            padding:10px 12px;
+            margin-bottom:8px;
+            color:#333;
+            border-radius:8px;
+            text-decoration:none;
+        }
+        .sidebar a:hover{
+            background:#e9f2ff;
+            color:#0d6efd;
+        }
+        .content{
+            margin-right:240px;
+            padding:20px;
+            transition:.3s;
+        }
+        @media (max-width:768px){
+            .sidebar{ right:-260px; }
+            .sidebar.active{ right:0; }
+            .content{ margin-right:0; }
+        }
+        #sidebarArrow{
+            display:none;
+        }
+        @media (max-width:768px){
+            #sidebarArrow{
+                display:flex;
+                position:fixed;
+                top:50%;
+                right:0;
+                transform:translateY(-50%);
+                width:26px;
+                height:48px;
+                background:#1A2A4A;
+                color:#fff;
+                border-radius:10px 0 0 10px;
+                align-items:center;
+                justify-content:center;
+                font-size:18px;
+                cursor:pointer;
+                z-index:1001;
+                box-shadow:-3px 0 10px rgba(0,0,0,.15);
+                user-select:none;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+<div id="sidebarArrow">❯</div>
+
+{% include "dashboard/sidebar.html" %}
+
+<div class="content">
+
+    <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+        <div>
+            <h3 class="mb-1">💸 الصرفيات</h3>
+            <div class="text-muted">
+                إجمالي الصرفيات (حسب الفلترة): <strong>{{ total_amount }}</strong>
+            </div>
+        </div>
+        <a href="{% url 'dashboard:expense_settings' store.slug %}" class="btn btn-outline-primary">
+            ⚙ إدارة الأنواع والأسباب
+        </a>
+    </div>
+
+    <div class="card p-3 shadow-sm mb-3">
+        <form id="expenseFilterForm" method="get" class="row g-3 align-items-end">
+            <div class="col-md-3">
+                <label class="form-label">من تاريخ</label>
+                <input type="date" name="date_from" class="form-control js-filter-input" value="{{ date_from }}">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">إلى تاريخ</label>
+                <input type="date" name="date_to" class="form-control js-filter-input" value="{{ date_to }}">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">النوع</label>
+                <select name="type_id" class="form-select js-filter-input">
+                    <option value="">الكل</option>
+                    {% for t in expense_types %}
+                        <option value="{{ t.id }}" {% if selected_type_id == t.id|stringformat:"s" %}selected{% endif %}>
+                            {{ t.name }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">السبب</label>
+                <select name="reason_id" class="form-select js-filter-input">
+                    <option value="">الكل</option>
+                    {% for r in expense_reasons %}
+                        <option value="{{ r.id }}" {% if selected_reason_id == r.id|stringformat:"s" %}selected{% endif %}>
+                            {{ r.name }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-12 d-flex gap-2">
+                <a class="btn btn-outline-secondary" href="{% url 'dashboard:expenses_list' store.slug %}">مسح</a>
+            </div>
+        </form>
+    </div>
+
+    <div class="card p-3 shadow-sm mb-3">
+        <form method="post" class="row g-3">
+            {% csrf_token %}
+            <div class="col-md-3">
+                <label class="form-label">المبلغ</label>
+                <input type="number" step="0.01" name="amount" class="form-control" value="0">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">التاريخ</label>
+                <input type="date" name="date" class="form-control" value="{{ today|date:'Y-m-d' }}">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">النوع</label>
+                <select name="expense_type" class="form-select">
+                    <option value="">—</option>
+                    {% for t in expense_types %}
+                        <option value="{{ t.id }}">{{ t.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">السبب</label>
+                <select name="expense_reason" class="form-select">
+                    <option value="">—</option>
+                    {% for r in expense_reasons %}
+                        <option value="{{ r.id }}">{{ r.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-12">
+                <label class="form-label">ملاحظات</label>
+                <textarea name="notes" class="form-control" rows="2"></textarea>
+            </div>
+            <div class="col-12">
+                <button class="btn btn-success">➕ إضافة صرفية</button>
+            </div>
+        </form>
+    </div>
+
+    <div class="card p-3 shadow-sm">
+        <div class="table-responsive">
+            <table class="table table-striped align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th>المبلغ</th>
+                        <th>التاريخ</th>
+                        <th>النوع</th>
+                        <th>السبب</th>
+                        <th>ملاحظات</th>
+                        <th class="text-center" style="width:170px;">إجراءات</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for expense in expenses %}
+                    <tr>
+                        <td>{{ expense.amount }}</td>
+                        <td>{{ expense.date|date:"Y-m-d" }}</td>
+                        <td>{{ expense.expense_type.name|default:"-" }}</td>
+                        <td>{{ expense.expense_reason.name|default:"-" }}</td>
+                        <td>{{ expense.notes|default:"-" }}</td>
+                        <td class="text-center">
+                            <a href="{% url 'dashboard:expense_edit' store.slug expense.id %}" class="btn btn-sm btn-outline-primary">
+                                تعديل
+                            </a>
+                            <form method="post"
+                                  action="{% url 'dashboard:expense_delete' store.slug expense.id %}"
+                                  class="d-inline"
+                                  onsubmit="return confirm('هل أنت متأكد من الحذف؟');">
+                                {% csrf_token %}
+                                <button class="btn btn-sm btn-danger">حذف</button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="6" class="text-center text-muted">
+                            لا توجد صرفيات حالياً
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+    const sidebar = document.getElementById("sidebar");
+    const arrow = document.getElementById("sidebarArrow");
+
+    arrow.onclick = () => {
+        sidebar.classList.toggle("active");
+        arrow.innerHTML = sidebar.classList.contains("active") ? "❮" : "❯";
+    };
+</script>
+<script>
+    const filterForm = document.getElementById("expenseFilterForm");
+    let filterTimer = null;
+
+    document.querySelectorAll(".js-filter-input").forEach((el) => {
+        el.addEventListener("change", () => {
+            filterForm.submit();
+        });
+        if (el.tagName === "INPUT") {
+            el.addEventListener("input", () => {
+                if (el.type !== "date") return;
+                clearTimeout(filterTimer);
+                filterTimer = setTimeout(() => filterForm.submit(), 300);
+            });
+        }
+    });
+</script>
+</body>
+</html>
