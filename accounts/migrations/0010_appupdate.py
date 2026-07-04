@@ -15,8 +15,8 @@ class Migration(migrations.Migration):
             fields=[
                 ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
                 ('app_name', models.CharField(max_length=50, unique=True)),
-                ('version', models.DateTimeField()),
-                ('prices_version', models.DateTimeField()),
+                ('version', models.PositiveIntegerField()),
+                ('prices_version', models.PositiveIntegerField()),
                 ('updated_at', models.DateTimeField(auto_now=True)),
             ],
         ),
