@@ -7,7 +7,7 @@ import django.db.models.deletion
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('accounts', '0019_alter_appupdate_prices_version_and_more'),
+        ('accounts', '0018_storeuser_auth_user'),
         ('orders', '0017_order_created_by_store_user'),
     ]
 
