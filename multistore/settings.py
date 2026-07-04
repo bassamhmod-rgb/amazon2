@@ -5,7 +5,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 SECRET_KEY = "change-me"
 
-DEBUG = True
+#DEBUG = True
 ADMINS = [("Admin", "admin@example.com")]
 LOGGING = {
     "version": 1,
