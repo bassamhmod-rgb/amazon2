@@ -6,6 +6,15 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = "change-me"
 
 DEBUG = True
+
+
+def _env_list(name, default):
+    raw = os.getenv(name)
+    if not raw:
+        return default
+    return [item.strip() for item in raw.split(",") if item.strip()]
+
+
 ADMINS = [("Admin", "admin@example.com")]
 LOGGING = {
     "version": 1,
@@ -30,9 +39,24 @@ LOGGING = {
 ALLOWED_HOSTS = [
     "amazon2-dwsb.onrender.com",
     "www.amazon2-dwsb.onrender.com",
+    "amazonsyria.com",
+    "www.amazonsyria.com",
     "127.0.0.1",
     "localhost",
 ]
+
+ALLOWED_HOSTS += _env_list("DJANGO_ALLOWED_HOSTS", [])
+
+CSRF_TRUSTED_ORIGINS = [
+    "https://amazon2-dwsb.onrender.com",
+    "https://www.amazon2-dwsb.onrender.com",
+    "https://amazonsyria.com",
+    "https://www.amazonsyria.com",
+]
+CSRF_TRUSTED_ORIGINS += _env_list("DJANGO_CSRF_TRUSTED_ORIGINS", [])
+
+USE_X_FORWARDED_HOST = True
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
 INSTALLED_APPS = [
     "django.contrib.admin",
