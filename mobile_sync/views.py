@@ -1260,6 +1260,7 @@ def orders_push(request):
                 local_order_id = _to_int(order_payload.get("local_order_id"))
                 sync_client_id = _to_str(order_payload.get("sync_client_id")).strip() or None
                 accounting_invoice_number = _to_int(order_payload.get("accounting_invoice_number"))
+                document_kind = _to_int(order_payload.get("document_kind"), 1)
 
                 customer = resolve_customer(order_payload)
                 store_user = resolve_store_user(order_payload)
@@ -1317,6 +1318,7 @@ def orders_push(request):
                     order_qs = Order.objects.filter(
                         store=store,
                         accounting_invoice_number=accounting_invoice_number,
+                        document_kind=document_kind,
                     ).select_related("customer", "supplier", "warehouse", "created_by_store_user")
                     if store_user is None:
                         order_qs = order_qs.filter(created_by_store_user__isnull=True)
@@ -1327,6 +1329,7 @@ def orders_push(request):
                     order = Order(
                         store=store,
                         accounting_invoice_number=accounting_invoice_number if not sync_client_id else None,
+                        document_kind=document_kind,
                         mobile_sync_client_id=sync_client_id,
                         mobile_local_order_id=local_order_id,
                     )
@@ -1340,6 +1343,7 @@ def orders_push(request):
                     order.mobile_local_order_id = local_order_id
                 order.warehouse = warehouse
                 order.transaction_type = transaction_type
+                order.document_kind = document_kind
                 order.status = status_value
                 order.discount = Decimal(str(discount))
                 order.payment = Decimal(str(payment))
@@ -1394,6 +1398,7 @@ def orders_push(request):
                     "server_order_id": order.id,
                     "server_update_time": order.update_time or 0,
                     "accounting_invoice_number": order.accounting_invoice_number,
+                    "document_kind": order.document_kind,
                     "cashback_status": cashback_entry["status"],
                     "cashback_amount": float(cashback_entry["cashback_amount"] or 0),
                     "items": created_items,
