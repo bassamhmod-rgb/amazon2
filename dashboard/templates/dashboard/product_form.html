@@ -97,6 +97,62 @@
             box-sizing:border-box;
         }
 
+        .barcode-actions{
+            display:flex;
+            gap:10px;
+            flex-wrap:wrap;
+            align-items:center;
+        }
+
+        #scan-barcode-btn{
+            display:none;
+        }
+
+        .barcode-scanner-modal{
+            position:fixed;
+            inset:0;
+            background:rgba(0,0,0,.72);
+            display:none;
+            align-items:center;
+            justify-content:center;
+            padding:16px;
+            z-index:3000;
+        }
+
+        .barcode-scanner-modal.show{
+            display:flex;
+        }
+
+        .barcode-scanner-dialog{
+            width:min(100%, 520px);
+            background:#fff;
+            border-radius:18px;
+            padding:16px;
+            box-shadow:0 18px 50px rgba(0,0,0,.35);
+        }
+
+        .barcode-scanner-head{
+            display:flex;
+            align-items:center;
+            justify-content:space-between;
+            gap:12px;
+            margin-bottom:12px;
+        }
+
+        .barcode-scanner-video{
+            width:100%;
+            max-height:62vh;
+            border-radius:14px;
+            background:#111;
+            object-fit:cover;
+        }
+
+        @media (max-width:768px){
+            #scan-barcode-btn{
+                display:inline-flex;
+            }
+        }
+
         textarea{
             min-height:140px;
             resize:vertical;
@@ -234,9 +290,14 @@
                     </div>
                 {% endif %}
             </div>
-            <button type="button" class="btn btn-outline-secondary my-2" id="add-barcode">
-                + &#1573;&#1590;&#1575;&#1601;&#1577; &#1576;&#1575;&#1585;&#1603;&#1608;&#1583;
-            </button>
+            <div class="barcode-actions mb-2">
+                <button type="button" class="btn btn-outline-secondary" id="add-barcode">
+                    + &#1573;&#1590;&#1575;&#1601;&#1577; &#1576;&#1575;&#1585;&#1603;&#1608;&#1583;
+                </button>
+                <button type="button" class="btn btn-primary" id="scan-barcode-btn">
+                    &#1605;&#1587;&#1581; &#1576;&#1575;&#1604;&#1603;&#1575;&#1605;&#1610;&#1585;&#1575;
+                </button>
+            </div>
 
             <!-- Product Details -->
             <hr class="my-4">
@@ -290,6 +351,26 @@
 
     </div>
 </div>
+
+<div class="barcode-scanner-modal" id="barcode-scanner-modal" aria-hidden="true">
+    <div class="barcode-scanner-dialog">
+        <div class="barcode-scanner-head">
+            <strong>&#1605;&#1587;&#1581; &#1575;&#1604;&#1576;&#1575;&#1585;&#1603;&#1608;&#1583;</strong>
+            <button type="button" class="btn-close" id="barcode-scanner-close" aria-label="Close"></button>
+        </div>
+        <video id="barcode-scanner-video" class="barcode-scanner-video" autoplay muted playsinline></video>
+        <div class="small text-muted mt-2" id="barcode-scanner-status">
+            &#1610;&#1578;&#1605; &#1576;&#1581;&#1579; &#1575;&#1604;&#1576;&#1575;&#1585;&#1603;&#1608;&#1583; &#1576;&#1575;&#1604;&#1603;&#1575;&#1605;&#1610;&#1585;&#1575;...
+        </div>
+        <div class="d-flex gap-2 mt-3">
+            <button type="button" class="btn btn-secondary" id="barcode-scanner-cancel">
+                &#1573;&#1594;&#1604;&#1575;&#1602;
+            </button>
+        </div>
+    </div>
+</div>
+
+<input type="file" id="barcode-image-input" accept="image/*" capture="environment" class="d-none">
 
 <script>
 const sidebar = document.getElementById("sidebar");
@@ -346,6 +427,179 @@ addBarcodeBtn.onclick = () => {
 document.addEventListener("click", e => {
     if(e.target.classList.contains("remove-barcode")){
         e.target.closest(".barcode-row")?.remove();
+    }
+});
+
+const scanBarcodeBtn = document.getElementById("scan-barcode-btn");
+const barcodeScannerModal = document.getElementById("barcode-scanner-modal");
+const barcodeScannerVideo = document.getElementById("barcode-scanner-video");
+const barcodeScannerStatus = document.getElementById("barcode-scanner-status");
+const barcodeScannerClose = document.getElementById("barcode-scanner-close");
+const barcodeScannerCancel = document.getElementById("barcode-scanner-cancel");
+const barcodeImageInput = document.getElementById("barcode-image-input");
+
+let barcodeStream = null;
+let barcodeDetector = null;
+let scannerActive = false;
+
+function setBarcodeValue(value){
+    const inputs = Array.from(document.querySelectorAll('input[name="barcode_value"]'));
+    const target = inputs.find(input => !input.value.trim()) || inputs[0];
+    if(!target){
+        return;
+    }
+    target.value = value;
+    target.focus();
+    target.dispatchEvent(new Event("input", { bubbles: true }));
+}
+
+function stopBarcodeStream(){
+    scannerActive = false;
+    if(barcodeStream){
+        barcodeStream.getTracks().forEach(track => track.stop());
+        barcodeStream = null;
+    }
+    barcodeScannerVideo.srcObject = null;
+}
+
+function closeBarcodeScanner(){
+    stopBarcodeStream();
+    barcodeScannerModal.classList.remove("show");
+    barcodeScannerModal.setAttribute("aria-hidden", "true");
+}
+
+async function ensureBarcodeDetector(){
+    if(!("BarcodeDetector" in window)){
+        return null;
+    }
+
+    if(!barcodeDetector){
+        try{
+            barcodeDetector = new BarcodeDetector({
+                formats: [
+                    "ean_13",
+                    "ean_8",
+                    "upc_a",
+                    "upc_e",
+                    "code_128",
+                    "code_39",
+                    "code_93",
+                    "itf",
+                    "qr_code",
+                    "data_matrix"
+                ]
+            });
+        }catch(err){
+            barcodeDetector = null;
+        }
+    }
+
+    return barcodeDetector;
+}
+
+async function scanVideoFrame(){
+    if(!scannerActive || !barcodeDetector || !barcodeScannerVideo.videoWidth){
+        if(scannerActive){
+            requestAnimationFrame(scanVideoFrame);
+        }
+        return;
+    }
+
+    try{
+        const codes = await barcodeDetector.detect(barcodeScannerVideo);
+        if(codes && codes.length){
+            const value = (codes[0].rawValue || "").trim();
+            if(value){
+                setBarcodeValue(value);
+                barcodeScannerStatus.textContent = "تم إدخال الباركود.";
+                closeBarcodeScanner();
+                return;
+            }
+        }
+    }catch(err){
+        barcodeScannerStatus.textContent = "تعذر قراءة الباركود من الكاميرا.";
+    }
+
+    requestAnimationFrame(scanVideoFrame);
+}
+
+async function openBarcodeScanner(){
+    const detector = await ensureBarcodeDetector();
+    if(!detector || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
+        barcodeImageInput.click();
+        return;
+    }
+
+    try{
+        barcodeScannerModal.classList.add("show");
+        barcodeScannerModal.setAttribute("aria-hidden", "false");
+        barcodeScannerStatus.textContent = "وجّه الكاميرا نحو الباركود...";
+
+        barcodeStream = await navigator.mediaDevices.getUserMedia({
+            video: {
+                facingMode: { ideal: "environment" }
+            },
+            audio: false
+        });
+
+        barcodeScannerVideo.srcObject = barcodeStream;
+        await barcodeScannerVideo.play();
+        scannerActive = true;
+        requestAnimationFrame(scanVideoFrame);
+    }catch(err){
+        closeBarcodeScanner();
+        barcodeImageInput.click();
+    }
+}
+
+async function scanBarcodeImage(file){
+    if(!file){
+        return;
+    }
+
+    const detector = await ensureBarcodeDetector();
+    if(!detector){
+        alert("المتصفح لا يدعم مسح الباركود بالكاميرا.");
+        return;
+    }
+
+    try{
+        const bitmap = await createImageBitmap(file);
+        const codes = await detector.detect(bitmap);
+        if(bitmap.close){
+            bitmap.close();
+        }
+
+        if(codes && codes.length){
+            const value = (codes[0].rawValue || "").trim();
+            if(value){
+                setBarcodeValue(value);
+                return;
+            }
+        }
+
+        alert("لم يتم العثور على باركود داخل الصورة.");
+    }catch(err){
+        alert("تعذر قراءة الصورة.");
+    }
+}
+
+scanBarcodeBtn?.addEventListener("click", openBarcodeScanner);
+barcodeScannerClose?.addEventListener("click", closeBarcodeScanner);
+barcodeScannerCancel?.addEventListener("click", closeBarcodeScanner);
+barcodeScannerModal?.addEventListener("click", function(e){
+    if(e.target === barcodeScannerModal){
+        closeBarcodeScanner();
+    }
+});
+barcodeImageInput?.addEventListener("change", function(){
+    const file = this.files && this.files[0];
+    scanBarcodeImage(file);
+    this.value = "";
+});
+document.addEventListener("keydown", function(e){
+    if(e.key === "Escape" && barcodeScannerModal.classList.contains("show")){
+        closeBarcodeScanner();
     }
 });
 </script>
