@@ -993,12 +993,17 @@ def sync_push(request):
             return Product.objects.filter(store_id=merchant_id, access_id=int(product_access_id)).first()
         return None
 
-    def resolve_barcode_product(payload_item):
+    def resolve_barcode_product(
+        product_id=None,
+        product_access_id=None,
+        product_server_id=None,
+        product_local_id=None,
+    ):
         return resolve_product(
-            payload_item.get("product_id"),
-            payload_item.get("product_access_id"),
-            payload_item.get("product_server_id"),
-            payload_item.get("product_local_id"),
+            product_id,
+            product_access_id,
+            product_server_id,
+            product_local_id,
         )
 
     upserts = [item for item in changes if str(item.get("action", "upsert")).lower() != "delete"]
