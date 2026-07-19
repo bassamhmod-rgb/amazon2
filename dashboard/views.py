@@ -636,11 +636,11 @@ def delete_gallery_image(request, image_id):
 # 🔹 حذف منتج
 @login_required
 def product_delete(request, store_slug, product_id):
-    store = get_object_or_404(
-        Store,
-        slug=store_slug,
-        owner=request.user
-    )
+    store = _get_store_for_dashboard(request, store_slug)
+
+    if store.owner_id != request.user.id:
+        messages.error(request, "لا تملك صلاحية حذف المنتجات.")
+        return redirect("dashboard:products_list", store_slug=store.slug)
 
     product_qs = Product.objects.filter(
         id=product_id,

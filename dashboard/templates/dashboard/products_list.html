@@ -182,6 +182,12 @@
         </a>
     </div>
 
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags|default:'info' }} mb-3">{{ message }}</div>
+        {% endfor %}
+    {% endif %}
+
     <!-- فلترة -->
     <form method="get" class="row g-2 mb-3" id="productsFilterForm">
         <div class="col-12 col-md-4">
