@@ -9,6 +9,8 @@ psycopg2-binary==2.9.11
 djangorestframework==3.16.1
 django-filter==24.3
 django-bootstrap4==24.3
+django-cloudinary-storage==0.3.0
+cloudinary==1.41.0
 beautifulsoup4==4.12.3
 requests==2.32.5
 pillow==10.4.0

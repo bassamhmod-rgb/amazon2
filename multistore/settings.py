@@ -86,6 +86,9 @@ INSTALLED_APPS = [
 
 ]
 
+if os.getenv("CLOUDINARY_URL"):
+    INSTALLED_APPS = ["cloudinary_storage", *INSTALLED_APPS, "cloudinary"]
+
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
@@ -163,6 +166,11 @@ STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 MEDIA_URL = "/media/"
 MEDIA_ROOT = Path(os.getenv("DJANGO_MEDIA_ROOT", BASE_DIR / "media"))
 SERVE_MEDIA_FILES = _env_bool("DJANGO_SERVE_MEDIA_FILES", DEBUG)
+
+if os.getenv("CLOUDINARY_URL"):
+    DEFAULT_FILE_STORAGE = "cloudinary_storage.storage.MediaCloudinaryStorage"
+    MEDIA_URL = "/media/"
+    SERVE_MEDIA_FILES = False
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 DEFAULT_CHARSET = "utf-8"
