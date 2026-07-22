@@ -650,7 +650,7 @@ def product_delete(request, store_slug, product_id):
     if not product_qs.exists():
         messages.warning(
             request,
-            "âڑ ï¸ڈ ط§ظ„ظ…ظ†طھط¬ ط؛ظٹط± ظ…ظˆط¬ظˆط¯ ط£ظˆ طھظ… ط­ط°ظپظ‡ ظ…ط³ط¨ظ‚ط§ظ‹"
+            "المنتج غير موجود أو تم حذفه مسبقًا"
         )
         return redirect("dashboard:products_list", store_slug=store.slug)
 
@@ -658,7 +658,7 @@ def product_delete(request, store_slug, product_id):
         product_qs.delete()
         messages.success(
             request,
-            "ًں—‘ï¸ڈ طھظ… ط­ط°ظپ ط§ظ„ظ…ظ†طھط¬ ط¨ظ†ط¬ط§ط­"
+            "تم حذف المنتج بنجاح"
         )
 
     return redirect("dashboard:products_list", store_slug=store.slug)
@@ -695,7 +695,7 @@ def add_category(request, store_slug):
         if not name:
             return render(request, "dashboard/category_form.html", {
                 "store": store,
-                "error": "ط§ظ„ط±ط¬ط§ط، ط¥ط¯ط®ط§ظ„ ط§ط³ظ… ط§ظ„ظپط¦ط©",
+                "error": "الرجاء إدخال اسم الفئة",
             })
 
         # إنشاء الفئة وربطها تلقائياً بالمتجر
@@ -980,11 +980,11 @@ def order_create(request, store_slug):
                 supplier = Supplier.objects.filter(id=supplier_id, store=store).first()
 
         if transaction_type == "sale" and not customer:
-            messages.error(request, "ظٹط¬ط¨ ط§ط®طھظٹط§ط± ط²ط¨ظˆظ† ظ„ط¥طھظ…ط§ظ… ط¹ظ…ظ„ظٹط© ط§ظ„ط¨ظٹط¹.")
+            messages.error(request, "يجب اختيار زبون لإتمام عملية البيع.")
             return redirect("dashboard:order_create", store_slug=store.slug)
 
         if transaction_type == "purchase" and not supplier:
-            messages.error(request, "ظٹط¬ط¨ ط§ط®طھظٹط§ط± ظ…ظˆط±ط¯ ظ„ط¥طھظ…ط§ظ… ط¹ظ…ظ„ظٹط© ط§ظ„ط´ط±ط§ط،.")
+            messages.error(request, "يجب اختيار مورد لإتمام عملية الشراء.")
             return redirect("dashboard:order_create", store_slug=store.slug)
 
         status = "confirmed"
@@ -1261,7 +1261,7 @@ def orders_list(request, store_slug):
         "current_status": status,
         "current_id": order_id,
         "current_transaction_type": transaction_type,
-        "new_orders_count": new_orders_count,  # ظ…ظ‡ظ… ظ„ظ„ظ€ sidebar
+        "new_orders_count": new_orders_count,  # مهم للـ sidebar
     }
 
     # 🔴 انتبه: هون ما عم نغيّر is_seen_by_store
@@ -2298,11 +2298,11 @@ def balances_report(request, store_slug):
         customer.calc_balance = bal
         customer.calc_balance_abs = abs(bal)
         if bal > 0:
-            customer.calc_balance_label = "ظ…ط¯ظٹظ†"
+            customer.calc_balance_label = "مدين"
         elif bal < 0:
-            customer.calc_balance_label = "ط¯ط§ط¦ظ†"
+            customer.calc_balance_label = "دائن"
         else:
-            customer.calc_balance_label = "ظ…طھظˆط§ط²ظ†"
+            customer.calc_balance_label = "متوازن"
 
     for supplier in suppliers:
         bal = supplier_balances.get(supplier.id, Decimal("0"))
@@ -2310,19 +2310,19 @@ def balances_report(request, store_slug):
         supplier.calc_balance = bal
         supplier.calc_balance_abs = abs(bal)
         if bal > 0:
-            supplier.calc_balance_label = "ظ…ط¯ظٹظ†"
+            supplier.calc_balance_label = "مدين"
         elif bal < 0:
-            supplier.calc_balance_label = "ط¯ط§ط¦ظ†"
+            supplier.calc_balance_label = "دائن"
         else:
-            supplier.calc_balance_label = "ظ…طھظˆط§ط²ظ†"
+            supplier.calc_balance_label = "متوازن"
 
     customers = [customer for customer in customers if customer.calc_balance != 0]
     suppliers = [supplier for supplier in suppliers if supplier.calc_balance != 0]
 
     customer_total_abs = abs(customer_total)
     supplier_total_abs = abs(supplier_total)
-    customer_total_label = "ظ…ط¯ظٹظ†" if customer_total > 0 else "ط¯ط§ط¦ظ†" if customer_total < 0 else "ظ…طھظˆط§ط²ظ†"
-    supplier_total_label = "ظ…ط¯ظٹظ†" if supplier_total > 0 else "ط¯ط§ط¦ظ†" if supplier_total < 0 else "ظ…طھظˆط§ط²ظ†"
+    customer_total_label = "مدين" if customer_total > 0 else "دائن" if customer_total < 0 else "متوازن"
+    supplier_total_label = "مدين" if supplier_total > 0 else "دائن" if supplier_total < 0 else "متوازن"
 
     return render(request, "dashboard/balances_report.html", {
         "store": store,
