@@ -123,6 +123,7 @@ def _serialize_customer(customer):
         "note": customer.note or "",
         "balance": float(customer.balance),
         "opening_balance": float(customer.opening_balance),
+        "is_subscription_active": customer.is_subscription_active,
         "access_id": customer.access_id,
         "update_time": customer.update_time or 0,
     }
@@ -424,6 +425,7 @@ def _apply_customer_change(store, payload, server_id=None):
         "note": note,
         "balance": Decimal(str(_to_float(payload.get("balance"), 0.0))),
         "opening_balance": Decimal(str(_to_float(payload.get("opening_balance"), 0.0))),
+        "is_subscription_active": _to_bool(payload.get("is_subscription_active")),
         "update_time": now_minute,
     }
     if access_id is not None:
@@ -443,6 +445,7 @@ def _apply_customer_change(store, payload, server_id=None):
         note=note,
         balance=update_fields["balance"],
         opening_balance=update_fields["opening_balance"],
+        is_subscription_active=update_fields["is_subscription_active"],
         update_time=now_minute,
     )
     return obj, "created"
@@ -535,6 +538,7 @@ def customers_pull(request):
             "note",
             "balance",
             "opening_balance",
+            "is_subscription_active",
             "access_id",
             "update_time",
         )
