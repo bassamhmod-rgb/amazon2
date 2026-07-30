@@ -1847,6 +1847,7 @@ def customer_create(request, store_slug):
     if request.method == "POST":
         name = request.POST.get("name")
         phone = request.POST.get("phone")
+        is_subscription_active = request.POST.get("is_subscription_active") == "on"
 
         duplicate_name = Customer.objects.filter(store=store, name=name).exists()
         duplicate_phone = Customer.objects.filter(store=store, phone=phone).exists()
@@ -1863,7 +1864,8 @@ def customer_create(request, store_slug):
         Customer.objects.create(
             store=store,
             name=name,
-            phone=phone
+            phone=phone,
+            is_subscription_active=is_subscription_active
         )
 
         return redirect("dashboard:customers_list", store_slug=store.slug)
@@ -1883,6 +1885,7 @@ def customer_update(request, store_slug, customer_id):
         phone = (request.POST.get("phone") or "").strip()
         address = (request.POST.get("address") or "").strip()
         note = (request.POST.get("note") or "").strip()
+        is_subscription_active = request.POST.get("is_subscription_active") == "on"
 
         if not name or not phone:
             messages.error(request, "الاسم ورقم الموبايل مطلوبان.")
@@ -1917,6 +1920,7 @@ def customer_update(request, store_slug, customer_id):
             "phone": phone,
             "address": address,
             "note": note,
+            "is_subscription_active": is_subscription_active,
         }
         if customer.access_id not in (None, 0, ""):
             update_data["update_time"] = int(timezone.now().timestamp() // 60)

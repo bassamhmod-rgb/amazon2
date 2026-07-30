@@ -132,6 +132,7 @@
                     <tr>
                         <th>اسم العميل</th>
                         <th>رقم الهاتف</th>
+                        <th>الاشتراك</th>
                         <th class="text-center" style="min-width:120px;">خيارات</th>
                     </tr>
                 </thead>
@@ -140,6 +141,13 @@
                     <tr class="customer-row" data-search="{{ customer.name|default:'' }} {{ customer.phone|default:'' }}">
                         <td>{{ customer.name }}</td>
                         <td>{{ customer.phone }}</td>
+                        <td>
+                            {% if customer.is_subscription_active %}
+                                <span class="badge bg-success">مفعل</span>
+                            {% else %}
+                                <span class="badge bg-secondary">غير مفعل</span>
+                            {% endif %}
+                        </td>
                         <td class="text-center">
                             <a href="{% url 'dashboard:customer_update' store.slug customer.id %}" class="btn btn-warning">تعديل</a>
                             <form method="post" action="{% url 'dashboard:delete_customer' store.slug customer.id %}" style="display:inline;">
@@ -150,7 +158,7 @@
                     </tr>
                 {% empty %}
                     <tr class="empty-initial-row">
-                        <td colspan="3" class="text-center text-muted">لا يوجد عملاء بعد</td>
+                        <td colspan="4" class="text-center text-muted">لا يوجد عملاء بعد</td>
                     </tr>
                 {% endfor %}
                 </tbody>

@@ -171,6 +171,8 @@ class Customer(models.Model):
         help_text="ط§ظ„ط±طµظٹط¯ ط§ظ„ط³ط§ط¨ظ‚ ط¨ظٹظ† ط§ظ„طھط§ط¬ط± ظˆط§ظ„ط¹ظ…ظٹظ„"
     )
 
+    is_subscription_active = models.BooleanField(default=False)
+
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
