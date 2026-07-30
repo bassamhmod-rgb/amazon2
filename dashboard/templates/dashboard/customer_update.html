@@ -74,6 +74,12 @@
                     <textarea name="note" class="form-control" rows="3">{{ customer.note|default:'' }}</textarea>
                 </div>
 
+                <div class="mb-3">
+                    <label class="form-label">قيمة الاشتراك</label>
+                    <input type="number" name="balance" class="form-control"
+                           min="0" step="0.01" value="{{ customer.balance }}">
+                </div>
+
                 <div class="form-check mb-3">
                     <input class="form-check-input" type="checkbox" name="is_subscription_active" id="is_subscription_active" {% if customer.is_subscription_active %}checked{% endif %}>
                     <label class="form-check-label" for="is_subscription_active">الاشتراك مفعل</label>

@@ -1847,7 +1847,17 @@ def customer_create(request, store_slug):
     if request.method == "POST":
         name = request.POST.get("name")
         phone = request.POST.get("phone")
+        balance_raw = (request.POST.get("balance") or "0").strip()
         is_subscription_active = request.POST.get("is_subscription_active") == "on"
+
+        try:
+            balance = Decimal(balance_raw.replace(",", "."))
+        except (InvalidOperation, TypeError):
+            messages.error(request, "قيمة الاشتراك غير صالحة.")
+            return render(request, "dashboard/customer_create.html", {
+                "store": store,
+                "form_data": request.POST,
+            })
 
         duplicate_name = Customer.objects.filter(store=store, name=name).exists()
         duplicate_phone = Customer.objects.filter(store=store, phone=phone).exists()
@@ -1865,6 +1875,7 @@ def customer_create(request, store_slug):
             store=store,
             name=name,
             phone=phone,
+            balance=balance,
             is_subscription_active=is_subscription_active
         )
 
@@ -1885,10 +1896,20 @@ def customer_update(request, store_slug, customer_id):
         phone = (request.POST.get("phone") or "").strip()
         address = (request.POST.get("address") or "").strip()
         note = (request.POST.get("note") or "").strip()
+        balance_raw = (request.POST.get("balance") or "0").strip()
         is_subscription_active = request.POST.get("is_subscription_active") == "on"
 
         if not name or not phone:
             messages.error(request, "الاسم ورقم الموبايل مطلوبان.")
+            return render(request, "dashboard/customer_update.html", {
+                "store": store,
+                "customer": customer,
+            })
+
+        try:
+            balance = Decimal(balance_raw.replace(",", "."))
+        except (InvalidOperation, TypeError):
+            messages.error(request, "قيمة الاشتراك غير صالحة.")
             return render(request, "dashboard/customer_update.html", {
                 "store": store,
                 "customer": customer,
@@ -1920,6 +1941,7 @@ def customer_update(request, store_slug, customer_id):
             "phone": phone,
             "address": address,
             "note": note,
+            "balance": balance,
             "is_subscription_active": is_subscription_active,
         }
         if customer.access_id not in (None, 0, ""):

@@ -116,17 +116,23 @@
         <div class="mb-3">
             <label class="form-label">اسم العميل</label>
             <input type="text" name="name" class="form-control"
-                   placeholder="اكتب اسم العميل" required>
+                   placeholder="اكتب اسم العميل" value="{{ form_data.name }}" required>
         </div>
 
         <div class="mb-3">
             <label class="form-label">رقم الموبايل</label>
             <input type="text" name="phone" class="form-control"
-                   placeholder="مثال: 0933333333" required>
+                   placeholder="مثال: 0933333333" value="{{ form_data.phone }}" required>
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">قيمة الاشتراك</label>
+            <input type="number" name="balance" class="form-control"
+                   min="0" step="0.01" value="{{ form_data.balance|default:'0' }}">
         </div>
 
         <div class="form-check mb-3">
-            <input class="form-check-input" type="checkbox" name="is_subscription_active" id="is_subscription_active">
+            <input class="form-check-input" type="checkbox" name="is_subscription_active" id="is_subscription_active" checked>
             <label class="form-check-label" for="is_subscription_active">الاشتراك مفعل</label>
         </div>
 
