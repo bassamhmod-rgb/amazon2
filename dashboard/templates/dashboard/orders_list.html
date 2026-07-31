@@ -132,12 +132,17 @@
 
     <!-- فلترة -->
     <form method="get" class="row g-2 mb-3">
-        <div class="col-12 col-md-3">
+        <div class="col-12 col-md-2">
             <input type="number" name="order_id" class="form-control"
-                   value="{{ current_id }}" placeholder="رقم الطلب">
+                   value="{{ current_id }}" placeholder="رقم الطلب بالمتجر">
         </div>
 
-        <div class="col-12 col-md-3">
+        <div class="col-12 col-md-2">
+            <input type="number" name="mobile_order_id" class="form-control"
+                   value="{{ current_mobile_id }}" placeholder="رقم الطلب بالتطبيق">
+        </div>
+
+        <div class="col-12 col-md-2">
             <select name="status" class="form-select">
                 <option value="">كل الحالات</option>
                 <option value="pending" {% if current_status == 'pending' %}selected{% endif %}>
@@ -149,7 +154,7 @@
             </select>
         </div>
 
-        <div class="col-12 col-md-3">
+        <div class="col-12 col-md-2">
             <select name="transaction_type" class="form-select">
                 <option value="">كل المعاملات</option>
                 <option value="sale" {% if current_transaction_type == 'sale' %}selected{% endif %}>

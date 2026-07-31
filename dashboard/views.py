@@ -1229,6 +1229,7 @@ def orders_list(request, store_slug):
 
     status = request.GET.get("status", "")
     order_id = request.GET.get("order_id", "")
+    mobile_order_id = request.GET.get("mobile_order_id", "")
     transaction_type = request.GET.get("transaction_type", "")
 
     # كل طلبات المتجر (الطلبات فقط بدون إشعارات القبض/الصرف)
@@ -1241,6 +1242,10 @@ def orders_list(request, store_slug):
     # فلترة حسب رقم الطلب
     if order_id:
         orders = orders.filter(id=order_id)
+
+    # فلترة حسب رقم الطلب في التطبيق
+    if mobile_order_id:
+        orders = orders.filter(mobile_local_order_id=mobile_order_id)
 
     # فلترة حسب نوع المعاملة (بيع / شراء)
     if transaction_type:
@@ -1260,6 +1265,7 @@ def orders_list(request, store_slug):
         "orders": orders,
         "current_status": status,
         "current_id": order_id,
+        "current_mobile_id": mobile_order_id,
         "current_transaction_type": transaction_type,
         "new_orders_count": new_orders_count,  # مهم للـ sidebar
     }
@@ -1375,6 +1381,8 @@ def notices_list(request, store_slug):
 
     # ===== فلترة الاسم حسب نوع الحركة =====
     keyword = (request.GET.get("keyword") or "").strip()
+    notice_id = (request.GET.get("notice_id") or "").strip()
+    mobile_notice_id = (request.GET.get("mobile_notice_id") or "").strip()
 
     if keyword:
         if normalized_type == "sale":
@@ -1384,6 +1392,12 @@ def notices_list(request, store_slug):
             # فلترة حسب اسم المورد
             notices = notices.filter(supplier__name__icontains=keyword)
 
+    if notice_id:
+        notices = notices.filter(id=notice_id)
+
+    if mobile_notice_id:
+        notices = notices.filter(mobile_local_order_id=mobile_notice_id)
+
     notices = notices.order_by("-created_at")
 
     return render(request, "dashboard/notices_list.html", {
@@ -1391,6 +1405,8 @@ def notices_list(request, store_slug):
         "notices": notices,
         "current_type": transaction_type,
         "current_keyword": keyword,
+        "current_notice_id": notice_id,
+        "current_mobile_notice_id": mobile_notice_id,
         "can_create_notice": True,
         "can_delete_notice": store.owner_id == request.user.id,
     })
@@ -1409,6 +1425,8 @@ def notices_filter(request, store_slug):
     transaction_type = request.GET.get("transaction_type")
     customer_id = request.GET.get("customer_id")
     supplier_id = request.GET.get("supplier_id")
+    notice_id = (request.GET.get("notice_id") or "").strip()
+    mobile_notice_id = (request.GET.get("mobile_notice_id") or "").strip()
 
     if transaction_type:
         if transaction_type == "in":
@@ -1424,6 +1442,12 @@ def notices_filter(request, store_slug):
 
     if supplier_id and supplier_id.isdigit():
         notices = notices.filter(supplier_id=supplier_id)
+
+    if notice_id:
+        notices = notices.filter(id=notice_id)
+
+    if mobile_notice_id:
+        notices = notices.filter(mobile_local_order_id=mobile_notice_id)
 
     notices = notices.order_by("-created_at")
 

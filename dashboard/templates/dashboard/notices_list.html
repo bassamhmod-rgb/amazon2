@@ -112,6 +112,19 @@
     </div>
 <div class="card p-3 mb-3 shadow-sm border-0">
 
+    <div class="row g-2 mb-3">
+        <div class="col-12 col-md-6">
+            <label class="form-label fw-bold">رقم الإشعار بالمتجر</label>
+            <input type="number" id="filterNoticeId" class="form-control"
+                   value="{{ current_notice_id }}" placeholder="رقم الإشعار بالمتجر">
+        </div>
+        <div class="col-12 col-md-6">
+            <label class="form-label fw-bold">رقم الإشعار بالتطبيق</label>
+            <input type="number" id="filterMobileNoticeId" class="form-control"
+                   value="{{ current_mobile_notice_id }}" placeholder="رقم الإشعار بالتطبيق">
+        </div>
+    </div>
+
     <label class="form-label fw-bold">نوع الإشعار</label>
     <select id="filter_type" class="form-select mb-3" onchange="onFilterTypeChange()">
         <option value="">الكل</option>
@@ -193,12 +206,18 @@ function onFilterTypeChange() {
 }
 
 function applyNoticeFilter() {
-    let url = `/dashboard/store/{{ store.slug }}/notices/filter/?`;
+    const params = new URLSearchParams();
 
     const type = document.getElementById("filter_type").value;
-    if (type) url += `transaction_type=${type}&`;
-    if (filterCustomerId) url += `customer_id=${filterCustomerId}&`;
-    if (filterSupplierId) url += `supplier_id=${filterSupplierId}`;
+    const noticeId = document.getElementById("filterNoticeId").value.trim();
+    const mobileNoticeId = document.getElementById("filterMobileNoticeId").value.trim();
+    if (type) params.set("transaction_type", type);
+    if (noticeId) params.set("notice_id", noticeId);
+    if (mobileNoticeId) params.set("mobile_notice_id", mobileNoticeId);
+    if (filterCustomerId) params.set("customer_id", filterCustomerId);
+    if (filterSupplierId) params.set("supplier_id", filterSupplierId);
+
+    const url = `/dashboard/store/{{ store.slug }}/notices/filter/?${params.toString()}`;
 
     fetch(url)
         .then(r => r.text())
@@ -206,6 +225,9 @@ function applyNoticeFilter() {
             document.getElementById("noticesTable").innerHTML = html;
         });
 }
+
+document.getElementById("filterNoticeId").addEventListener("input", applyNoticeFilter);
+document.getElementById("filterMobileNoticeId").addEventListener("input", applyNoticeFilter);
 </script>
 <script>
     const sidebar = document.getElementById("sidebar");
