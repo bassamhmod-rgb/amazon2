@@ -139,7 +139,7 @@
                         <td>{{ supplier.name }}</td>
                         <td>{{ supplier.phone }}</td>
                         <td>{{ supplier.address }}</td>
-                        <td>{{ supplier.opening_balance }} ل.س</td>
+                        <td>{{ supplier.opening_balance|floatformat:2 }} {{ currency_symbol }}</td>
                         <td class="text-center">
                             <a href="{% url 'dashboard:supplier_update' store.slug supplier.id %}" class="btn btn-warning">تعديل</a>
                             <form method="post" action="{% url 'dashboard:delete_supplier' store.slug supplier.id %}" style="display:inline;">

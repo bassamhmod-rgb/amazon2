@@ -164,7 +164,7 @@
             <div class="summary-card">
                 <div class="label">إجمالي أرصدة العملاء</div>
                 <div class="value">
-                    {{ customer_total_abs }} ل.س
+                    {{ customer_total_abs }} {{ currency_symbol }}
                     (
                     {% if customer_total > 0 %}
                         مدين
@@ -181,7 +181,7 @@
             <div class="summary-card">
                 <div class="label">إجمالي أرصدة الموردين</div>
                 <div class="value">
-                    {{ supplier_total_abs }} ل.س
+                    {{ supplier_total_abs }} {{ currency_symbol }}
                     (
                     {% if supplier_total > 0 %}
                         مدين
@@ -213,7 +213,7 @@
                         <td>{{ customer.name }}</td>
                         <td>{{ customer.phone }}</td>
                         <td>
-                            {{ customer.calc_balance_abs }} ل.س
+                            {{ customer.calc_balance_abs }} {{ currency_symbol }}
                             (
                             {% if customer.calc_balance > 0 %}
                                 مدين
@@ -254,7 +254,7 @@
                         <td>{{ supplier.name }}</td>
                         <td>{{ supplier.phone }}</td>
                         <td>
-                            {{ supplier.calc_balance_abs }} ل.س
+                            {{ supplier.calc_balance_abs }} {{ currency_symbol }}
                             (
                             {% if supplier.calc_balance > 0 %}
                                 مدين

@@ -1840,6 +1840,7 @@ def suppliers_list(request, store_slug):
         "store": store,
         "suppliers": suppliers,
         "q": q,
+        "currency_symbol": "$" if store.pricing_currency == "USD" else "ل.س",
     })
 
 
@@ -2384,6 +2385,7 @@ def balances_report(request, store_slug):
         "supplier_total_abs": supplier_total_abs,
         "customer_total_label": customer_total_label,
         "supplier_total_label": supplier_total_label,
+        "currency_symbol": "$" if store.pricing_currency == "USD" else "ل.س",
     })
 
 
