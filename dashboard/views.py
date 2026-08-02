@@ -1848,6 +1848,7 @@ def suppliers_list(request, store_slug):
 def customers_list(request, store_slug):
     store = _get_store_for_dashboard(request, store_slug)
     customers = Customer.objects.filter(store=store).exclude(name__in=HIDDEN_CUSTOMER_NAMES_IN_LISTS)
+    active_customers_count = customers.filter(is_subscription_active=True).count()
     q = (request.GET.get("q") or "").strip()
     if q:
         customers = customers.filter(
@@ -1861,6 +1862,7 @@ def customers_list(request, store_slug):
     return render(request, "dashboard/customers_list.html", {
         "store": store,
         "customers": customers,
+        "active_customers_count": active_customers_count,
         "q": q,
     })
 
