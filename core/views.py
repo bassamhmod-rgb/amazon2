@@ -53,9 +53,6 @@ def index(request):
                 query | Q(has_product=True) | Q(has_category=True) | Q(has_subcategory=True)
             )
 
-        else:
-            stores = stores[:6]
-
         return render(request, "core/index.html", {
             "stores": stores,
             "query": q,
@@ -71,7 +68,7 @@ def index(request):
 
         if not q:
             return render(request, "core/index.html", {
-                "stores": stores[:6],
+                "stores": stores,
                 "query": q,
                 "results": [],
                 "type": "products",
@@ -89,7 +86,7 @@ def index(request):
         results = Product.objects.filter(query).distinct()
 
         return render(request, "core/index.html", {
-            "stores": stores[:6],
+            "stores": stores,
             "query": q,
             "results": results,
             "type": "products",
