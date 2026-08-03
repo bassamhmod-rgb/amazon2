@@ -3,7 +3,7 @@ import os
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-SECRET_KEY = "change-me"
+SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "change-me")
 
 def _env_bool(name, default=False):
     raw = os.getenv(name)
@@ -86,7 +86,9 @@ INSTALLED_APPS = [
 
 ]
 
-if os.getenv("CLOUDINARY_URL"):
+USE_CLOUDINARY = _env_bool("DJANGO_USE_CLOUDINARY", False)
+
+if USE_CLOUDINARY and os.getenv("CLOUDINARY_URL"):
     INSTALLED_APPS = ["cloudinary_storage", *INSTALLED_APPS, "cloudinary"]
 
 MIDDLEWARE = [
@@ -168,7 +170,7 @@ MEDIA_URL = "/media/"
 MEDIA_ROOT = Path(os.getenv("DJANGO_MEDIA_ROOT", BASE_DIR / "media"))
 SERVE_MEDIA_FILES = _env_bool("DJANGO_SERVE_MEDIA_FILES", DEBUG)
 
-if os.getenv("CLOUDINARY_URL"):
+if USE_CLOUDINARY and os.getenv("CLOUDINARY_URL"):
     DEFAULT_FILE_STORAGE = "cloudinary_storage.storage.MediaCloudinaryStorage"
     MEDIA_URL = "/media/"
     SERVE_MEDIA_FILES = False
