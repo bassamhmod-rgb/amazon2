@@ -12,6 +12,9 @@ from .models import Expense, ExpenseType, ExpenseReason
 from accounts.models import DeleteSync
 from core.access_dedupe import dedupe_keep_oldest_for_value
 
+DEFAULT_ACCESS_EXPENSE_TYPE = "صرفيات عمل"
+DEFAULT_ACCESS_EXPENSE_REASON = "أجور موظفين"
+
 
 def _clear_store_reset_marker(store_id):
     DeleteSync.objects.filter(
@@ -98,6 +101,9 @@ def create_expense_from_access(request, merchant_id):
             or data.get("reason")
             or ""
         ).strip()
+        if not expense_type_name:
+            expense_type_name = DEFAULT_ACCESS_EXPENSE_TYPE
+            expense_reason_name = DEFAULT_ACCESS_EXPENSE_REASON
         notes = data.get("notes", "")
 
         store = Store.objects.filter(id=merchant_id).first()
