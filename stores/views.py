@@ -15,7 +15,7 @@ from django.http import HttpResponse
 from django.urls import reverse
 from django.templatetags.static import static
 from io import BytesIO
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, UnidentifiedImageError
 from accounts.models import StoreUser
 
 def store_list(request):
@@ -198,21 +198,26 @@ def store_app_icon(request, slug, size):
         fallback_url = static("pwa/icon-512.png" if size == 512 else "pwa/icon-192.png")
         return redirect(fallback_url)
 
-    with Image.open(store.logo.path).convert("RGBA") as img:
-        # Center-crop to square, then mask to a circle to match storefront logo style.
-        side = min(img.width, img.height)
-        left = (img.width - side) // 2
-        top = (img.height - side) // 2
-        square = img.crop((left, top, left + side, top + side)).resize((size, size), Image.LANCZOS)
+    try:
+        with store.logo.open("rb") as logo_file:
+            with Image.open(logo_file).convert("RGBA") as img:
+                # Center-crop to square, then mask to a circle to match storefront logo style.
+                side = min(img.width, img.height)
+                left = (img.width - side) // 2
+                top = (img.height - side) // 2
+                square = img.crop((left, top, left + side, top + side)).resize((size, size), Image.LANCZOS)
 
-        mask = Image.new("L", (size, size), 0)
-        ImageDraw.Draw(mask).ellipse((0, 0, size - 1, size - 1), fill=255)
+                mask = Image.new("L", (size, size), 0)
+                ImageDraw.Draw(mask).ellipse((0, 0, size - 1, size - 1), fill=255)
 
-        canvas = Image.new("RGBA", (size, size), (0, 0, 0, 0))
-        canvas.paste(square, (0, 0), mask)
+                canvas = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+                canvas.paste(square, (0, 0), mask)
 
-        output = BytesIO()
-        canvas.save(output, format="PNG", optimize=True)
+                output = BytesIO()
+                canvas.save(output, format="PNG", optimize=True)
+    except (OSError, ValueError, UnidentifiedImageError):
+        fallback_url = static("pwa/icon-512.png" if size == 512 else "pwa/icon-192.png")
+        return redirect(fallback_url)
 
     response = HttpResponse(output.getvalue(), content_type="image/png")
     response["Cache-Control"] = "no-cache, no-store, must-revalidate"
