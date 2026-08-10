@@ -48,6 +48,9 @@ ALLOWED_HOSTS = [
     "www.amazon2-dwsb.onrender.com",
     "amazonsyria.com",
     "www.amazonsyria.com",
+    "153.75.87.178",
+    "syriastores.pw",
+    "www.syriastores.pw",
     "127.0.0.1",
     "localhost",
 ]
@@ -59,6 +62,10 @@ CSRF_TRUSTED_ORIGINS = [
     "https://www.amazon2-dwsb.onrender.com",
     "https://amazonsyria.com",
     "https://www.amazonsyria.com",
+    "http://syriastores.pw",
+    "http://www.syriastores.pw",
+    "https://syriastores.pw",
+    "https://www.syriastores.pw",
 ]
 CSRF_TRUSTED_ORIGINS += _env_list("DJANGO_CSRF_TRUSTED_ORIGINS", [])
 
