@@ -1990,25 +1990,36 @@ def delete_customer(request, store_slug, customer_id):
 
     if request.method == "POST":
         access_ack_key = f"access_delete_ack:customer:{store.id}:{customer.id}"
-        linked_orders = Order.objects.filter(store=store, customer=customer).count()
+        linked_orders_qs = Order.objects.filter(store=store, customer=customer)
+        linked_orders = linked_orders_qs.filter(document_kind=1).count()
+        linked_notices = linked_orders_qs.filter(document_kind=2).count()
         linked_points = PointsTransaction.objects.filter(customer=customer).count()
-        if linked_orders > 0 or linked_points > 0:
-            messages.error(
-                request,
-                f"لا يمكن حذف العميل. يوجد ارتباطات: طلبات={linked_orders}، نقاط={linked_points}. احذف السجلات المرتبطة أولاً."
-            )
-            request.session.pop(access_ack_key, None)
-            return redirect("dashboard:customers_list", store_slug=store.slug)
+        has_linked_records = linked_orders > 0 or linked_notices > 0 or linked_points > 0
+        is_access_linked = _is_store_access_linked(store)
+        delete_confirmed = _consume_access_delete_ack(request, access_ack_key)
 
-        if _is_store_access_linked(store) and not _consume_access_delete_ack(request, access_ack_key):
+        if (has_linked_records or is_access_linked) and not delete_confirmed:
             _set_access_delete_ack(request, access_ack_key)
+            warnings = []
+            if linked_orders:
+                warnings.append(f"{linked_orders} طلب")
+            if linked_notices:
+                warnings.append(f"{linked_notices} إشعار")
+            if linked_points:
+                warnings.append(f"{linked_points} سجل نقاط")
+            linked_summary = "، ".join(warnings) if warnings else "سجلات مرتبطة"
+            sync_note = " ومزامنة حذفها مع برنامج الأمان للمحاسبة" if is_access_linked else ""
             messages.warning(
                 request,
-                "متجرك مرتبط ببرنامج الأمان للمحاسبة. عند المزامنة رح يتم حذف كل الفواتير المرتبطة بهذا العميل. اضغط حذف مرة ثانية للتأكيد."
+                f"هذا العميل مرتبط بـ {linked_summary}. إذا وافقت على الحذف سيتم حذف العميل وكل السجلات المرتبطة به{sync_note}. اضغط حذف مرة ثانية للتأكيد."
             )
             return redirect("dashboard:customers_list", store_slug=store.slug)
 
-        customer.delete()
+        with transaction.atomic():
+            linked_orders_qs.delete()
+            PointsTransaction.objects.filter(customer=customer).delete()
+            customer.delete()
+        messages.success(request, "تم حذف العميل وكل السجلات المرتبطة به بنجاح.")
         return redirect("dashboard:customers_list", store_slug=store.slug)
 
     return render(request, "dashboard/delete_customer.html", {
