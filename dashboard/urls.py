@@ -80,6 +80,7 @@ path("<slug:store_slug>/search-suppliers/", views.search_suppliers),
 # Customers (Clients)
 path("<slug:store_slug>/customers/", views.customers_list, name="customers_list"),
 path("<slug:store_slug>/customers/add/", views.customer_create, name="customer_create"),
+path("<slug:store_slug>/customers/bulk-delete/", views.bulk_delete_customers, name="bulk_delete_customers"),
 path("<slug:store_slug>/customers/<int:customer_id>/edit/", views.customer_update, name="customer_update"),
 path("<slug:store_slug>/customers/<int:customer_id>/delete/", views.delete_customer, name="delete_customer"),
 # ادارة النقاط

@@ -1850,6 +1850,7 @@ def customers_list(request, store_slug):
     customers = Customer.objects.filter(store=store).exclude(name__in=HIDDEN_CUSTOMER_NAMES_IN_LISTS)
     active_customers_count = customers.filter(is_subscription_active=True).count()
     q = (request.GET.get("q") or "").strip()
+    balance_gt_zero = request.GET.get("balance_gt_zero") == "1"
     if q:
         customers = customers.filter(
             Q(name__icontains=q)
@@ -1857,14 +1858,82 @@ def customers_list(request, store_slug):
             | Q(address__icontains=q)
             | Q(note__icontains=q)
         )
-    customers = customers.order_by("-id")
+    customers = list(customers.order_by("-id"))
+
+    customer_ids = [customer.id for customer in customers]
+    customer_balances = {}
+    orders_qs = (
+        Order.objects
+        .filter(store=store, customer_id__in=customer_ids, document_kind__in=[1, 2], status="confirmed")
+        .prefetch_related("items")
+    )
+    for order in orders_qs:
+        if order.document_kind == 1:
+            amount = order.net_total
+        else:
+            amount = order.amount or Decimal("0")
+        payment = order.payment
+        balance_delta = amount - payment
+        customer_balances[order.customer_id] = customer_balances.get(order.customer_id, Decimal("0")) + balance_delta
+
+    for customer in customers:
+        customer.calc_balance = customer_balances.get(customer.id, Decimal("0"))
+        customer.calc_balance_abs = abs(customer.calc_balance)
+        if customer.calc_balance > 0:
+            customer.calc_balance_label = "مدين"
+        elif customer.calc_balance < 0:
+            customer.calc_balance_label = "دائن"
+        else:
+            customer.calc_balance_label = "متوازن"
+
+    if balance_gt_zero:
+        customers = [customer for customer in customers if customer.calc_balance > 0]
+
+    queue_key = f"bulk_customer_delete_queue:{store.id}"
+    bulk_delete_queue = request.session.get(queue_key, [])
+    bulk_delete_customer = None
+    bulk_delete_remaining = len(bulk_delete_queue)
+    if bulk_delete_queue:
+        bulk_delete_customer = Customer.objects.filter(store=store, id=bulk_delete_queue[0]).first()
 
     return render(request, "dashboard/customers_list.html", {
         "store": store,
         "customers": customers,
         "active_customers_count": active_customers_count,
         "q": q,
+        "balance_gt_zero": balance_gt_zero,
+        "bulk_delete_customer": bulk_delete_customer,
+        "bulk_delete_remaining": bulk_delete_remaining,
     })
+
+
+def _customer_delete_links(store, customer):
+    linked_orders_qs = Order.objects.filter(store=store, customer=customer)
+    return {
+        "orders_qs": linked_orders_qs,
+        "orders": linked_orders_qs.filter(document_kind=1).count(),
+        "notices": linked_orders_qs.filter(document_kind=2).count(),
+        "points": PointsTransaction.objects.filter(customer=customer).count(),
+    }
+
+
+def _customer_delete_warning_summary(links):
+    warnings = []
+    if links["orders"]:
+        warnings.append(f"{links['orders']} طلب")
+    if links["notices"]:
+        warnings.append(f"{links['notices']} إشعار")
+    if links["points"]:
+        warnings.append(f"{links['points']} سجل نقاط")
+    return "، ".join(warnings) if warnings else "سجلات مرتبطة"
+
+
+def _delete_customer_with_related(store, customer, links=None):
+    links = links or _customer_delete_links(store, customer)
+    with transaction.atomic():
+        links["orders_qs"].delete()
+        PointsTransaction.objects.filter(customer=customer).delete()
+        customer.delete()
 
 
 @login_required
@@ -1990,24 +2059,14 @@ def delete_customer(request, store_slug, customer_id):
 
     if request.method == "POST":
         access_ack_key = f"access_delete_ack:customer:{store.id}:{customer.id}"
-        linked_orders_qs = Order.objects.filter(store=store, customer=customer)
-        linked_orders = linked_orders_qs.filter(document_kind=1).count()
-        linked_notices = linked_orders_qs.filter(document_kind=2).count()
-        linked_points = PointsTransaction.objects.filter(customer=customer).count()
-        has_linked_records = linked_orders > 0 or linked_notices > 0 or linked_points > 0
+        links = _customer_delete_links(store, customer)
+        has_linked_records = links["orders"] > 0 or links["notices"] > 0 or links["points"] > 0
         is_access_linked = _is_store_access_linked(store)
         delete_confirmed = _consume_access_delete_ack(request, access_ack_key)
 
         if (has_linked_records or is_access_linked) and not delete_confirmed:
             _set_access_delete_ack(request, access_ack_key)
-            warnings = []
-            if linked_orders:
-                warnings.append(f"{linked_orders} طلب")
-            if linked_notices:
-                warnings.append(f"{linked_notices} إشعار")
-            if linked_points:
-                warnings.append(f"{linked_points} سجل نقاط")
-            linked_summary = "، ".join(warnings) if warnings else "سجلات مرتبطة"
+            linked_summary = _customer_delete_warning_summary(links)
             sync_note = " ومزامنة حذفها مع برنامج الأمان للمحاسبة" if is_access_linked else ""
             messages.warning(
                 request,
@@ -2015,10 +2074,7 @@ def delete_customer(request, store_slug, customer_id):
             )
             return redirect("dashboard:customers_list", store_slug=store.slug)
 
-        with transaction.atomic():
-            linked_orders_qs.delete()
-            PointsTransaction.objects.filter(customer=customer).delete()
-            customer.delete()
+        _delete_customer_with_related(store, customer, links)
         messages.success(request, "تم حذف العميل وكل السجلات المرتبطة به بنجاح.")
         return redirect("dashboard:customers_list", store_slug=store.slug)
 
@@ -2026,6 +2082,85 @@ def delete_customer(request, store_slug, customer_id):
         "store": store,
         "customer": customer,
     })
+
+
+@login_required
+@require_POST
+def bulk_delete_customers(request, store_slug):
+    store = _get_store_for_dashboard(request, store_slug)
+    queue_key = f"bulk_customer_delete_queue:{store.id}"
+    deleted_key = f"bulk_customer_delete_deleted:{store.id}"
+    skipped_key = f"bulk_customer_delete_skipped:{store.id}"
+    action = request.POST.get("bulk_delete_action") or "start"
+
+    if action == "start":
+        customer_ids = []
+        for raw_id in request.POST.getlist("customer_ids"):
+            try:
+                customer_ids.append(int(raw_id))
+            except (TypeError, ValueError):
+                continue
+        customer_ids = list(
+            Customer.objects
+            .filter(store=store, id__in=customer_ids)
+            .exclude(name__in=HIDDEN_CUSTOMER_NAMES_IN_LISTS)
+            .order_by("id")
+            .values_list("id", flat=True)
+        )
+        if not customer_ids:
+            messages.warning(request, "لم يتم تحديد أي عميل للحذف.")
+            return redirect("dashboard:customers_list", store_slug=store.slug)
+        request.session[queue_key] = customer_ids
+        request.session[deleted_key] = 0
+        request.session[skipped_key] = 0
+    elif action == "skip":
+        queue = request.session.get(queue_key, [])
+        if queue:
+            queue.pop(0)
+            request.session[queue_key] = queue
+            request.session[skipped_key] = int(request.session.get(skipped_key, 0)) + 1
+    elif action == "confirm":
+        queue = request.session.get(queue_key, [])
+        if queue:
+            customer = Customer.objects.filter(store=store, id=queue[0]).first()
+            if customer:
+                _delete_customer_with_related(store, customer)
+                request.session[deleted_key] = int(request.session.get(deleted_key, 0)) + 1
+            queue.pop(0)
+            request.session[queue_key] = queue
+    else:
+        return redirect("dashboard:customers_list", store_slug=store.slug)
+
+    while True:
+        queue = request.session.get(queue_key, [])
+        if not queue:
+            deleted = int(request.session.pop(deleted_key, 0))
+            skipped = int(request.session.pop(skipped_key, 0))
+            request.session.pop(queue_key, None)
+            messages.success(request, f"انتهى حذف العملاء المحددين: تم حذف {deleted}، وتم تخطي {skipped}.")
+            return redirect("dashboard:customers_list", store_slug=store.slug)
+
+        customer = Customer.objects.filter(store=store, id=queue[0]).first()
+        if not customer:
+            queue.pop(0)
+            request.session[queue_key] = queue
+            request.session[skipped_key] = int(request.session.get(skipped_key, 0)) + 1
+            continue
+
+        links = _customer_delete_links(store, customer)
+        has_linked_records = links["orders"] > 0 or links["notices"] > 0 or links["points"] > 0
+        if has_linked_records:
+            request.session.modified = True
+            messages.warning(
+                request,
+                f"العميل {customer.name} مرتبط بـ {_customer_delete_warning_summary(links)}. اختر حذف هذا العميل والمتابعة أو تخطيه."
+            )
+            return redirect("dashboard:customers_list", store_slug=store.slug)
+
+        _delete_customer_with_related(store, customer, links)
+        queue.pop(0)
+        request.session[queue_key] = queue
+        request.session[deleted_key] = int(request.session.get(deleted_key, 0)) + 1
 
 
 def points_page(request, store_slug):

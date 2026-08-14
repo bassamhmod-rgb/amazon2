@@ -122,30 +122,92 @@
         {% endfor %}
     {% endif %}
 
+    {% if bulk_delete_customer %}
+        <div class="alert alert-warning shadow-sm">
+            <div class="fw-bold mb-2">تأكيد حذف العميل: {{ bulk_delete_customer.name }}</div>
+            <div class="mb-3">
+                يوجد عملاء ضمن عملية حذف جماعي بحاجة لتأكيد. المتبقي في الطابور: {{ bulk_delete_remaining }}.
+            </div>
+            <form method="post" action="{% url 'dashboard:bulk_delete_customers' store.slug %}" class="d-inline">
+                {% csrf_token %}
+                <input type="hidden" name="bulk_delete_action" value="confirm">
+                <button type="submit" class="btn btn-danger">حذف هذا العميل والمتابعة</button>
+            </form>
+            <form method="post" action="{% url 'dashboard:bulk_delete_customers' store.slug %}" class="d-inline">
+                {% csrf_token %}
+                <input type="hidden" name="bulk_delete_action" value="skip">
+                <button type="submit" class="btn btn-outline-secondary">تخطي هذا العميل والمتابعة</button>
+            </form>
+        </div>
+    {% endif %}
+
     <div class="card p-3 shadow-sm mb-3">
-        <input type="text"
-               id="liveSearchCustomers"
-               class="form-control"
-               placeholder="ابحث بالاسم أو الموبايل (الأسهم للتنقل و Enter للاختيار)"
-               autocomplete="off">
+        <div class="d-flex flex-wrap gap-2 align-items-center">
+            <input type="text"
+                   id="liveSearchCustomers"
+                   class="form-control flex-grow-1"
+                   placeholder="ابحث بالاسم أو الموبايل (الأسهم للتنقل و Enter للاختيار)"
+                   autocomplete="off">
+            {% if balance_gt_zero %}
+                <a href="{% url 'dashboard:customers_list' store.slug %}" class="btn btn-outline-secondary">عرض الكل</a>
+            {% else %}
+                <a href="{% url 'dashboard:customers_list' store.slug %}?balance_gt_zero=1" class="btn btn-outline-primary">رصيد أكبر من صفر</a>
+            {% endif %}
+        </div>
     </div>
 
     <div class="card p-3 shadow-sm">
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+            <form id="bulkDeleteCustomersForm" method="post" action="{% url 'dashboard:bulk_delete_customers' store.slug %}">
+                {% csrf_token %}
+                <input type="hidden" name="bulk_delete_action" value="start">
+            </form>
+            <div class="form-check m-0">
+                <input class="form-check-input" type="checkbox" id="selectAllCustomers">
+                <label class="form-check-label" for="selectAllCustomers">تحديد الكل</label>
+            </div>
+            <button type="submit"
+                    form="bulkDeleteCustomersForm"
+                    id="bulkDeleteCustomersBtn"
+                    class="btn btn-danger"
+                    disabled>
+                حذف المحدد
+                <span id="selectedCustomersCount" class="badge bg-light text-danger ms-1">0</span>
+            </button>
+        </div>
         <div class="table-responsive">
             <table class="table table-striped align-middle mb-0">
                 <thead>
                     <tr>
+                        <th style="width:45px;"></th>
                         <th>اسم العميل</th>
                         <th>رقم الهاتف</th>
+                        <th>الرصيد</th>
                         <th>الاشتراك</th>
                         <th class="text-center" style="min-width:120px;">خيارات</th>
                     </tr>
                 </thead>
                 <tbody>
                 {% for customer in customers %}
-                    <tr class="customer-row" data-search="{{ customer.name|default:'' }} {{ customer.phone|default:'' }}">
+                    <tr class="customer-row" data-search="{{ customer.name|default:'' }} {{ customer.phone|default:'' }} {{ customer.calc_balance|default:'' }}">
+                        <td>
+                            <input class="form-check-input customer-select"
+                                   type="checkbox"
+                                   name="customer_ids"
+                                   value="{{ customer.id }}"
+                                   form="bulkDeleteCustomersForm">
+                        </td>
                         <td>{{ customer.name }}</td>
                         <td>{{ customer.phone }}</td>
+                        <td>
+                            {% if customer.calc_balance > 0 %}
+                                <span class="text-danger fw-bold">{{ customer.calc_balance|floatformat:2 }} مدين</span>
+                            {% elif customer.calc_balance < 0 %}
+                                <span class="text-success fw-bold">{{ customer.calc_balance_abs|floatformat:2 }} دائن</span>
+                            {% else %}
+                                <span class="text-muted">0.00</span>
+                            {% endif %}
+                        </td>
                         <td>
                             {% if customer.is_subscription_active %}
                                 <span class="badge bg-success">مفعل</span>
@@ -163,7 +225,7 @@
                     </tr>
                 {% empty %}
                     <tr class="empty-initial-row">
-                        <td colspan="4" class="text-center text-muted">لا يوجد عملاء بعد</td>
+                        <td colspan="6" class="text-center text-muted">لا يوجد عملاء بعد</td>
                     </tr>
                 {% endfor %}
                 </tbody>
@@ -186,8 +248,33 @@
     const customerSearchInput = document.getElementById("liveSearchCustomers");
     const customerRows = Array.from(document.querySelectorAll(".customer-row"));
     const noCustomerResults = document.getElementById("noCustomerResults");
+    const selectAllCustomers = document.getElementById("selectAllCustomers");
+    const bulkDeleteCustomersForm = document.getElementById("bulkDeleteCustomersForm");
+    const bulkDeleteCustomersBtn = document.getElementById("bulkDeleteCustomersBtn");
+    const selectedCustomersCount = document.getElementById("selectedCustomersCount");
     let customerVisibleRows = [...customerRows];
     let customerActiveIndex = -1;
+
+    function customerCheckboxes() {
+        return Array.from(document.querySelectorAll(".customer-select"));
+    }
+
+    function visibleCustomerCheckboxes() {
+        return customerVisibleRows
+            .map((row) => row.querySelector(".customer-select"))
+            .filter(Boolean);
+    }
+
+    function updateBulkDeleteState() {
+        const checked = customerCheckboxes().filter((checkbox) => checkbox.checked).length;
+        selectedCustomersCount.innerText = checked;
+        bulkDeleteCustomersBtn.disabled = checked === 0;
+
+        const visible = visibleCustomerCheckboxes();
+        const visibleChecked = visible.filter((checkbox) => checkbox.checked).length;
+        selectAllCustomers.checked = visible.length > 0 && visibleChecked === visible.length;
+        selectAllCustomers.indeterminate = visibleChecked > 0 && visibleChecked < visible.length;
+    }
 
     function updateCustomerHighlight() {
         customerRows.forEach((row) => row.classList.remove("table-active"));
@@ -216,7 +303,30 @@
         } else {
             noCustomerResults.classList.add("d-none");
         }
+        updateBulkDeleteState();
     }
+
+    selectAllCustomers.addEventListener("change", () => {
+        visibleCustomerCheckboxes().forEach((checkbox) => {
+            checkbox.checked = selectAllCustomers.checked;
+        });
+        updateBulkDeleteState();
+    });
+
+    customerCheckboxes().forEach((checkbox) => {
+        checkbox.addEventListener("change", updateBulkDeleteState);
+    });
+
+    bulkDeleteCustomersForm.addEventListener("submit", (e) => {
+        const checked = customerCheckboxes().filter((checkbox) => checkbox.checked).length;
+        if (!checked) {
+            e.preventDefault();
+            return;
+        }
+        if (!confirm(`هل أنت متأكد من حذف ${checked} عميل محدد؟ سيتم طلب تأكيد إضافي عند وجود سجلات مرتبطة.`)) {
+            e.preventDefault();
+        }
+    });
 
     customerSearchInput.addEventListener("input", filterCustomers);
     customerSearchInput.addEventListener("keydown", (e) => {
