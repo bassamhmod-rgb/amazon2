@@ -24,6 +24,7 @@ from products.models import Product
 from products.models import ProductBarcode
 from orders.models import Order, OrderItem
 from stores.models import Store
+from stores.models import TrialDevice
 from stores.models import Warehouse
 from django.db import IntegrityError, transaction
 
@@ -71,6 +72,10 @@ def _to_str(value, default=""):
     if value in (None, ""):
         return default
     return str(value)
+
+
+def _normalize_mobile(value):
+    return _to_str(value).strip().replace(" ", "")
 
 
 def _serialize_category(category):
@@ -127,6 +132,74 @@ def _serialize_customer(customer):
         "access_id": customer.access_id,
         "update_time": customer.update_time or 0,
     }
+
+
+@api_view(["POST"])
+@permission_classes([AllowAny])
+def activate_permanent_license(request):
+    mobile = _normalize_mobile(request.data.get("mobile"))
+    activation_code = _to_str(request.data.get("activation_code")).strip()
+    device_id = _to_str(request.data.get("device_id")).strip()
+
+    if not mobile or not activation_code or not device_id:
+        return Response(
+            {"detail": "رقم الموبايل ورمز التفعيل ورقم الجهاز مطلوبة."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    store = Store.objects.filter(
+        mobile=mobile,
+        activation_code=activation_code,
+        is_active=True,
+    ).first()
+    if not store:
+        return Response(
+            {
+                "detail": "رمز التفعيل غير صحيح. تواصل مع المسؤول للحصول على رمز تفعيل.",
+                "contact_numbers": ["+963000000000"],
+            },
+            status=status.HTTP_404_NOT_FOUND,
+        )
+
+    store.licensed_device_id = device_id
+    store.save(update_fields=["licensed_device_id"])
+
+    return Response(
+        {
+            "license_type": 1,
+            "activation_code": activation_code,
+            "store": {
+                "id": store.id,
+                "name": store.name,
+                "slug": store.slug,
+                "mobile": store.mobile,
+            },
+            "periodic_check_enabled": True,
+        }
+    )
+
+
+@api_view(["POST"])
+@permission_classes([AllowAny])
+def register_trial_license(request):
+    device_id = _to_str(request.data.get("device_id")).strip()
+    if not device_id:
+        return Response(
+            {"detail": "رقم الجهاز مطلوب."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    if TrialDevice.objects.filter(device_id=device_id).exists():
+        return Response(
+            {
+                "detail": "انتهت الفترة التجريبية لهذا الجهاز. تواصل مع المسؤول للحصول على نسخة دائمة.",
+                "contact_numbers": ["+963000000000"],
+            },
+            status=status.HTTP_409_CONFLICT,
+        )
+
+    TrialDevice.objects.create(device_id=device_id)
+    return Response({"license_type": 2})
 
 
 def _resolve_mobile_warehouse(store, warehouse_server_id):

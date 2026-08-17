@@ -7,6 +7,7 @@ from django.utils.text import slugify
 from PIL import Image, ImageOps, UnidentifiedImageError
 from decimal import Decimal
 from django.core.validators import MaxValueValidator, MinValueValidator
+import secrets
 import time
 
 
@@ -30,6 +31,8 @@ class Store(models.Model):
     slug = models.SlugField(unique=True)
     logo = models.ImageField(upload_to="store_logos/", blank=True, null=True)
     mobile = models.CharField(max_length=20, unique=True, blank=True, null=True)
+    activation_code = models.CharField(max_length=32, unique=True, blank=True, null=True)
+    licensed_device_id = models.CharField(max_length=128, blank=True, null=True)
     facebook_url = models.URLField(blank=True)
     instagram_url = models.URLField(blank=True)
     telegram_url = models.URLField(blank=True)
@@ -90,6 +93,8 @@ class Store(models.Model):
         # توليد slug (مثل ما كان)
         if not self.slug:
             self.slug = slugify(self.name)
+        if not self.activation_code:
+            self.activation_code = secrets.token_urlsafe(12)
 
         update_fields = kwargs.get("update_fields")
         should_process_logo = bool(self.logo)
@@ -169,6 +174,17 @@ class Store(models.Model):
 
     def __str__(self):
         return self.name
+
+
+class TrialDevice(models.Model):
+    device_id = models.CharField(max_length=128, unique=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return self.device_id
 
 # المستودعات
 class Warehouse(models.Model):

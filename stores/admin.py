@@ -1,10 +1,20 @@
 from django.contrib import admin
-from .models import Store, Warehouse
+from .models import Store, TrialDevice, Warehouse
 
 @admin.register(Store)
 class StoreAdmin(admin.ModelAdmin):
-    list_display = ("name", "owner", "mobile", "rkmdb", "rkmtb", "theme", "is_active")
-    search_fields = ("name", "owner__username")
+    list_display = (
+        "name",
+        "owner",
+        "mobile",
+        "activation_code",
+        "licensed_device_id",
+        "rkmdb",
+        "rkmtb",
+        "theme",
+        "is_active",
+    )
+    search_fields = ("name", "owner__username", "mobile", "activation_code", "licensed_device_id")
     list_filter = ("theme", "is_active")
 
 
@@ -24,4 +34,10 @@ class WarehouseAdmin(admin.ModelAdmin):
         if obj and obj.is_main:
             return False
         return super().has_delete_permission(request, obj=obj)
+
+
+@admin.register(TrialDevice)
+class TrialDeviceAdmin(admin.ModelAdmin):
+    list_display = ("device_id", "created_at")
+    search_fields = ("device_id",)
 
