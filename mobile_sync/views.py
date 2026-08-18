@@ -17,7 +17,7 @@ from rest_framework.response import Response
 from rest_framework import status
 
 from mobile_sync.models import MobileDeleteSync
-from accounts.models import Customer, normalize_phone_number, PointsTransaction
+from accounts.models import Customer, Supplier, normalize_phone_number, PointsTransaction
 from accounts.models import StoreUser
 from products.models import Category
 from products.models import Product
@@ -31,6 +31,9 @@ from django.db import IntegrityError, transaction
 
 STORE_WEB_LOGIN_SIGNER_SALT = "mobile_sync.store_web_login"
 STORE_WEB_LOGIN_MAX_AGE_SECONDS = 300
+GENERAL_CUSTOMER_NAME = "زبون عام"
+GENERAL_CUSTOMER_PHONE = "GENERAL_CUSTOMER"
+OPENING_INVENTORY_SUPPLIER_NAME = "بضاعة أول المدة"
 
 
 def _now_minute():
@@ -78,6 +81,35 @@ def _normalize_mobile(value):
     return _to_str(value).strip().replace(" ", "")
 
 
+def _ensure_mobile_default_records(store):
+    now_minute = _now_minute()
+    Customer.objects.get_or_create(
+        store=store,
+        name=GENERAL_CUSTOMER_NAME,
+        defaults={
+            "phone": GENERAL_CUSTOMER_PHONE,
+            "address": "",
+            "note": "",
+            "balance": Decimal("0"),
+            "opening_balance": Decimal("0"),
+            "is_subscription_active": True,
+            "update_time": now_minute,
+        },
+    )
+    Supplier.objects.get_or_create(
+        store=store,
+        name=OPENING_INVENTORY_SUPPLIER_NAME,
+        defaults={
+            "phone": "",
+            "address": "",
+            "email": "",
+            "balance": Decimal("0"),
+            "opening_balance": Decimal("0"),
+            "update_time": now_minute,
+        },
+    )
+
+
 def _serialize_category(category):
     return {
         "id": category.id,
@@ -123,7 +155,7 @@ def _serialize_customer(customer):
     return {
         "id": customer.id,
         "name": customer.name,
-        "phone": customer.phone,
+        "phone": "" if customer.name == GENERAL_CUSTOMER_NAME else customer.phone,
         "address": customer.address or "",
         "note": customer.note or "",
         "balance": float(customer.balance),
@@ -131,6 +163,20 @@ def _serialize_customer(customer):
         "is_subscription_active": customer.is_subscription_active,
         "access_id": customer.access_id,
         "update_time": customer.update_time or 0,
+    }
+
+
+def _serialize_supplier(supplier):
+    return {
+        "id": supplier.id,
+        "name": supplier.name,
+        "phone": supplier.phone or "",
+        "address": supplier.address or "",
+        "email": supplier.email or "",
+        "balance": float(supplier.balance),
+        "opening_balance": float(supplier.opening_balance),
+        "access_id": supplier.access_id,
+        "update_time": supplier.update_time or 0,
     }
 
 
@@ -565,6 +611,62 @@ def _apply_customer_change(store, payload, server_id=None):
     return obj, "created"
 
 
+def _apply_supplier_change(store, payload, server_id=None):
+    name = _to_str(payload.get("name")).strip()
+    phone = _to_str(payload.get("phone")).strip()
+    address = _to_str(payload.get("address")).strip()
+    email = _to_str(payload.get("email")).strip()
+    access_id = _to_int(payload.get("access_id"))
+    if not name and not phone:
+        raise ValueError("Supplier name or phone is required")
+
+    if not name:
+        name = phone
+
+    now_minute = _now_minute()
+    obj = None
+    if server_id:
+        obj = Supplier.objects.filter(id=server_id, store=store).first()
+    if not obj and access_id not in (None, 0, ""):
+        obj = Supplier.objects.filter(store=store, access_id=access_id).first()
+    if not obj and phone:
+        obj = Supplier.objects.filter(store=store, phone=phone).first()
+    if not obj:
+        obj = Supplier.objects.filter(store=store, name=name).first()
+
+    update_fields = {
+        "name": name,
+        "phone": phone,
+        "address": address,
+        "email": email,
+        "balance": Decimal(str(_to_float(payload.get("balance"), 0.0))),
+        "opening_balance": Decimal(str(_to_float(payload.get("opening_balance"), 0.0))),
+        "update_time": now_minute,
+    }
+    if name == GENERAL_CUSTOMER_NAME and not phone:
+        update_fields["phone"] = GENERAL_CUSTOMER_PHONE
+    if access_id is not None:
+        update_fields["access_id"] = access_id
+
+    if obj:
+        Supplier.objects.filter(id=obj.id, store=store).update(**update_fields)
+        obj.refresh_from_db()
+        return obj, "updated"
+
+    obj = Supplier.objects.create(
+        store=store,
+        access_id=access_id,
+        name=name,
+        phone=update_fields["phone"],
+        address=address,
+        email=email,
+        balance=update_fields["balance"],
+        opening_balance=update_fields["opening_balance"],
+        update_time=now_minute,
+    )
+    return obj, "created"
+
+
 @api_view(["GET"])
 @permission_classes([AllowAny])
 def categories_pull(request):
@@ -633,6 +735,7 @@ def customers_pull(request):
     store = Store.objects.filter(id=merchant_id_int).first()
     if not store:
         return Response({"detail": "Store not found"}, status=status.HTTP_404_NOT_FOUND)
+    _ensure_mobile_default_records(store)
 
     qs = Customer.objects.filter(store_id=merchant_id_int).order_by("id")
     if since not in (None, "", "0"):
@@ -653,6 +756,57 @@ def customers_pull(request):
             "balance",
             "opening_balance",
             "is_subscription_active",
+            "access_id",
+            "update_time",
+        )
+    ]
+
+    return Response(
+        {
+            "merchant_id": merchant_id_int,
+            "items": data,
+            "max_update_time": max((x["update_time"] for x in data), default=0),
+        }
+    )
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def suppliers_pull(request):
+    merchant_id = request.query_params.get("merchant_id")
+    since = request.query_params.get("since")
+
+    if not merchant_id:
+        return Response({"detail": "merchant_id is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        merchant_id_int = int(merchant_id)
+    except (TypeError, ValueError):
+        return Response({"detail": "merchant_id must be an integer"}, status=status.HTTP_400_BAD_REQUEST)
+
+    store = Store.objects.filter(id=merchant_id_int).first()
+    if not store:
+        return Response({"detail": "Store not found"}, status=status.HTTP_404_NOT_FOUND)
+    _ensure_mobile_default_records(store)
+
+    qs = Supplier.objects.filter(store_id=merchant_id_int).order_by("id")
+    if since not in (None, "", "0"):
+        try:
+            since_int = int(since)
+        except (TypeError, ValueError):
+            return Response({"detail": "since must be an integer"}, status=status.HTTP_400_BAD_REQUEST)
+        qs = qs.filter(update_time__gt=since_int)
+
+    data = [
+        _serialize_supplier(supplier)
+        for supplier in qs.only(
+            "id",
+            "name",
+            "phone",
+            "address",
+            "email",
+            "balance",
+            "opening_balance",
             "access_id",
             "update_time",
         )
@@ -1076,12 +1230,14 @@ def sync_push(request):
     store = Store.objects.filter(id=merchant_id).first()
     if not store:
         return Response({"detail": "Merchant not found"}, status=status.HTTP_404_NOT_FOUND)
+    _ensure_mobile_default_records(store)
 
     applied = []
     errors = []
     category_local_to_server = {}
     product_local_to_server = {}
     customer_local_to_server = {}
+    supplier_local_to_server = {}
 
     def resolve_category(server_id, local_id):
         if server_id not in (None, ""):
@@ -1128,7 +1284,7 @@ def sync_push(request):
     deletes = [item for item in changes if str(item.get("action", "upsert")).lower() == "delete"]
 
     def entity_priority(item):
-        return {"category": 0, "product": 1, "barcode": 2}.get(str(item.get("entity")), 99)
+        return {"category": 0, "customer": 0, "supplier": 0, "product": 1, "barcode": 2}.get(str(item.get("entity")), 99)
 
     upserts.sort(key=entity_priority)
     deletes.sort(key=entity_priority, reverse=True)
@@ -1205,6 +1361,21 @@ def sync_push(request):
                         "server_id": obj.id,
                         "update_time": obj.update_time or 0,
                     })
+                elif entity == "supplier":
+                    obj, action = _apply_supplier_change(
+                        store,
+                        payload_item,
+                        server_id=_to_int(server_id),
+                    )
+                    if local_id not in (None, ""):
+                        supplier_local_to_server[int(local_id)] = obj
+                    applied.append({
+                        "entity": "supplier",
+                        "action": action,
+                        "local_id": local_id,
+                        "server_id": obj.id,
+                        "update_time": obj.update_time or 0,
+                    })
 
             for item in deletes:
                 entity = str(item.get("entity", "")).lower()
@@ -1259,10 +1430,37 @@ def sync_push(request):
                 elif entity == "customer":
                     obj = Customer.objects.filter(id=server_id, store_id=merchant_id).first()
                     if obj:
+                        if obj.name == GENERAL_CUSTOMER_NAME:
+                            applied.append({
+                                "entity": "customer",
+                                "action": "protected",
+                                "local_id": local_id,
+                                "server_id": server_id,
+                            })
+                            continue
                         obj._skip_mobile_delete_sync = True
                         obj.delete()
                         applied.append({
                             "entity": "customer",
+                            "action": "deleted",
+                            "local_id": local_id,
+                            "server_id": server_id,
+                        })
+                elif entity == "supplier":
+                    obj = Supplier.objects.filter(id=server_id, store_id=merchant_id).first()
+                    if obj:
+                        if obj.name == OPENING_INVENTORY_SUPPLIER_NAME:
+                            applied.append({
+                                "entity": "supplier",
+                                "action": "protected",
+                                "local_id": local_id,
+                                "server_id": server_id,
+                            })
+                            continue
+                        obj._skip_mobile_delete_sync = True
+                        obj.delete()
+                        applied.append({
+                            "entity": "supplier",
                             "action": "deleted",
                             "local_id": local_id,
                             "server_id": server_id,
@@ -1290,6 +1488,7 @@ def orders_push(request):
     store = Store.objects.filter(id=merchant_id).first()
     if not store:
         return Response({"detail": "Merchant not found"}, status=status.HTTP_404_NOT_FOUND)
+    _ensure_mobile_default_records(store)
 
     applied = []
     errors = []
@@ -1313,6 +1512,34 @@ def orders_push(request):
             customer = Customer.objects.filter(store=store, name=customer_name).first()
             if customer:
                 return customer
+
+        return None
+
+    def resolve_supplier(order_payload):
+        server_id = _to_int(order_payload.get("supplier_server_id"))
+        supplier_phone = _to_str(order_payload.get("supplier_phone")).strip()
+        supplier_name = _to_str(order_payload.get("supplier_name")).strip()
+
+        if server_id is not None:
+            supplier = Supplier.objects.filter(id=server_id, store=store).first()
+            if supplier:
+                return supplier
+
+        if supplier_phone:
+            supplier = Supplier.objects.filter(store=store, phone=supplier_phone).first()
+            if supplier:
+                return supplier
+
+        if supplier_name:
+            supplier = Supplier.objects.filter(store=store, name=supplier_name).first()
+            if supplier:
+                return supplier
+            return Supplier.objects.create(
+                store=store,
+                name=supplier_name,
+                phone=supplier_phone,
+                update_time=_now_minute(),
+            )
 
         return None
 
@@ -1385,12 +1612,13 @@ def orders_push(request):
                 accounting_invoice_number = _to_int(order_payload.get("accounting_invoice_number"))
                 document_kind = _to_int(order_payload.get("document_kind"), 1)
 
+                transaction_type = _to_str(order_payload.get("transaction_type"), "sale") or "sale"
                 customer = resolve_customer(order_payload)
+                supplier = resolve_supplier(order_payload) if transaction_type == "purchase" else None
                 store_user = resolve_store_user(order_payload)
                 created_by_user = resolve_created_by_user(order_payload, store_user)
                 warehouse = _resolve_mobile_warehouse(store, order_payload.get("warehouse_server_id"))
 
-                transaction_type = _to_str(order_payload.get("transaction_type"), "sale") or "sale"
                 status_value = _to_str(order_payload.get("status"), "confirmed") or "confirmed"
                 if status_value == "completed":
                     status_value = "confirmed"
@@ -1458,7 +1686,7 @@ def orders_push(request):
                     )
 
                 order.customer = customer if transaction_type == "sale" else None
-                order.supplier = None
+                order.supplier = supplier if transaction_type == "purchase" else None
                 order.created_by = created_by_user
                 order.created_by_store_user = store_user
                 if sync_client_id:
@@ -1522,6 +1750,8 @@ def orders_push(request):
                     "server_update_time": order.update_time or 0,
                     "accounting_invoice_number": order.accounting_invoice_number,
                     "document_kind": order.document_kind,
+                    "customer_server_id": order.customer_id,
+                    "supplier_server_id": order.supplier_id,
                     "cashback_status": cashback_entry["status"],
                     "cashback_amount": float(cashback_entry["cashback_amount"] or 0),
                     "items": created_items,

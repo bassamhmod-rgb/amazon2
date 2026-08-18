@@ -14,6 +14,7 @@ urlpatterns = [
     path("license/check/", views.check_permanent_license, name="check_permanent_license"),
     path("categories/", views.categories_pull, name="categories_pull"),
     path("customers/", views.customers_pull, name="customers_pull"),
+    path("suppliers/", views.suppliers_pull, name="suppliers_pull"),
     path("products/", views.products_pull, name="products_pull"),
     path("barcodes/", views.barcodes_pull, name="barcodes_pull"),
     path("deletes/", views.deletes_pull, name="deletes_pull"),
