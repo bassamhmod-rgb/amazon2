@@ -1333,12 +1333,20 @@ def sync_push(request):
                     if "product_id" not in payload_item and "product_server_id" not in payload_item and "product_local_id" not in payload_item:
                         payload_item["product_server_id"] = item.get("product_server_id")
                         payload_item["product_local_id"] = item.get("product_local_id")
-                    obj, action = _apply_barcode_change(
-                        store,
-                        payload_item,
-                        server_id=_to_int(server_id),
-                        product_resolver=resolve_barcode_product,
-                    )
+                    try:
+                        obj, action = _apply_barcode_change(
+                            store,
+                            payload_item,
+                            server_id=_to_int(server_id),
+                            product_resolver=resolve_barcode_product,
+                        )
+                    except ValueError as exc:
+                        errors.append({
+                            "entity": "barcode",
+                            "local_id": local_id,
+                            "detail": str(exc),
+                        })
+                        continue
                     applied.append({
                         "entity": "barcode",
                         "action": action,
