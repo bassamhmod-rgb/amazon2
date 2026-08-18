@@ -161,8 +161,19 @@ def activate_permanent_license(request):
             status=status.HTTP_404_NOT_FOUND,
         )
 
-    store.licensed_device_id = device_id
-    store.save(update_fields=["licensed_device_id"])
+    registered_device_id = _to_str(store.licensed_device_id).strip()
+    if registered_device_id and registered_device_id != device_id:
+        return Response(
+            {
+                "detail": "يوجد بالفعل نسخة مسجلة من قبل بهذه البيانات يرجى التواصل مع المسؤول",
+                "contact_numbers": ["+963000000000"],
+            },
+            status=status.HTTP_409_CONFLICT,
+        )
+
+    if registered_device_id != device_id:
+        store.licensed_device_id = device_id
+        store.save(update_fields=["licensed_device_id"])
 
     return Response(
         {
@@ -200,6 +211,36 @@ def register_trial_license(request):
 
     TrialDevice.objects.create(device_id=device_id)
     return Response({"license_type": 2})
+
+
+@api_view(["POST"])
+@permission_classes([AllowAny])
+def check_permanent_license(request):
+    activation_code = _to_str(request.data.get("activation_code")).strip()
+    device_id = _to_str(request.data.get("device_id")).strip()
+
+    if not activation_code or not device_id:
+        return Response(
+            {"detail": "رمز التفعيل ورقم الجهاز مطلوبان."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    store = Store.objects.filter(
+        activation_code=activation_code,
+        licensed_device_id=device_id,
+        is_active=True,
+    ).first()
+    if not store:
+        return Response(
+            {
+                "valid": False,
+                "detail": "رقم الجهاز غير مطابق للنسخة الدائمة.",
+                "contact_numbers": ["+963000000000"],
+            },
+            status=status.HTTP_403_FORBIDDEN,
+        )
+
+    return Response({"valid": True, "store_id": store.id})
 
 
 def _resolve_mobile_warehouse(store, warehouse_server_id):

@@ -11,6 +11,7 @@ urlpatterns = [
     path("store-web-login/open/", views.store_web_login_open, name="store_web_login_open"),
     path("license/activate/", views.activate_permanent_license, name="activate_permanent_license"),
     path("license/trial/", views.register_trial_license, name="register_trial_license"),
+    path("license/check/", views.check_permanent_license, name="check_permanent_license"),
     path("categories/", views.categories_pull, name="categories_pull"),
     path("customers/", views.customers_pull, name="customers_pull"),
     path("products/", views.products_pull, name="products_pull"),
