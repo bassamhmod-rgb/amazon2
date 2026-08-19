@@ -718,6 +718,46 @@ def _apply_supplier_change(store, payload, server_id=None):
     return obj, "created"
 
 
+def _apply_warehouse_change(store, payload, server_id=None):
+    identifier = _to_str(payload.get("identifier")).strip()
+    name = _to_str(payload.get("name")).strip()
+    if not identifier:
+        identifier = name
+    if not identifier or not name:
+        raise ValueError("Warehouse identifier and name are required")
+
+    now_minute = _now_minute()
+    obj = Warehouse.objects.filter(id=server_id, store=store).first() if server_id else None
+    if not obj:
+        obj = Warehouse.objects.filter(store=store, identifier=identifier).first()
+    if not obj:
+        obj = Warehouse.objects.filter(store=store, name=name).first()
+
+    is_main = bool(obj.is_main) if obj else _to_bool(payload.get("is_main"), False)
+    if is_main:
+        name = Warehouse.MAIN_WAREHOUSE_NAME
+
+    update_fields = {
+        "identifier": identifier,
+        "name": name,
+        "address": _to_str(payload.get("address")).strip(),
+        "phone": _to_str(payload.get("phone")).strip(),
+        "percentage": Decimal(str(_to_float(payload.get("percentage"), 0.0))),
+        "is_representative": _to_bool(payload.get("is_representative"), False),
+        "is_main": is_main,
+        "is_active": _to_bool(payload.get("is_active"), True),
+        "update_time": now_minute,
+    }
+
+    if obj:
+        Warehouse.objects.filter(id=obj.id, store=store).update(**update_fields)
+        obj.refresh_from_db()
+        return obj, "updated"
+
+    obj = Warehouse.objects.create(store=store, **update_fields)
+    return obj, "created"
+
+
 def _apply_expense_type_change(store, payload, server_id=None):
     name = _to_str(payload.get("name")).strip()
     if not name:
@@ -1537,6 +1577,7 @@ def sync_push(request):
             "category": 0,
             "customer": 0,
             "supplier": 0,
+            "warehouse": 0,
             "expense_type": 0,
             "expense_reason": 0,
             "product": 1,
@@ -1637,6 +1678,19 @@ def sync_push(request):
                         supplier_local_to_server[int(local_id)] = obj
                     applied.append({
                         "entity": "supplier",
+                        "action": action,
+                        "local_id": local_id,
+                        "server_id": obj.id,
+                        "update_time": obj.update_time or 0,
+                    })
+                elif entity == "warehouse":
+                    obj, action = _apply_warehouse_change(
+                        store,
+                        payload_item,
+                        server_id=_to_int(server_id),
+                    )
+                    applied.append({
+                        "entity": "warehouse",
                         "action": action,
                         "local_id": local_id,
                         "server_id": obj.id,
@@ -1766,6 +1820,25 @@ def sync_push(request):
                         obj.delete()
                         applied.append({
                             "entity": "supplier",
+                            "action": "deleted",
+                            "local_id": local_id,
+                            "server_id": server_id,
+                        })
+                elif entity == "warehouse":
+                    obj = Warehouse.objects.filter(id=server_id, store_id=merchant_id).first()
+                    if obj:
+                        if obj.is_main:
+                            applied.append({
+                                "entity": "warehouse",
+                                "action": "protected",
+                                "local_id": local_id,
+                                "server_id": server_id,
+                            })
+                            continue
+                        obj._skip_delete_sync = True
+                        obj.delete()
+                        applied.append({
+                            "entity": "warehouse",
                             "action": "deleted",
                             "local_id": local_id,
                             "server_id": server_id,
