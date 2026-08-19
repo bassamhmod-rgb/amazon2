@@ -789,6 +789,14 @@ def _apply_warehouse_transfer_change(store, payload, server_id=None, product_res
     to_warehouse_id = _to_int(payload.get("to_warehouse_id"))
     from_warehouse = Warehouse.objects.filter(id=from_warehouse_id, store=store).first()
     to_warehouse = Warehouse.objects.filter(id=to_warehouse_id, store=store).first()
+    if not from_warehouse:
+        from_identifier = _to_str(payload.get("from_warehouse_identifier")).strip()
+        if from_identifier:
+            from_warehouse = Warehouse.objects.filter(store=store, identifier=from_identifier).first()
+    if not to_warehouse:
+        to_identifier = _to_str(payload.get("to_warehouse_identifier")).strip()
+        if to_identifier:
+            to_warehouse = Warehouse.objects.filter(store=store, identifier=to_identifier).first()
     if not from_warehouse or not to_warehouse:
         raise ValueError("Transfer warehouses are required")
     if from_warehouse.id == to_warehouse.id:
