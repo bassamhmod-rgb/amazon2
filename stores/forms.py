@@ -6,7 +6,15 @@ from .models import Warehouse
 class WarehouseForm(forms.ModelForm):
     class Meta:
         model = Warehouse
-        fields = ["identifier", "name", "address", "phone", "percentage", "is_active"]
+        fields = [
+            "identifier",
+            "name",
+            "address",
+            "phone",
+            "percentage",
+            "is_representative",
+            "is_active",
+        ]
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

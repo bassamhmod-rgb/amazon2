@@ -5,6 +5,7 @@ from . import views
 urlpatterns = [
     path("ping/", views.ping, name="ping"),
     path("stores/", views.stores_pull, name="stores_pull"),
+    path("warehouses/", views.warehouses_pull, name="warehouses_pull"),
     path("store-users/", views.store_users_pull, name="store_users_pull"),
     path("store-users/login/", views.store_user_login, name="store_user_login"),
     path("store-web-login/", views.store_web_login, name="store_web_login"),
@@ -15,6 +16,9 @@ urlpatterns = [
     path("categories/", views.categories_pull, name="categories_pull"),
     path("customers/", views.customers_pull, name="customers_pull"),
     path("suppliers/", views.suppliers_pull, name="suppliers_pull"),
+    path("expense-types/", views.expense_types_pull, name="expense_types_pull"),
+    path("expense-reasons/", views.expense_reasons_pull, name="expense_reasons_pull"),
+    path("expenses/", views.expenses_pull, name="expenses_pull"),
     path("products/", views.products_pull, name="products_pull"),
     path("barcodes/", views.barcodes_pull, name="barcodes_pull"),
     path("deletes/", views.deletes_pull, name="deletes_pull"),

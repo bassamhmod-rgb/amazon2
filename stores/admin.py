@@ -20,9 +20,17 @@ class StoreAdmin(admin.ModelAdmin):
 
 @admin.register(Warehouse)
 class WarehouseAdmin(admin.ModelAdmin):
-    list_display = ("name", "store", "identifier", "phone", "percentage", "is_active")
+    list_display = (
+        "name",
+        "store",
+        "identifier",
+        "phone",
+        "percentage",
+        "is_representative",
+        "is_active",
+    )
     search_fields = ("name", "identifier", "store__name")
-    list_filter = ("store", "is_active")
+    list_filter = ("store", "is_representative", "is_active")
 
     def get_readonly_fields(self, request, obj=None):
         readonly = list(super().get_readonly_fields(request, obj))

@@ -211,6 +211,10 @@ class Warehouse(models.Model):
         validators=[MinValueValidator(Decimal("0.00")), MaxValueValidator(Decimal("100.00"))],
         help_text="نسبة (مثال: 5 = 5%)",
     )
+    is_representative = models.BooleanField(
+        default=False,
+        help_text="تمييز هذا السجل كمندوب",
+    )
 
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)

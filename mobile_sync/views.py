@@ -23,6 +23,7 @@ from products.models import Category
 from products.models import Product
 from products.models import ProductBarcode
 from orders.models import Order, OrderItem
+from dashboard.models import Expense, ExpenseType, ExpenseReason
 from stores.models import Store
 from stores.models import TrialDevice
 from stores.models import Warehouse
@@ -177,6 +178,56 @@ def _serialize_supplier(supplier):
         "opening_balance": float(supplier.opening_balance),
         "access_id": supplier.access_id,
         "update_time": supplier.update_time or 0,
+    }
+
+
+def _serialize_warehouse(warehouse):
+    return {
+        "id": warehouse.id,
+        "store_id": warehouse.store_id,
+        "identifier": warehouse.identifier,
+        "name": warehouse.name,
+        "address": warehouse.address or "",
+        "phone": warehouse.phone or "",
+        "percentage": float(warehouse.percentage or 0),
+        "is_representative": warehouse.is_representative,
+        "is_main": warehouse.is_main,
+        "is_active": warehouse.is_active,
+        "access_id": warehouse.access_id,
+        "update_time": warehouse.update_time or 0,
+    }
+
+
+def _serialize_expense_type(expense_type):
+    return {
+        "id": expense_type.id,
+        "name": expense_type.name,
+        "access_id": expense_type.access_id,
+        "update_time": expense_type.update_time or 0,
+    }
+
+
+def _serialize_expense_reason(expense_reason):
+    return {
+        "id": expense_reason.id,
+        "name": expense_reason.name,
+        "access_id": expense_reason.access_id,
+        "update_time": expense_reason.update_time or 0,
+    }
+
+
+def _serialize_expense(expense):
+    return {
+        "id": expense.id,
+        "amount": float(expense.amount or 0),
+        "date": expense.date.strftime("%Y-%m-%d"),
+        "expense_type_server_id": expense.expense_type_id,
+        "expense_type": expense.expense_type.name if expense.expense_type else "",
+        "expense_reason_server_id": expense.expense_reason_id,
+        "expense_reason": expense.expense_reason.name if expense.expense_reason else "",
+        "notes": expense.notes or "",
+        "access_id": expense.access_id,
+        "update_time": expense.update_time or 0,
     }
 
 
@@ -667,6 +718,77 @@ def _apply_supplier_change(store, payload, server_id=None):
     return obj, "created"
 
 
+def _apply_expense_type_change(store, payload, server_id=None):
+    name = _to_str(payload.get("name")).strip()
+    if not name:
+        raise ValueError("Expense type name is required")
+    now_minute = _now_minute()
+    obj = ExpenseType.objects.filter(id=server_id, store=store).first() if server_id else None
+    if not obj:
+        obj = ExpenseType.objects.filter(store=store, name=name).first()
+    if obj:
+        ExpenseType.objects.filter(id=obj.id, store=store).update(name=name, update_time=now_minute)
+        obj.refresh_from_db()
+        return obj, "updated"
+    return ExpenseType.objects.create(store=store, name=name, update_time=now_minute), "created"
+
+
+def _apply_expense_reason_change(store, payload, server_id=None):
+    name = _to_str(payload.get("name")).strip()
+    if not name:
+        raise ValueError("Expense reason name is required")
+    now_minute = _now_minute()
+    obj = ExpenseReason.objects.filter(id=server_id, store=store).first() if server_id else None
+    if not obj:
+        obj = ExpenseReason.objects.filter(store=store, name=name).first()
+    if obj:
+        ExpenseReason.objects.filter(id=obj.id, store=store).update(name=name, update_time=now_minute)
+        obj.refresh_from_db()
+        return obj, "updated"
+    return ExpenseReason.objects.create(store=store, name=name, update_time=now_minute), "created"
+
+
+def _apply_expense_change(store, payload, server_id=None):
+    expense_type = None
+    expense_reason = None
+    type_id = _to_int(payload.get("expense_type_server_id"))
+    reason_id = _to_int(payload.get("expense_reason_server_id"))
+    type_name = _to_str(payload.get("expense_type")).strip()
+    reason_name = _to_str(payload.get("expense_reason")).strip()
+    if type_id:
+        expense_type = ExpenseType.objects.filter(id=type_id, store=store).first()
+    if not expense_type and type_name:
+        expense_type, _ = ExpenseType.objects.get_or_create(store=store, name=type_name)
+    if reason_id:
+        expense_reason = ExpenseReason.objects.filter(id=reason_id, store=store).first()
+    if not expense_reason and reason_name:
+        expense_reason, _ = ExpenseReason.objects.get_or_create(store=store, name=reason_name)
+
+    date_value = parse_datetime(str(payload.get("date") or ""))
+    if date_value is None:
+        from django.utils.dateparse import parse_date
+        date_value = parse_date(str(payload.get("date") or "")) or timezone.localdate()
+    else:
+        date_value = date_value.date()
+
+    now_minute = _now_minute()
+    update_fields = {
+        "amount": Decimal(str(_to_float(payload.get("amount"), 0.0))),
+        "date": date_value,
+        "expense_type": expense_type,
+        "expense_reason": expense_reason,
+        "notes": _to_str(payload.get("notes")),
+        "update_time": now_minute,
+    }
+    obj = Expense.objects.filter(id=server_id, store=store).first() if server_id else None
+    if obj:
+        Expense.objects.filter(id=obj.id, store=store).update(**update_fields)
+        obj.refresh_from_db()
+        return obj, "updated"
+    obj = Expense.objects.create(store=store, **update_fields)
+    return obj, "created"
+
+
 @api_view(["GET"])
 @permission_classes([AllowAny])
 def categories_pull(request):
@@ -818,6 +940,80 @@ def suppliers_pull(request):
             "items": data,
             "max_update_time": max((x["update_time"] for x in data), default=0),
         }
+    )
+
+
+def _pull_store_rows(request, model, serializer, only_fields):
+    merchant_id = request.query_params.get("merchant_id")
+    since = request.query_params.get("since")
+
+    if not merchant_id:
+        return Response({"detail": "merchant_id is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        merchant_id_int = int(merchant_id)
+    except (TypeError, ValueError):
+        return Response({"detail": "merchant_id must be an integer"}, status=status.HTTP_400_BAD_REQUEST)
+
+    store = Store.objects.filter(id=merchant_id_int).first()
+    if not store:
+        return Response({"detail": "Store not found"}, status=status.HTTP_404_NOT_FOUND)
+
+    qs = model.objects.filter(store_id=merchant_id_int).order_by("id")
+    if since not in (None, "", "0"):
+        try:
+            since_int = int(since)
+        except (TypeError, ValueError):
+            return Response({"detail": "since must be an integer"}, status=status.HTTP_400_BAD_REQUEST)
+        qs = qs.filter(update_time__gt=since_int)
+
+    data = [serializer(row) for row in qs.only(*only_fields)]
+    return Response({
+        "merchant_id": merchant_id_int,
+        "items": data,
+        "max_update_time": max((x["update_time"] for x in data), default=0),
+    })
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def expense_types_pull(request):
+    return _pull_store_rows(
+        request,
+        ExpenseType,
+        _serialize_expense_type,
+        ["id", "name", "access_id", "update_time"],
+    )
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def expense_reasons_pull(request):
+    return _pull_store_rows(
+        request,
+        ExpenseReason,
+        _serialize_expense_reason,
+        ["id", "name", "access_id", "update_time"],
+    )
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def expenses_pull(request):
+    return _pull_store_rows(
+        request,
+        Expense,
+        _serialize_expense,
+        [
+            "id",
+            "amount",
+            "date",
+            "expense_type_id",
+            "expense_reason_id",
+            "notes",
+            "access_id",
+            "update_time",
+        ],
     )
 
 
@@ -1016,6 +1212,59 @@ def store_users_pull(request):
             "merchant_id": merchant_id_int,
             "items": data,
             "max_update_time": 0,
+        }
+    )
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def warehouses_pull(request):
+    merchant_id = request.query_params.get("merchant_id")
+    since = request.query_params.get("since")
+
+    if not merchant_id:
+        return Response({"detail": "merchant_id is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        merchant_id_int = int(merchant_id)
+    except (TypeError, ValueError):
+        return Response({"detail": "merchant_id must be an integer"}, status=status.HTTP_400_BAD_REQUEST)
+
+    store = Store.objects.filter(id=merchant_id_int).first()
+    if not store:
+        return Response({"detail": "Store not found"}, status=status.HTTP_404_NOT_FOUND)
+
+    qs = Warehouse.objects.filter(store_id=merchant_id_int).order_by("-is_main", "name")
+    if since not in (None, "", "0"):
+        try:
+            since_int = int(since)
+        except (TypeError, ValueError):
+            return Response({"detail": "since must be an integer"}, status=status.HTTP_400_BAD_REQUEST)
+        qs = qs.filter(update_time__gt=since_int)
+
+    data = [
+        _serialize_warehouse(warehouse)
+        for warehouse in qs.only(
+            "id",
+            "store_id",
+            "identifier",
+            "name",
+            "address",
+            "phone",
+            "percentage",
+            "is_representative",
+            "is_main",
+            "is_active",
+            "access_id",
+            "update_time",
+        )
+    ]
+
+    return Response(
+        {
+            "merchant_id": merchant_id_int,
+            "items": data,
+            "max_update_time": max((x["update_time"] for x in data), default=0),
         }
     )
 
@@ -1284,7 +1533,16 @@ def sync_push(request):
     deletes = [item for item in changes if str(item.get("action", "upsert")).lower() == "delete"]
 
     def entity_priority(item):
-        return {"category": 0, "customer": 0, "supplier": 0, "product": 1, "barcode": 2}.get(str(item.get("entity")), 99)
+        return {
+            "category": 0,
+            "customer": 0,
+            "supplier": 0,
+            "expense_type": 0,
+            "expense_reason": 0,
+            "product": 1,
+            "barcode": 2,
+            "expense": 2,
+        }.get(str(item.get("entity")), 99)
 
     upserts.sort(key=entity_priority)
     deletes.sort(key=entity_priority, reverse=True)
@@ -1384,6 +1642,45 @@ def sync_push(request):
                         "server_id": obj.id,
                         "update_time": obj.update_time or 0,
                     })
+                elif entity == "expense_type":
+                    obj, action = _apply_expense_type_change(
+                        store,
+                        payload_item,
+                        server_id=_to_int(server_id),
+                    )
+                    applied.append({
+                        "entity": "expense_type",
+                        "action": action,
+                        "local_id": local_id,
+                        "server_id": obj.id,
+                        "update_time": obj.update_time or 0,
+                    })
+                elif entity == "expense_reason":
+                    obj, action = _apply_expense_reason_change(
+                        store,
+                        payload_item,
+                        server_id=_to_int(server_id),
+                    )
+                    applied.append({
+                        "entity": "expense_reason",
+                        "action": action,
+                        "local_id": local_id,
+                        "server_id": obj.id,
+                        "update_time": obj.update_time or 0,
+                    })
+                elif entity == "expense":
+                    obj, action = _apply_expense_change(
+                        store,
+                        payload_item,
+                        server_id=_to_int(server_id),
+                    )
+                    applied.append({
+                        "entity": "expense",
+                        "action": action,
+                        "local_id": local_id,
+                        "server_id": obj.id,
+                        "update_time": obj.update_time or 0,
+                    })
 
             for item in deletes:
                 entity = str(item.get("entity", "")).lower()
@@ -1469,6 +1766,39 @@ def sync_push(request):
                         obj.delete()
                         applied.append({
                             "entity": "supplier",
+                            "action": "deleted",
+                            "local_id": local_id,
+                            "server_id": server_id,
+                        })
+                elif entity == "expense":
+                    obj = Expense.objects.filter(id=server_id, store_id=merchant_id).first()
+                    if obj:
+                        obj._skip_mobile_delete_sync = True
+                        obj.delete()
+                        applied.append({
+                            "entity": "expense",
+                            "action": "deleted",
+                            "local_id": local_id,
+                            "server_id": server_id,
+                        })
+                elif entity == "expense_type":
+                    obj = ExpenseType.objects.filter(id=server_id, store_id=merchant_id).first()
+                    if obj:
+                        obj._skip_mobile_delete_sync = True
+                        obj.delete()
+                        applied.append({
+                            "entity": "expense_type",
+                            "action": "deleted",
+                            "local_id": local_id,
+                            "server_id": server_id,
+                        })
+                elif entity == "expense_reason":
+                    obj = ExpenseReason.objects.filter(id=server_id, store_id=merchant_id).first()
+                    if obj:
+                        obj._skip_mobile_delete_sync = True
+                        obj.delete()
+                        applied.append({
+                            "entity": "expense_reason",
                             "action": "deleted",
                             "local_id": local_id,
                             "server_id": server_id,
