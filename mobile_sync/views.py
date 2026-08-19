@@ -26,7 +26,7 @@ from orders.models import Order, OrderItem
 from dashboard.models import Expense, ExpenseType, ExpenseReason
 from stores.models import Store
 from stores.models import TrialDevice
-from stores.models import Warehouse
+from stores.models import Warehouse, WarehouseTransfer, WarehouseTransferItem
 from django.db import IntegrityError, transaction
 
 
@@ -195,6 +195,32 @@ def _serialize_warehouse(warehouse):
         "is_active": warehouse.is_active,
         "access_id": warehouse.access_id,
         "update_time": warehouse.update_time or 0,
+    }
+
+
+def _serialize_warehouse_transfer(transfer):
+    return {
+        "id": transfer.id,
+        "store_id": transfer.store_id,
+        "from_warehouse_id": transfer.from_warehouse_id,
+        "to_warehouse_id": transfer.to_warehouse_id,
+        "transfer_date": transfer.transfer_date.isoformat() if transfer.transfer_date else "",
+        "notes": transfer.notes or "",
+        "access_id": transfer.access_id,
+        "update_time": transfer.update_time or 0,
+        "items": [
+            {
+                "id": item.id,
+                "product_id": item.product_id,
+                "quantity": float(item.quantity or 0),
+                "unit_name": item.unit_name or "",
+                "unit_factor": float(item.unit_factor or 1),
+                "notes": item.notes or "",
+                "access_id": item.access_id,
+                "update_time": item.update_time or 0,
+            }
+            for item in transfer.items.all()
+        ],
     }
 
 
@@ -758,6 +784,69 @@ def _apply_warehouse_change(store, payload, server_id=None):
     return obj, "created"
 
 
+def _apply_warehouse_transfer_change(store, payload, server_id=None, product_resolver=None):
+    from_warehouse_id = _to_int(payload.get("from_warehouse_id"))
+    to_warehouse_id = _to_int(payload.get("to_warehouse_id"))
+    from_warehouse = Warehouse.objects.filter(id=from_warehouse_id, store=store).first()
+    to_warehouse = Warehouse.objects.filter(id=to_warehouse_id, store=store).first()
+    if not from_warehouse or not to_warehouse:
+        raise ValueError("Transfer warehouses are required")
+    if from_warehouse.id == to_warehouse.id:
+        raise ValueError("Transfer source and target must be different")
+
+    transfer_date_raw = _to_str(payload.get("transfer_date")).strip()
+    transfer_date = parse_datetime(transfer_date_raw) if transfer_date_raw else None
+    if transfer_date is None:
+        transfer_date = timezone.now()
+    if timezone.is_naive(transfer_date):
+        transfer_date = timezone.make_aware(transfer_date)
+
+    now_minute = _now_minute()
+    obj = WarehouseTransfer.objects.filter(id=server_id, store=store).first() if server_id else None
+    fields = {
+        "from_warehouse": from_warehouse,
+        "to_warehouse": to_warehouse,
+        "transfer_date": transfer_date,
+        "notes": _to_str(payload.get("notes")).strip(),
+        "update_time": now_minute,
+    }
+    if obj:
+        WarehouseTransfer.objects.filter(id=obj.id, store=store).update(**fields)
+        action = "updated"
+        obj.refresh_from_db()
+    else:
+        obj = WarehouseTransfer.objects.create(store=store, **fields)
+        action = "created"
+
+    items = payload.get("items", [])
+    if not isinstance(items, list):
+        items = []
+    obj.items.all().delete()
+    for item_payload in items:
+        if not isinstance(item_payload, dict):
+            continue
+        product = None
+        if product_resolver:
+            product = product_resolver(
+                product_server_id=_to_int(item_payload.get("product_id")),
+                product_local_id=_to_int(item_payload.get("product_local_id")),
+                product_access_id=_to_int(item_payload.get("product_access_id")),
+            )
+        if not product:
+            raise ValueError("Transfer item product is required")
+        WarehouseTransferItem.objects.create(
+            transfer=obj,
+            store=store,
+            product=product,
+            quantity=Decimal(str(_to_float(item_payload.get("quantity"), 0.0))),
+            unit_name=_to_str(item_payload.get("unit_name")).strip(),
+            unit_factor=Decimal(str(_to_float(item_payload.get("unit_factor"), 1.0) or 1.0)),
+            notes=_to_str(item_payload.get("notes")).strip(),
+            update_time=now_minute,
+        )
+    return obj, action
+
+
 def _apply_expense_type_change(store, payload, server_id=None):
     name = _to_str(payload.get("name")).strip()
     if not name:
@@ -1309,6 +1398,47 @@ def warehouses_pull(request):
     )
 
 
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def warehouse_transfers_pull(request):
+    merchant_id = request.query_params.get("merchant_id")
+    since = request.query_params.get("since")
+
+    if not merchant_id:
+        return Response({"detail": "merchant_id is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        merchant_id_int = int(merchant_id)
+    except (TypeError, ValueError):
+        return Response({"detail": "merchant_id must be an integer"}, status=status.HTTP_400_BAD_REQUEST)
+
+    store = Store.objects.filter(id=merchant_id_int).first()
+    if not store:
+        return Response({"detail": "Store not found"}, status=status.HTTP_404_NOT_FOUND)
+
+    qs = (
+        WarehouseTransfer.objects.filter(store_id=merchant_id_int)
+        .prefetch_related("items")
+        .order_by("-transfer_date", "-id")
+    )
+    if since not in (None, "", "0"):
+        try:
+            since_int = int(since)
+        except (TypeError, ValueError):
+            return Response({"detail": "since must be an integer"}, status=status.HTTP_400_BAD_REQUEST)
+        qs = qs.filter(update_time__gt=since_int)
+
+    data = [_serialize_warehouse_transfer(transfer) for transfer in qs]
+
+    return Response(
+        {
+            "merchant_id": merchant_id_int,
+            "items": data,
+            "max_update_time": max((x["update_time"] for x in data), default=0),
+        }
+    )
+
+
 @api_view(["POST"])
 @permission_classes([AllowAny])
 def store_user_login(request):
@@ -1527,6 +1657,7 @@ def sync_push(request):
     product_local_to_server = {}
     customer_local_to_server = {}
     supplier_local_to_server = {}
+    warehouse_transfer_local_to_server = {}
 
     def resolve_category(server_id, local_id):
         if server_id not in (None, ""):
@@ -1583,6 +1714,7 @@ def sync_push(request):
             "product": 1,
             "barcode": 2,
             "expense": 2,
+            "warehouse_transfer": 3,
         }.get(str(item.get("entity")), 99)
 
     upserts.sort(key=entity_priority)
@@ -1722,6 +1854,22 @@ def sync_push(request):
                         "server_id": obj.id,
                         "update_time": obj.update_time or 0,
                     })
+                elif entity == "warehouse_transfer":
+                    obj, action = _apply_warehouse_transfer_change(
+                        store,
+                        payload_item,
+                        server_id=_to_int(server_id),
+                        product_resolver=resolve_product,
+                    )
+                    if local_id not in (None, ""):
+                        warehouse_transfer_local_to_server[int(local_id)] = obj
+                    applied.append({
+                        "entity": "warehouse_transfer",
+                        "action": action,
+                        "local_id": local_id,
+                        "server_id": obj.id,
+                        "update_time": obj.update_time or 0,
+                    })
                 elif entity == "expense":
                     obj, action = _apply_expense_change(
                         store,
@@ -1839,6 +1987,16 @@ def sync_push(request):
                         obj.delete()
                         applied.append({
                             "entity": "warehouse",
+                            "action": "deleted",
+                            "local_id": local_id,
+                            "server_id": server_id,
+                        })
+                elif entity == "warehouse_transfer":
+                    obj = WarehouseTransfer.objects.filter(id=server_id, store_id=merchant_id).first()
+                    if obj:
+                        obj.delete()
+                        applied.append({
+                            "entity": "warehouse_transfer",
                             "action": "deleted",
                             "local_id": local_id,
                             "server_id": server_id,

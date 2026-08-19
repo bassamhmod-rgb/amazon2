@@ -1,6 +1,7 @@
 ﻿from django.db import models
 from django.contrib.auth.models import User
 from django.db.models import Q
+from django.utils import timezone
 from django.utils.text import slugify
 from django.core.exceptions import ValidationError
 from django.utils.text import slugify
@@ -264,6 +265,87 @@ class Warehouse(models.Model):
 
     def __str__(self):
         return f"{self.store} - {self.name} ({self.identifier})"
+
+
+class WarehouseTransfer(models.Model):
+    store = models.ForeignKey(Store, on_delete=models.CASCADE, related_name="warehouse_transfers")
+    update_time = models.BigIntegerField(blank=True, null=True)
+    access_id = models.BigIntegerField(blank=True, null=True)
+    from_warehouse = models.ForeignKey(
+        Warehouse,
+        on_delete=models.PROTECT,
+        related_name="outgoing_transfers",
+    )
+    to_warehouse = models.ForeignKey(
+        Warehouse,
+        on_delete=models.PROTECT,
+        related_name="incoming_transfers",
+    )
+    transfer_date = models.DateTimeField(default=timezone.now)
+    notes = models.TextField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-transfer_date", "-id"]
+
+    def clean(self):
+        if self.from_warehouse_id and self.to_warehouse_id:
+            if self.from_warehouse_id == self.to_warehouse_id:
+                raise ValidationError("لا يمكن المناقلة لنفس المستودع.")
+            if self.from_warehouse.store_id != self.store_id or self.to_warehouse.store_id != self.store_id:
+                raise ValidationError("يجب أن تكون مستودعات المناقلة من نفس المتجر.")
+
+    def save(self, *args, **kwargs):
+        _touch_update_time(self, kwargs)
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.store} - {self.from_warehouse} -> {self.to_warehouse}"
+
+
+class WarehouseTransferItem(models.Model):
+    transfer = models.ForeignKey(
+        WarehouseTransfer,
+        on_delete=models.CASCADE,
+        related_name="items",
+    )
+    store = models.ForeignKey(Store, on_delete=models.CASCADE, related_name="warehouse_transfer_items")
+    update_time = models.BigIntegerField(blank=True, null=True)
+    access_id = models.BigIntegerField(blank=True, null=True)
+    product = models.ForeignKey("products.Product", on_delete=models.PROTECT, related_name="warehouse_transfer_items")
+    quantity = models.DecimalField(max_digits=12, decimal_places=3)
+    unit_name = models.CharField(max_length=100, blank=True, null=True)
+    unit_factor = models.DecimalField(max_digits=12, decimal_places=3, default=Decimal("1.000"))
+    notes = models.TextField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["id"]
+
+    def clean(self):
+        if self.quantity is not None and self.quantity <= 0:
+            raise ValidationError({"quantity": "الكمية يجب أن تكون أكبر من صفر."})
+        if self.unit_factor is not None and self.unit_factor <= 0:
+            raise ValidationError({"unit_factor": "معامل الوحدة يجب أن يكون أكبر من صفر."})
+        if self.transfer_id and self.store_id and self.transfer.store_id != self.store_id:
+            raise ValidationError("بند المناقلة يجب أن يتبع نفس متجر المناقلة.")
+        if self.product_id and self.store_id and self.product.store_id != self.store_id:
+            raise ValidationError("المنتج يجب أن يتبع نفس المتجر.")
+
+    def save(self, *args, **kwargs):
+        _touch_update_time(self, kwargs)
+        if self.transfer_id and not self.store_id:
+            self.store_id = self.transfer.store_id
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    @property
+    def base_quantity(self):
+        return self.quantity * self.unit_factor
+
+    def __str__(self):
+        return f"{self.product} - {self.quantity}"
 #طرق الدفع
 class StorePaymentMethod(models.Model):
     update_time = models.BigIntegerField(blank=True, null=True)

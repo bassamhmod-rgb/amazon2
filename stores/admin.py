@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Store, TrialDevice, Warehouse
+from .models import Store, TrialDevice, Warehouse, WarehouseTransfer, WarehouseTransferItem
 
 @admin.register(Store)
 class StoreAdmin(admin.ModelAdmin):
@@ -42,6 +42,19 @@ class WarehouseAdmin(admin.ModelAdmin):
         if obj and obj.is_main:
             return False
         return super().has_delete_permission(request, obj=obj)
+
+
+class WarehouseTransferItemInline(admin.TabularInline):
+    model = WarehouseTransferItem
+    extra = 0
+
+
+@admin.register(WarehouseTransfer)
+class WarehouseTransferAdmin(admin.ModelAdmin):
+    list_display = ("store", "from_warehouse", "to_warehouse", "transfer_date", "update_time")
+    search_fields = ("notes", "from_warehouse__name", "to_warehouse__name", "items__product__name")
+    list_filter = ("store", "from_warehouse", "to_warehouse")
+    inlines = [WarehouseTransferItemInline]
 
 
 @admin.register(TrialDevice)
