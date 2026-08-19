@@ -140,36 +140,14 @@
                             <div class="card-body">
                                 <div class="fw-bold mb-2">الصلاحيات</div>
                                 <div class="row g-2">
-                                    <div class="col-md-4">
-                                        <div class="form-check">
-                                            {{ form.sales_orders }}
-                                            <label class="form-check-label">{{ form.sales_orders.label }}</label>
+                                    {% for field in form.permission_fields %}
+                                        <div class="col-md-4">
+                                            <div class="form-check">
+                                                {{ field }}
+                                                <label class="form-check-label">{{ field.label }}</label>
+                                            </div>
                                         </div>
-                                    </div>
-                                    <div class="col-md-4">
-                                        <div class="form-check">
-                                            {{ form.purchase_orders }}
-                                            <label class="form-check-label">{{ form.purchase_orders.label }}</label>
-                                        </div>
-                                    </div>
-                                    <div class="col-md-4">
-                                        <div class="form-check">
-                                            {{ form.products }}
-                                            <label class="form-check-label">{{ form.products.label }}</label>
-                                        </div>
-                                    </div>
-                                    <div class="col-md-4">
-                                        <div class="form-check">
-                                            {{ form.customer_balances }}
-                                            <label class="form-check-label">{{ form.customer_balances.label }}</label>
-                                        </div>
-                                    </div>
-                                    <div class="col-md-4">
-                                        <div class="form-check">
-                                            {{ form.receipt_notices }}
-                                            <label class="form-check-label">{{ form.receipt_notices.label }}</label>
-                                        </div>
-                                    </div>
+                                    {% endfor %}
                                 </div>
                             </div>
                         </div>

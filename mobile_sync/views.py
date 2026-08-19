@@ -32,6 +32,57 @@ from django.db import IntegrityError, transaction
 
 STORE_WEB_LOGIN_SIGNER_SALT = "mobile_sync.store_web_login"
 STORE_WEB_LOGIN_MAX_AGE_SECONDS = 300
+MOBILE_PERMISSION_KEYS = [
+    "sales.view",
+    "sales.create",
+    "sales.edit",
+    "sales.delete",
+    "purchases.view",
+    "purchases.create",
+    "purchases.edit",
+    "purchases.delete",
+    "products.view",
+    "products.create",
+    "products.edit",
+    "products.delete",
+    "products.prices",
+    "products.stock",
+    "customers.view",
+    "customers.create",
+    "customers.edit",
+    "customers.delete",
+    "customers.balances",
+    "suppliers.view",
+    "suppliers.create",
+    "suppliers.edit",
+    "suppliers.delete",
+    "suppliers.balances",
+    "warehouses.view",
+    "warehouses.create",
+    "warehouses.edit",
+    "warehouses.delete",
+    "warehouses.transfer",
+    "stock.view",
+    "stock.adjust",
+    "stock.movement",
+    "expenses.view",
+    "expenses.create",
+    "expenses.edit",
+    "expenses.delete",
+    "expenses.settings",
+    "reports.profits",
+    "reports.history",
+    "sync.run",
+    "store.open",
+    "settings.open",
+]
+LEGACY_MOBILE_PERMISSION_MAP = {
+    "sales_orders": ["sales.view", "sales.create"],
+    "purchase_orders": ["purchases.view", "purchases.create"],
+    "products": ["products.view", "products.create", "products.edit"],
+    "customer_balances": ["customers.view", "customers.balances"],
+    "receipt_notices": ["customers.view", "customers.create"],
+}
 GENERAL_CUSTOMER_NAME = "زبون عام"
 GENERAL_CUSTOMER_PHONE = "GENERAL_CUSTOMER"
 OPENING_INVENTORY_SUPPLIER_NAME = "بضاعة أول المدة"
@@ -76,6 +127,20 @@ def _to_str(value, default=""):
     if value in (None, ""):
         return default
     return str(value)
+
+
+def _all_mobile_permissions():
+    return {key: True for key in MOBILE_PERMISSION_KEYS}
+
+
+def _normalize_mobile_permissions(permissions):
+    permissions = permissions or {}
+    normalized = {key: bool(permissions.get(key)) for key in MOBILE_PERMISSION_KEYS}
+    for legacy_key, new_keys in LEGACY_MOBILE_PERMISSION_MAP.items():
+        if permissions.get(legacy_key):
+            for key in new_keys:
+                normalized[key] = True
+    return normalized
 
 
 def _normalize_mobile(value):
@@ -1318,6 +1383,7 @@ def store_users_pull(request):
             "has_password": owner.has_usable_password(),
             "password": owner.password,
             "is_owner": True,
+            "permissions": _all_mobile_permissions(),
         }
     ]
 
@@ -1332,6 +1398,7 @@ def store_users_pull(request):
             "has_password": bool(u.password),
             "password": u.password,
             "is_owner": False,
+            "permissions": _normalize_mobile_permissions(u.permissions),
         }
         for u in qs.select_related("warehouse").only(
             "id",
@@ -1341,6 +1408,7 @@ def store_users_pull(request):
             "warehouse_id",
             "is_active",
             "password",
+            "permissions",
         )
     )
 
@@ -1490,6 +1558,7 @@ def store_user_login(request):
                     "name": owner_name,
                     "is_active": owner_candidate.is_active,
                     "is_owner": True,
+                    "permissions": _all_mobile_permissions(),
                 },
             }
         )
@@ -1517,6 +1586,7 @@ def store_user_login(request):
                 "name": user.name,
                 "is_active": user.is_active,
                 "is_owner": False,
+                "permissions": _normalize_mobile_permissions(user.permissions),
             },
         }
     )
