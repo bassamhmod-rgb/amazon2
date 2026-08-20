@@ -2255,6 +2255,8 @@ def orders_push(request):
                     continue
 
                 local_order_id = _to_int(order_payload.get("local_order_id"))
+                server_order_id = _to_int(order_payload.get("server_order_id"))
+                action = _to_str(order_payload.get("action"), "upsert").lower()
                 sync_client_id = _to_str(order_payload.get("sync_client_id")).strip() or None
                 accounting_invoice_number = _to_int(order_payload.get("accounting_invoice_number"))
                 document_kind = _to_int(order_payload.get("document_kind"), 1)
@@ -2306,7 +2308,12 @@ def orders_push(request):
                 if prepared_items is None:
                     continue
 
-                if sync_client_id and local_order_id is not None:
+                if server_order_id is not None:
+                    order_qs = Order.objects.filter(
+                        store=store,
+                        id=server_order_id,
+                    ).select_related("customer", "supplier", "warehouse", "created_by_store_user")
+                elif sync_client_id and local_order_id is not None:
                     order_qs = Order.objects.filter(
                         store=store,
                         mobile_sync_client_id=sync_client_id,
@@ -2323,6 +2330,21 @@ def orders_push(request):
                     else:
                         order_qs = order_qs.filter(created_by_store_user=store_user)
                 order = order_qs.first()
+
+                if action == "delete":
+                    if order is not None:
+                        deleted_order_id = order.id
+                        order.items.all().delete()
+                        order.delete()
+                    else:
+                        deleted_order_id = None
+                    applied.append({
+                        "local_order_id": local_order_id,
+                        "server_order_id": deleted_order_id,
+                        "action": "deleted",
+                    })
+                    continue
+
                 if order is None:
                     order = Order(
                         store=store,
@@ -2354,6 +2376,7 @@ def orders_push(request):
                 order.shipping_address = _to_str(order_payload.get("shipping_address"), "") or None
                 order.is_seen_by_store = is_seen_by_store
                 order.created_at = created_at
+                order.update_time = _now_minute()
                 order._skip_update_time_touch = True
                 order.save()
 
@@ -2380,6 +2403,7 @@ def orders_push(request):
                         warehouse=warehouse,
                         access_id=None,
                     )
+                    order_item.update_time = order.update_time
                     order_item._skip_update_time_touch = True
                     order_item.save()
 
@@ -2407,6 +2431,91 @@ def orders_push(request):
         return Response({"status": "ok", "applied": applied, "errors": errors})
     except Exception as exc:
         return Response({"detail": str(exc)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+def _serialize_order_item_for_mobile(item):
+    return {
+        "id": item.id,
+        "product_id": item.product_id,
+        "warehouse_id": item.warehouse_id,
+        "quantity": float(item.quantity if isinstance(item.quantity, Decimal) else item.quantity),
+        "price": float(item.price if isinstance(item.price, Decimal) else item.price),
+        "direction": item.direction,
+        "buy_price": None
+        if item.buy_price is None
+        else float(item.buy_price if isinstance(item.buy_price, Decimal) else item.buy_price),
+        "item_note": item.item_note or "",
+        "update_time": item.update_time or 0,
+    }
+
+
+def _serialize_order_for_mobile(order):
+    items = [
+        _serialize_order_item_for_mobile(item)
+        for item in order.items.select_related("product", "warehouse").order_by("id")
+    ]
+    return {
+        "id": order.id,
+        "update_time": order.update_time or 0,
+        "customer_id": order.customer_id,
+        "supplier_id": order.supplier_id,
+        "warehouse_id": order.warehouse_id,
+        "transaction_type": order.transaction_type,
+        "status": "completed" if order.status == "confirmed" else order.status,
+        "discount": float(order.discount if isinstance(order.discount, Decimal) else order.discount),
+        "payment": float(order.payment if isinstance(order.payment, Decimal) else order.payment),
+        "amount": float(order.amount if isinstance(order.amount, Decimal) else order.amount),
+        "accounting_invoice_number": order.accounting_invoice_number,
+        "document_kind": order.document_kind,
+        "payment_type": order.payment_type or "",
+        "payment_method_name": order.payment_method_name or "",
+        "payment_recipient_name": order.payment_recipient_name or "",
+        "payment_account_info": order.payment_account_info or "",
+        "payment_additional_info": order.payment_additional_info or "",
+        "shipping_address": order.shipping_address or "",
+        "is_seen_by_store": order.is_seen_by_store,
+        "created_at": order.created_at.isoformat() if order.created_at else "",
+        "items": items,
+    }
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def orders_pull(request):
+    merchant_id = request.query_params.get("merchant_id")
+    since = request.query_params.get("since")
+
+    if not merchant_id:
+        return Response({"detail": "merchant_id is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        merchant_id_int = int(merchant_id)
+    except (TypeError, ValueError):
+        return Response({"detail": "merchant_id must be an integer"}, status=status.HTTP_400_BAD_REQUEST)
+
+    store = Store.objects.filter(id=merchant_id_int).first()
+    if not store:
+        return Response({"detail": "Store not found"}, status=status.HTTP_404_NOT_FOUND)
+
+    qs = (
+        Order.objects.filter(store_id=merchant_id_int)
+        .select_related("customer", "supplier", "warehouse")
+        .prefetch_related("items")
+        .order_by("id")
+    )
+    if since not in (None, "", "0"):
+        try:
+            since_int = int(since)
+        except (TypeError, ValueError):
+            return Response({"detail": "since must be an integer"}, status=status.HTTP_400_BAD_REQUEST)
+        qs = qs.filter(update_time__gt=since_int)
+
+    data = [_serialize_order_for_mobile(order) for order in qs]
+    return Response({
+        "merchant_id": merchant_id_int,
+        "items": data,
+        "max_update_time": max((x["update_time"] for x in data), default=0),
+    })
 
 
 @api_view(["GET"])
