@@ -2420,6 +2420,7 @@ def orders_push(request):
                     "local_order_id": local_order_id,
                     "server_order_id": order.id,
                     "server_update_time": order.update_time or 0,
+                    "created_by_store_user_id": order.created_by_store_user_id,
                     "accounting_invoice_number": order.accounting_invoice_number,
                     "document_kind": order.document_kind,
                     "customer_server_id": order.customer_id,
@@ -2461,6 +2462,10 @@ def _serialize_order_for_mobile(order):
         "customer_id": order.customer_id,
         "supplier_id": order.supplier_id,
         "warehouse_id": order.warehouse_id,
+        "created_by_store_user_id": order.created_by_store_user_id,
+        "created_by_store_user_name": (
+            order.created_by_store_user.name if order.created_by_store_user_id else ""
+        ),
         "transaction_type": order.transaction_type,
         "status": "completed" if order.status == "confirmed" else order.status,
         "discount": float(order.discount if isinstance(order.discount, Decimal) else order.discount),
@@ -2505,7 +2510,7 @@ def orders_pull(request):
             | ~Q(document_kind=1)
             | Q(status="confirmed")
         )
-        .select_related("customer", "supplier", "warehouse")
+        .select_related("customer", "supplier", "warehouse", "created_by_store_user")
         .prefetch_related("items")
         .order_by("id")
     )
