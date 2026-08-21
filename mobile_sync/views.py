@@ -28,6 +28,7 @@ from stores.models import Store
 from stores.models import TrialDevice
 from stores.models import Warehouse, WarehouseTransfer, WarehouseTransferItem
 from django.db import IntegrityError, transaction
+from django.db.models import Q
 
 
 STORE_WEB_LOGIN_SIGNER_SALT = "mobile_sync.store_web_login"
@@ -2508,7 +2509,7 @@ def orders_pull(request):
             since_int = int(since)
         except (TypeError, ValueError):
             return Response({"detail": "since must be an integer"}, status=status.HTTP_400_BAD_REQUEST)
-        qs = qs.filter(update_time__gt=since_int)
+        qs = qs.filter(Q(update_time__gt=since_int) | Q(update_time__isnull=True))
 
     data = [_serialize_order_for_mobile(order) for order in qs]
     return Response({
