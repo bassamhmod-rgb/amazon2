@@ -305,8 +305,9 @@ def confirm_order(request, store_slug):
         )
 
     # اعتبر الطلب مدفوع بالكامل عند إنشائه من قبل الزبون
+    order.amount = order.net_total
     order.payment = order.net_total
-    order.save(update_fields=["payment"])
+    order.save(update_fields=["amount", "payment"])
 
     cart.items.all().delete()
 
