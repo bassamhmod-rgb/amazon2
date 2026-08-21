@@ -21,7 +21,7 @@ from products.utils import fix_missing_buy_price_for_product, apply_purchase_pri
 # --- استيراد المودلز من التطبيقات المختلفة ---
 from products.models import Category, Product
 from products.forms import CategoryForm, ProductForm
-from stores.models import Store, StorePaymentMethod, Warehouse
+from stores.models import Store, StorePaymentMethod, Warehouse, WarehouseTransfer, WarehouseTransferItem
 from stores.forms import WarehouseForm
 from orders.models import Order, OrderItem
 from accounts.models import PointsTransaction, AccountingClient, SystemNotification, DeleteSync, StoreUser
@@ -2452,8 +2452,17 @@ def _perform_store_reset(request, store):
             "stores.Warehouse": list(
                 Warehouse.objects.filter(store=store).exclude(id=main_warehouse_id).values_list("id", flat=True)
             ),
+            "stores.WarehouseTransfer": list(
+                WarehouseTransfer.objects.filter(store=store).values_list("id", flat=True)
+            ),
+            "stores.WarehouseTransferItem": list(
+                WarehouseTransferItem.objects.filter(store=store).values_list("id", flat=True)
+            ),
             "accounts.StoreUser": list(StoreUser.objects.filter(store=store).values_list("id", flat=True)),
         }
+
+        WarehouseTransferItem.objects.filter(store=store).delete()
+        WarehouseTransfer.objects.filter(store=store).delete()
 
         Order.objects.filter(store=store).delete()
         Cart.objects.filter(store=store).delete()
