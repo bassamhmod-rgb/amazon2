@@ -71,6 +71,14 @@ MOBILE_PERMISSION_KEYS = [
     "expenses.edit",
     "expenses.delete",
     "expenses.settings",
+    "notices.receipt",
+    "notices.receipt.create",
+    "notices.receipt.edit",
+    "notices.receipt.delete",
+    "notices.disbursement",
+    "notices.disbursement.create",
+    "notices.disbursement.edit",
+    "notices.disbursement.delete",
     "reports.profits",
     "reports.history",
     "sync.run",
@@ -82,7 +90,18 @@ LEGACY_MOBILE_PERMISSION_MAP = {
     "purchase_orders": ["purchases.view", "purchases.create"],
     "products": ["products.view", "products.create", "products.edit"],
     "customer_balances": ["customers.view", "customers.balances"],
-    "receipt_notices": ["customers.view", "customers.create"],
+    "receipt_notices": [
+        "customers.view",
+        "customers.create",
+        "notices.receipt",
+        "notices.receipt.create",
+        "notices.receipt.edit",
+        "notices.receipt.delete",
+        "notices.disbursement",
+        "notices.disbursement.create",
+        "notices.disbursement.edit",
+        "notices.disbursement.delete",
+    ],
 }
 GENERAL_CUSTOMER_NAME = "زبون عام"
 GENERAL_CUSTOMER_PHONE = "GENERAL_CUSTOMER"
@@ -2470,7 +2489,11 @@ def _serialize_order_for_mobile(order):
         "status": "completed" if order.status == "confirmed" else order.status,
         "discount": float(order.discount if isinstance(order.discount, Decimal) else order.discount),
         "payment": float(order.payment if isinstance(order.payment, Decimal) else order.payment),
-        "amount": float(order.amount if isinstance(order.amount, Decimal) else order.amount),
+        "amount": float(
+            order.net_total
+            if order.document_kind == 1
+            else (order.amount if isinstance(order.amount, Decimal) else order.amount)
+        ),
         "accounting_invoice_number": order.accounting_invoice_number,
         "document_kind": order.document_kind,
         "payment_type": order.payment_type or "",

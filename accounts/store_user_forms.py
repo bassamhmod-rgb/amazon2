@@ -41,6 +41,12 @@ PERMISSION_FIELDS = [
     ("expenses.edit", "تعديل الصرفيات"),
     ("expenses.delete", "حذف الصرفيات"),
     ("expenses.settings", "إعدادات الصرفيات"),
+    ("notices.receipt.create", "إضافة إشعار قبض"),
+    ("notices.receipt.edit", "تعديل إشعار قبض"),
+    ("notices.receipt.delete", "حذف إشعار قبض"),
+    ("notices.disbursement.create", "إضافة إشعار صرف"),
+    ("notices.disbursement.edit", "تعديل إشعار صرف"),
+    ("notices.disbursement.delete", "حذف إشعار صرف"),
     ("reports.profits", "تقرير الأرباح"),
     ("reports.history", "السجل العام"),
     ("sync.run", "المزامنة"),
@@ -53,7 +59,16 @@ LEGACY_PERMISSION_MAP = {
     "purchase_orders": ["purchases.view", "purchases.create"],
     "products": ["products.view", "products.create", "products.edit"],
     "customer_balances": ["customers.view", "customers.balances"],
-    "receipt_notices": ["customers.view", "customers.create"],
+    "receipt_notices": [
+        "customers.view",
+        "customers.create",
+        "notices.receipt.create",
+        "notices.receipt.edit",
+        "notices.receipt.delete",
+        "notices.disbursement.create",
+        "notices.disbursement.edit",
+        "notices.disbursement.delete",
+    ],
 }
 
 
@@ -130,7 +145,7 @@ class StoreUserForm(forms.ModelForm):
             "purchase_orders": obj.permissions["purchases.create"],
             "products": obj.permissions["products.view"] or obj.permissions["products.create"] or obj.permissions["products.edit"],
             "customer_balances": obj.permissions["customers.balances"],
-            "receipt_notices": obj.permissions["customers.create"],
+            "receipt_notices": obj.permissions["notices.receipt.create"] or obj.permissions["notices.disbursement.create"],
         })
         raw_password = self.cleaned_data.get("raw_password")
         if raw_password:
