@@ -2500,6 +2500,11 @@ def orders_pull(request):
 
     qs = (
         Order.objects.filter(store_id=merchant_id_int)
+        .filter(
+            ~Q(transaction_type="sale")
+            | ~Q(document_kind=1)
+            | Q(status="confirmed")
+        )
         .select_related("customer", "supplier", "warehouse")
         .prefetch_related("items")
         .order_by("id")
