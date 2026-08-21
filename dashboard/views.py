@@ -12,7 +12,7 @@ import zipfile
 import time
 from io import BytesIO
 from django.contrib.auth.models import User
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.db.models import Sum
 from django.utils import timezone
 from django.views.decorators.http import require_POST
@@ -85,6 +85,45 @@ def _current_store_user_for_request(request, store):
         .select_related("warehouse")
         .first()
     )
+
+
+def _ensure_owner_store_user_for_dashboard(store):
+    owner = getattr(store, "owner", None)
+    if owner is None:
+        return None
+
+    owner_profile = getattr(owner, "store_user_profile", None)
+    if owner_profile and owner_profile.store_id == store.id:
+        return owner_profile
+
+    existing = StoreUser.objects.filter(store=store, auth_user=owner).first()
+    if existing:
+        return existing
+
+    display_name = (owner.get_full_name() or owner.username or store.name).strip()
+    identifier = (owner.username or f"owner_{store.id}").strip()
+
+    try:
+        with transaction.atomic():
+            return StoreUser.objects.create(
+                store=store,
+                auth_user=owner,
+                identifier=identifier,
+                name=display_name,
+                is_active=owner.is_active and store.is_active,
+            )
+    except IntegrityError:
+        with transaction.atomic():
+            existing = StoreUser.objects.filter(store=store, auth_user=owner).first()
+            if existing:
+                return existing
+            return StoreUser.objects.create(
+                store=store,
+                auth_user=owner,
+                identifier=f"{identifier}_{store.id}",
+                name=f"{display_name} ({store.id})",
+                is_active=owner.is_active and store.is_active,
+            )
 
 
 def _can_access_store_permission(request, store, permission_key):
@@ -890,9 +929,24 @@ def confirm_order(request, store_slug, order_id):
     if order.status != "pending":
         return redirect("dashboard:order_detail_dashboard", store_slug=store.slug, order_id=order.id)
 
+    confirming_store_user = _current_store_user_for_request(request, store)
+
     # تأكيد الطلب
     order.status = "confirmed"
-    order.save(update_fields=["status"])
+    order.update_time = int(time.time() // 60)
+    if confirming_store_user:
+        order.created_by_store_user = confirming_store_user
+        if confirming_store_user.auth_user_id:
+            order.created_by = confirming_store_user.auth_user
+    elif store.owner_id == request.user.id:
+        order.created_by_store_user = _ensure_owner_store_user_for_dashboard(store)
+        order.created_by = store.owner
+    order.save(update_fields=[
+        "status",
+        "created_by_store_user",
+        "created_by",
+        "update_time",
+    ])
 
     # ===============================
     # 🎁 حفظ الكاش باك (للبيع فقط)
