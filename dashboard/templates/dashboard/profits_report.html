@@ -170,6 +170,12 @@
     <div class="row g-3">
         <div class="col-md-4">
             <div class="card p-3 stat-card">
+                <div class="stat-title">فروقات الجرد</div>
+                <div class="stat-value {% if inventory_adjustments_total < 0 %}text-danger{% else %}text-success{% endif %}">{{ inventory_adjustments_total }}</div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card p-3 stat-card">
                 <div class="stat-title">الأرباح الصافية</div>
                 <div class="stat-value text-success">{{ net_profit }}</div>
             </div>

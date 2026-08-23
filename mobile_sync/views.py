@@ -26,7 +26,12 @@ from orders.models import Order, OrderItem
 from dashboard.models import Expense, ExpenseType, ExpenseReason
 from stores.models import Store
 from stores.models import TrialDevice
-from stores.models import Warehouse, WarehouseTransfer, WarehouseTransferItem
+from stores.models import (
+    InventoryAdjustment,
+    Warehouse,
+    WarehouseTransfer,
+    WarehouseTransferItem,
+)
 from django.db import IntegrityError, transaction
 from django.db.models import Q
 
@@ -306,6 +311,28 @@ def _serialize_warehouse_transfer(transfer):
             }
             for item in transfer.items.all()
         ],
+    }
+
+
+def _serialize_inventory_adjustment(adjustment):
+    return {
+        "id": adjustment.id,
+        "store_id": adjustment.store_id,
+        "product_id": adjustment.product_id,
+        "warehouse_id": adjustment.warehouse_id,
+        "registered_quantity": float(adjustment.registered_quantity or 0),
+        "actual_quantity": float(adjustment.actual_quantity or 0),
+        "difference_quantity": float(adjustment.difference_quantity or 0),
+        "unit_cost": float(adjustment.unit_cost or 0),
+        "difference_value": float(adjustment.difference_value or 0),
+        "reason": adjustment.reason or "",
+        "notes": adjustment.notes or "",
+        "adjusted_at": adjustment.adjusted_at.isoformat()
+        if adjustment.adjusted_at
+        else "",
+        "created_by_store_user_id": adjustment.created_by_store_user_id,
+        "access_id": adjustment.access_id,
+        "update_time": adjustment.update_time or 0,
     }
 
 
@@ -953,6 +980,66 @@ def _apply_warehouse_transfer_change(store, payload, server_id=None, product_res
     return obj, action
 
 
+def _apply_inventory_adjustment_change(
+    store,
+    payload,
+    server_id=None,
+    product_resolver=None,
+):
+    product = None
+    if product_resolver:
+        product = product_resolver(
+            product_server_id=_to_int(payload.get("product_id")),
+            product_local_id=_to_int(payload.get("product_local_id")),
+            product_access_id=_to_int(payload.get("product_access_id")),
+        )
+    if not product:
+        raise ValueError("Adjustment product is required")
+
+    warehouse = None
+    warehouse_id = _to_int(payload.get("warehouse_id"))
+    if warehouse_id:
+        warehouse = Warehouse.objects.filter(id=warehouse_id, store=store).first()
+
+    registered_quantity = Decimal(str(_to_float(payload.get("registered_quantity"), 0.0)))
+    actual_quantity = Decimal(str(_to_float(payload.get("actual_quantity"), 0.0)))
+    unit_cost = Decimal(str(_to_float(payload.get("unit_cost"), 0.0)))
+    adjusted_at = parse_datetime(str(payload.get("adjusted_at") or ""))
+    if adjusted_at is None:
+        adjusted_at = timezone.now()
+
+    created_by_store_user = None
+    created_by_store_user_id = _to_int(payload.get("created_by_store_user_id"))
+    if created_by_store_user_id:
+        created_by_store_user = StoreUser.objects.filter(
+            id=created_by_store_user_id,
+            store=store,
+        ).first()
+
+    now_minute = _now_minute()
+    obj = InventoryAdjustment.objects.filter(id=server_id, store=store).first() if server_id else None
+    fields = {
+        "product": product,
+        "warehouse": warehouse,
+        "registered_quantity": registered_quantity,
+        "actual_quantity": actual_quantity,
+        "difference_quantity": actual_quantity - registered_quantity,
+        "unit_cost": unit_cost,
+        "difference_value": (actual_quantity - registered_quantity) * unit_cost,
+        "reason": _to_str(payload.get("reason")).strip(),
+        "notes": _to_str(payload.get("notes")).strip(),
+        "adjusted_at": adjusted_at,
+        "created_by_store_user": created_by_store_user,
+        "update_time": now_minute,
+    }
+    if obj:
+        InventoryAdjustment.objects.filter(id=obj.id, store=store).update(**fields)
+        obj.refresh_from_db()
+        return obj, "updated"
+    obj = InventoryAdjustment.objects.create(store=store, **fields)
+    return obj, "created"
+
+
 def _apply_expense_type_change(store, payload, server_id=None):
     name = _to_str(payload.get("name")).strip()
     if not name:
@@ -1548,6 +1635,47 @@ def warehouse_transfers_pull(request):
     )
 
 
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def inventory_adjustments_pull(request):
+    merchant_id = request.query_params.get("merchant_id")
+    since = request.query_params.get("since")
+
+    if not merchant_id:
+        return Response({"detail": "merchant_id is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        merchant_id_int = int(merchant_id)
+    except (TypeError, ValueError):
+        return Response({"detail": "merchant_id must be an integer"}, status=status.HTTP_400_BAD_REQUEST)
+
+    store = Store.objects.filter(id=merchant_id_int).first()
+    if not store:
+        return Response({"detail": "Store not found"}, status=status.HTTP_404_NOT_FOUND)
+
+    qs = (
+        InventoryAdjustment.objects.filter(store_id=merchant_id_int)
+        .select_related("product", "warehouse", "created_by_store_user")
+        .order_by("-adjusted_at", "-id")
+    )
+    if since not in (None, "", "0"):
+        try:
+            since_int = int(since)
+        except (TypeError, ValueError):
+            return Response({"detail": "since must be an integer"}, status=status.HTTP_400_BAD_REQUEST)
+        qs = qs.filter(update_time__gt=since_int)
+
+    data = [_serialize_inventory_adjustment(adjustment) for adjustment in qs]
+
+    return Response(
+        {
+            "merchant_id": merchant_id_int,
+            "items": data,
+            "max_update_time": max((x["update_time"] for x in data), default=0),
+        }
+    )
+
+
 @api_view(["POST"])
 @permission_classes([AllowAny])
 def store_user_login(request):
@@ -1811,6 +1939,13 @@ def sync_push(request):
             product_local_id,
         )
 
+    def resolve_warehouse(server_id=None, local_id=None):
+        if server_id not in (None, ""):
+            obj = Warehouse.objects.filter(id=int(server_id), store_id=merchant_id).first()
+            if obj:
+                return obj
+        return None
+
     upserts = [item for item in changes if str(item.get("action", "upsert")).lower() != "delete"]
     deletes = [item for item in changes if str(item.get("action", "upsert")).lower() == "delete"]
 
@@ -1826,6 +1961,7 @@ def sync_push(request):
             "barcode": 2,
             "expense": 2,
             "warehouse_transfer": 3,
+            "inventory_adjustment": 4,
         }.get(str(item.get("entity")), 99)
 
     upserts.sort(key=entity_priority)
@@ -1981,6 +2117,20 @@ def sync_push(request):
                         "server_id": obj.id,
                         "update_time": obj.update_time or 0,
                     })
+                elif entity == "inventory_adjustment":
+                    obj, action = _apply_inventory_adjustment_change(
+                        store,
+                        payload_item,
+                        server_id=_to_int(server_id),
+                        product_resolver=resolve_product,
+                    )
+                    applied.append({
+                        "entity": "inventory_adjustment",
+                        "action": action,
+                        "local_id": local_id,
+                        "server_id": obj.id,
+                        "update_time": obj.update_time or 0,
+                    })
                 elif entity == "expense":
                     obj, action = _apply_expense_change(
                         store,
@@ -2108,6 +2258,17 @@ def sync_push(request):
                         obj.delete()
                         applied.append({
                             "entity": "warehouse_transfer",
+                            "action": "deleted",
+                            "local_id": local_id,
+                            "server_id": server_id,
+                        })
+                elif entity == "inventory_adjustment":
+                    obj = InventoryAdjustment.objects.filter(id=server_id, store_id=merchant_id).first()
+                    if obj:
+                        obj._skip_mobile_delete_sync = True
+                        obj.delete()
+                        applied.append({
+                            "entity": "inventory_adjustment",
                             "action": "deleted",
                             "local_id": local_id,
                             "server_id": server_id,

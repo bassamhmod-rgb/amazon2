@@ -7,6 +7,7 @@ urlpatterns = [
     path("stores/", views.stores_pull, name="stores_pull"),
     path("warehouses/", views.warehouses_pull, name="warehouses_pull"),
     path("warehouse-transfers/", views.warehouse_transfers_pull, name="warehouse_transfers_pull"),
+    path("inventory-adjustments/", views.inventory_adjustments_pull, name="inventory_adjustments_pull"),
     path("store-users/", views.store_users_pull, name="store_users_pull"),
     path("store-users/login/", views.store_user_login, name="store_user_login"),
     path("store-web-login/", views.store_web_login, name="store_web_login"),

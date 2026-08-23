@@ -346,6 +346,55 @@ class WarehouseTransferItem(models.Model):
 
     def __str__(self):
         return f"{self.product} - {self.quantity}"
+
+
+class InventoryAdjustment(models.Model):
+    store = models.ForeignKey(Store, on_delete=models.CASCADE, related_name="inventory_adjustments")
+    update_time = models.BigIntegerField(blank=True, null=True)
+    access_id = models.BigIntegerField(blank=True, null=True)
+    product = models.ForeignKey("products.Product", on_delete=models.PROTECT, related_name="inventory_adjustments")
+    warehouse = models.ForeignKey(
+        Warehouse,
+        on_delete=models.PROTECT,
+        related_name="inventory_adjustments",
+        blank=True,
+        null=True,
+    )
+    registered_quantity = models.DecimalField(max_digits=12, decimal_places=3)
+    actual_quantity = models.DecimalField(max_digits=12, decimal_places=3)
+    difference_quantity = models.DecimalField(max_digits=12, decimal_places=3)
+    unit_cost = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    difference_value = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+    reason = models.CharField(max_length=120, blank=True, default="")
+    notes = models.TextField(blank=True, null=True)
+    adjusted_at = models.DateTimeField(default=timezone.now)
+    created_by_store_user = models.ForeignKey(
+        "accounts.StoreUser",
+        on_delete=models.SET_NULL,
+        related_name="inventory_adjustments",
+        blank=True,
+        null=True,
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-adjusted_at", "-id"]
+
+    def clean(self):
+        if self.product_id and self.store_id and self.product.store_id != self.store_id:
+            raise ValidationError("المنتج يجب أن يتبع نفس المتجر.")
+        if self.warehouse_id and self.store_id and self.warehouse.store_id != self.store_id:
+            raise ValidationError("المستودع يجب أن يتبع نفس المتجر.")
+
+    def save(self, *args, **kwargs):
+        _touch_update_time(self, kwargs)
+        self.difference_quantity = self.actual_quantity - self.registered_quantity
+        self.difference_value = self.difference_quantity * self.unit_cost
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.store} - {self.product} - {self.difference_quantity}"
 #طرق الدفع
 class StorePaymentMethod(models.Model):
     update_time = models.BigIntegerField(blank=True, null=True)

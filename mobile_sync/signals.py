@@ -5,7 +5,7 @@ from mobile_sync.models import MobileDeleteSync
 from accounts.models import Customer, StoreUser
 from orders.models import Order
 from products.models import Category, Product, ProductBarcode
-from stores.models import Store
+from stores.models import InventoryAdjustment, Store
 
 
 def _resolve_merchant_id(instance):
@@ -70,3 +70,8 @@ def log_order_delete(sender, instance, **kwargs):
 @receiver(pre_delete, sender=ProductBarcode)
 def log_product_barcode_delete(sender, instance, **kwargs):
     _log_mobile_delete(instance, instance.access_id, "rmz")
+
+
+@receiver(pre_delete, sender=InventoryAdjustment)
+def log_inventory_adjustment_delete(sender, instance, **kwargs):
+    _log_mobile_delete(instance, instance.access_id, "inventory_adjustments")

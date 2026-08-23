@@ -21,7 +21,7 @@ from products.utils import fix_missing_buy_price_for_product, apply_purchase_pri
 # --- استيراد المودلز من التطبيقات المختلفة ---
 from products.models import Category, Product
 from products.forms import CategoryForm, ProductForm
-from stores.models import Store, StorePaymentMethod, Warehouse, WarehouseTransfer, WarehouseTransferItem
+from stores.models import Store, StorePaymentMethod, Warehouse, WarehouseTransfer, WarehouseTransferItem, InventoryAdjustment
 from stores.forms import WarehouseForm
 from orders.models import Order, OrderItem
 from accounts.models import PointsTransaction, AccountingClient, SystemNotification, DeleteSync, StoreUser
@@ -2698,8 +2698,21 @@ def profits_report(request, store_slug):
         ))
     )["total"]
 
+    inventory_adjustments = InventoryAdjustment.objects.filter(store=store)
+    if date_from:
+        inventory_adjustments = inventory_adjustments.filter(adjusted_at__date__gte=date_from)
+    if date_to:
+        inventory_adjustments = inventory_adjustments.filter(adjusted_at__date__lte=date_to)
+
+    inventory_adjustments_total = (
+        inventory_adjustments.aggregate(total=Coalesce(
+            Sum("difference_value"),
+            Value(0, output_field=DecimalField(max_digits=14, decimal_places=2))
+        ))
+    )["total"]
+
     actual_profit = general_profit - work_expenses
-    net_profit = actual_profit - general_expenses
+    net_profit = actual_profit - general_expenses + inventory_adjustments_total
 
     return render(request, "dashboard/profits_report.html", {
         "store": store,
@@ -2712,6 +2725,7 @@ def profits_report(request, store_slug):
         "work_expenses": work_expenses,
         "actual_profit": actual_profit,
         "general_expenses": general_expenses,
+        "inventory_adjustments_total": inventory_adjustments_total,
         "net_profit": net_profit,
     })
 #اضافة 
