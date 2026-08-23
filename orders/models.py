@@ -15,6 +15,8 @@ STATUS_CHOICES = [
 TRANSACTION_TYPES = [
     ("sale", "بيع"),
     ("purchase", "شراء"),
+    ("sale_return", "مرتجع بيع"),
+    ("purchase_return", "مرتجع شراء"),
 ]
 
 PAYMENT_TYPES = [
@@ -109,7 +111,7 @@ class Order(models.Model):
     )
 
     transaction_type = models.CharField(
-        max_length=10,
+        max_length=20,
         choices=TRANSACTION_TYPES,
         default="sale"
     )

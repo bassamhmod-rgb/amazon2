@@ -2631,7 +2631,7 @@ def profits_report(request, store_slug):
     orders = Order.objects.filter(
         store=store,
         status="confirmed",
-        transaction_type="sale",
+        transaction_type__in=["sale", "sale_return"],
         document_kind=1,
     )
 
@@ -2654,25 +2654,38 @@ def profits_report(request, store_slug):
             messages.error(request, "تاريخ النهاية غير صحيح.")
 
     profit_expr = ExpressionWrapper(
-        (F("price") - Coalesce(F("buy_price"), Value(0))) * F("quantity"),
+        (F("price") - Coalesce(F("buy_price"), Value(0))) *
+        F("quantity") *
+        Case(
+            When(order__transaction_type="sale_return", then=Value(-1)),
+            default=Value(1),
+            output_field=DecimalField(max_digits=14, decimal_places=2),
+        ),
         output_field=DecimalField(max_digits=14, decimal_places=2),
     )
 
     items_profit = (
         OrderItem.objects
-        .filter(order__in=orders, direction=-1)
+        .filter(order__in=orders)
         .aggregate(total=Coalesce(
             Sum(profit_expr),
             Value(0, output_field=DecimalField(max_digits=14, decimal_places=2))
         ))
     )["total"]
 
-    discount_total = (
-        orders.aggregate(total=Coalesce(
-            Sum("discount"),
-            Value(0, output_field=DecimalField(max_digits=14, decimal_places=2))
-        ))
-    )["total"]
+    discount_expr = ExpressionWrapper(
+        F("discount") *
+        Case(
+            When(transaction_type="sale_return", then=Value(-1)),
+            default=Value(1),
+            output_field=DecimalField(max_digits=14, decimal_places=2),
+        ),
+        output_field=DecimalField(max_digits=14, decimal_places=2),
+    )
+    discount_total = orders.aggregate(total=Coalesce(
+        Sum(discount_expr),
+        Value(0, output_field=DecimalField(max_digits=14, decimal_places=2))
+    ))["total"]
 
     general_profit = items_profit - discount_total
 

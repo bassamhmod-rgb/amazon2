@@ -2456,8 +2456,10 @@ def orders_push(request):
                 document_kind = _to_int(order_payload.get("document_kind"), 1)
 
                 transaction_type = _to_str(order_payload.get("transaction_type"), "sale") or "sale"
+                uses_customer = transaction_type in ("sale", "sale_return")
+                uses_supplier = transaction_type in ("purchase", "purchase_return")
                 customer = resolve_customer(order_payload)
-                supplier = resolve_supplier(order_payload) if transaction_type == "purchase" else None
+                supplier = resolve_supplier(order_payload) if uses_supplier else None
                 store_user = resolve_store_user(order_payload)
                 created_by_user = resolve_created_by_user(order_payload, store_user)
                 warehouse = _resolve_mobile_warehouse(store, order_payload.get("warehouse_server_id"))
@@ -2548,8 +2550,8 @@ def orders_push(request):
                         mobile_local_order_id=local_order_id,
                     )
 
-                order.customer = customer if transaction_type == "sale" else None
-                order.supplier = supplier if transaction_type == "purchase" else None
+                order.customer = customer if uses_customer else None
+                order.supplier = supplier if uses_supplier else None
                 order.created_by = created_by_user
                 order.created_by_store_user = store_user
                 if sync_client_id:
@@ -2581,7 +2583,7 @@ def orders_push(request):
                     price = _to_float(item_payload.get("price"), 0.0)
                     direction = _to_int(item_payload.get("direction"), -1)
                     buy_price = item_payload.get("buy_price")
-                    if transaction_type == "sale" and buy_price in (None, "", 0, "0", "0.0"):
+                    if transaction_type in ("sale", "sale_return") and buy_price in (None, "", 0, "0", "0.0"):
                         buy_price = product.get_avg_buy_price()
                     elif transaction_type == "purchase" and buy_price in (None, "", 0, "0", "0.0"):
                         buy_price = price
