@@ -726,7 +726,7 @@ def _apply_customer_change(store, payload, server_id=None):
     if not name and not phone:
         raise ValueError("Customer name or phone is required")
 
-    if not name:
+    if not name and phone:
         name = phone
 
     now_minute = _now_minute()
@@ -736,9 +736,22 @@ def _apply_customer_change(store, payload, server_id=None):
     if not obj and access_id not in (None, 0, ""):
         obj = Customer.objects.filter(store=store, access_id=access_id).first()
     if not obj and phone:
-        obj = Customer.objects.filter(store=store, phone=phone).first()
+        phone_match = Customer.objects.filter(store=store, phone=phone).first()
+        if phone_match and phone_match.name == name:
+            obj = phone_match
+        elif phone_match:
+            phone = ""
     if not obj:
         obj = Customer.objects.filter(store=store, name=name).first()
+    if obj and phone:
+        duplicate_phone = (
+            Customer.objects
+            .filter(store=store, phone=phone)
+            .exclude(id=obj.id)
+            .exists()
+        )
+        if duplicate_phone:
+            phone = ""
 
     update_fields = {
         "name": name,

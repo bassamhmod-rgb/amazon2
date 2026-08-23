@@ -1995,8 +1995,8 @@ def customer_create(request, store_slug):
     store = _get_store_for_dashboard(request, store_slug)
 
     if request.method == "POST":
-        name = request.POST.get("name")
-        phone = request.POST.get("phone")
+        name = (request.POST.get("name") or "").strip()
+        phone = (request.POST.get("phone") or "").strip()
         balance_raw = (request.POST.get("balance") or "0").strip()
         is_subscription_active = request.POST.get("is_subscription_active") == "on"
 
@@ -2010,7 +2010,7 @@ def customer_create(request, store_slug):
             })
 
         duplicate_name = Customer.objects.filter(store=store, name=name).exists()
-        duplicate_phone = Customer.objects.filter(store=store, phone=phone).exists()
+        duplicate_phone = bool(phone) and Customer.objects.filter(store=store, phone=phone).exists()
 
         if duplicate_name or duplicate_phone:
             if duplicate_name and duplicate_phone:
@@ -2049,8 +2049,8 @@ def customer_update(request, store_slug, customer_id):
         balance_raw = (request.POST.get("balance") or "0").strip()
         is_subscription_active = request.POST.get("is_subscription_active") == "on"
 
-        if not name or not phone:
-            messages.error(request, "الاسم ورقم الموبايل مطلوبان.")
+        if not name:
+            messages.error(request, "اسم العميل مطلوب.")
             return render(request, "dashboard/customer_update.html", {
                 "store": store,
                 "customer": customer,
@@ -2069,7 +2069,7 @@ def customer_update(request, store_slug, customer_id):
             store=store,
             name=name
         ).exclude(id=customer.id).exists()
-        duplicate_phone = Customer.objects.filter(
+        duplicate_phone = bool(phone) and Customer.objects.filter(
             store=store,
             phone=phone
         ).exclude(id=customer.id).exists()

@@ -200,7 +200,7 @@ class Customer(models.Model):
     access_id = models.BigIntegerField(blank=True, null=True)
 
     name = models.CharField(max_length=150)
-    phone = models.CharField(max_length=20)
+    phone = models.CharField(max_length=20, blank=True, default="")
 
     address = models.TextField(blank=True, null=True)
     note = models.TextField(blank=True, null=True)
@@ -233,14 +233,14 @@ class Customer(models.Model):
             ),
             models.UniqueConstraint(
                 fields=["store", "phone"],
-                name="unique_customer_phone_per_store"
+                condition=Q(phone__isnull=False) & ~Q(phone=""),
+                name="unique_customer_phone_per_store_when_exists"
             ),
         ]
     def save(self, *args, **kwargs):
         _touch_update_time(self, kwargs)
         self.phone = normalize_phone_number(self.phone)
-        # ًں”گ ط¶ظ…ط§ظ† ط§ظ„ط§ط³ظ…: ط¥ط°ط§ ظپط§ط¶ظٹ â†’ ط®ظ„ظټظ‡ ط±ظ‚ظ… ط§ظ„ظ‡ط§طھظپ
-        if not self.name:
+        if not self.name and self.phone:
             self.name = self.phone
         super().save(*args, **kwargs)
     def __str__(self):
