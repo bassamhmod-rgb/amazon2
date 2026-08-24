@@ -17,6 +17,9 @@ class AppUpdateAdmin(admin.ModelAdmin):
     search_fields = ("version", "notes", "file")
     ordering = ("platform", "-build", "-id")
 
+    class Media:
+        js = ("admin/js/app_update_upload_progress.js",)
+
 
 admin.site.register(ExpenseType)
 admin.site.register(ExpenseReason)
