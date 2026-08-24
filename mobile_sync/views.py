@@ -2389,22 +2389,18 @@ def orders_push(request):
         if server_id is not None:
             user = StoreUser.objects.filter(id=server_id, store=store).first()
             if user:
-                if user.auth_user_id and user.auth_user_id == getattr(store, "owner_id", None):
-                    return None
                 return user
 
             if server_id < 0:
-                return None
+                return _ensure_owner_store_user(store)
 
         created_by_name = _to_str(order_payload.get("created_by_store_user_name")).strip()
         if created_by_name:
             user = StoreUser.objects.filter(store=store, name__iexact=created_by_name).first()
             if user:
-                if user.auth_user_id and user.auth_user_id == getattr(store, "owner_id", None):
-                    return None
                 return user
             if created_by_name.lower() in {"المدير", "المدير العام", "admin"}:
-                return None
+                return _ensure_owner_store_user(store, created_by_name)
 
         return None
 
