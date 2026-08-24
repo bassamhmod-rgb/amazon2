@@ -14,13 +14,17 @@ def fix_missing_buy_price_for_product(product, dry_run=False):
     items = (
         OrderItem.objects
         .filter(product=product)
+        .select_related("order")
         .order_by("id")
     )
 
     for item in items:
         qty = Decimal(item.quantity or 0)
+        transaction_type = item.order.transaction_type if item.order_id else ""
+        is_inbound_cost = transaction_type in ("purchase", "sale_return")
+        is_outbound_cost = transaction_type in ("sale", "purchase_return")
 
-        if item.direction == 1:
+        if is_inbound_cost:
             if item.buy_price is None and item.price is not None:
                 item.buy_price = item.price
                 updated_count += 1
@@ -49,7 +53,7 @@ def fix_missing_buy_price_for_product(product, dry_run=False):
             total_qty += qty
             total_cost += buy_price * qty
 
-        elif item.direction == -1:
+        elif is_outbound_cost:
             if total_qty > 0:
                 avg_price = total_cost / total_qty
                 if item.buy_price is None:

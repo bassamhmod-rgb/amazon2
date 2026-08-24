@@ -124,33 +124,38 @@ class Product(models.Model):
         total_qty = Decimal("0")
         total_cost = Decimal("0")
 
-        items = OrderItem.objects.filter(product=self).order_by("id")
+        items = (
+            OrderItem.objects
+            .filter(product=self)
+            .select_related("order")
+            .order_by("order__created_at", "id")
+        )
 
         for item in items:
             qty = Decimal(item.quantity or 0)
+            transaction_type = item.order.transaction_type if item.order_id else ""
+            is_inbound_cost = transaction_type in ("purchase", "sale_return")
+            is_outbound_cost = transaction_type in ("sale", "purchase_return")
 
-            # ⛑️ حماية من None بالبيانات القديمة
             if item.buy_price is not None:
                 buy_price = Decimal(item.buy_price)
-            elif item.direction == 1 and item.price is not None:
+            elif is_inbound_cost and item.price is not None:
                 buy_price = Decimal(item.price)
             else:
                 buy_price = Decimal("0")
 
             cost = buy_price * qty
 
-            if item.direction == 1:  # شراء
+            if is_inbound_cost:
                 total_qty += qty
                 total_cost += cost
-
-            elif item.direction == -1:  # بيع
+            elif is_outbound_cost:
                 if item.buy_price is None:
                     current_avg = (total_cost / total_qty) if total_qty > 0 else Decimal("0")
                     cost = current_avg * qty
                 total_qty -= qty
                 total_cost -= cost
 
-            # إذا انتهى المخزون نعيد الحساب
             if total_qty <= 0:
                 total_qty = Decimal("0")
                 total_cost = Decimal("0")
@@ -158,7 +163,7 @@ class Product(models.Model):
         if total_qty > 0:
             return total_cost / total_qty
 
-        return Decimal("0")
+        return self.buy_price or Decimal("0")
 
 class ProductDetails(models.Model):
     update_time = models.BigIntegerField(blank=True, null=True)
