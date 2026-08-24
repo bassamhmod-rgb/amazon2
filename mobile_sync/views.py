@@ -986,6 +986,9 @@ def _apply_inventory_adjustment_change(
     server_id=None,
     product_resolver=None,
 ):
+    money_quant = Decimal("0.01")
+    qty_quant = Decimal("0.001")
+
     product = None
     if product_resolver:
         product = product_resolver(
@@ -1001,9 +1004,21 @@ def _apply_inventory_adjustment_change(
     if warehouse_id:
         warehouse = Warehouse.objects.filter(id=warehouse_id, store=store).first()
 
-    registered_quantity = Decimal(str(_to_float(payload.get("registered_quantity"), 0.0)))
-    actual_quantity = Decimal(str(_to_float(payload.get("actual_quantity"), 0.0)))
-    unit_cost = Decimal(str(_to_float(payload.get("unit_cost"), 0.0)))
+    registered_quantity = Decimal(str(_to_float(payload.get("registered_quantity"), 0.0))).quantize(
+        qty_quant, rounding=ROUND_HALF_UP
+    )
+    actual_quantity = Decimal(str(_to_float(payload.get("actual_quantity"), 0.0))).quantize(
+        qty_quant, rounding=ROUND_HALF_UP
+    )
+    unit_cost = Decimal(str(_to_float(payload.get("unit_cost"), 0.0))).quantize(
+        money_quant, rounding=ROUND_HALF_UP
+    )
+    difference_quantity = (actual_quantity - registered_quantity).quantize(
+        qty_quant, rounding=ROUND_HALF_UP
+    )
+    difference_value = (difference_quantity * unit_cost).quantize(
+        money_quant, rounding=ROUND_HALF_UP
+    )
     adjusted_at = parse_datetime(str(payload.get("adjusted_at") or ""))
     if adjusted_at is None:
         adjusted_at = timezone.now()
@@ -1021,11 +1036,11 @@ def _apply_inventory_adjustment_change(
     fields = {
         "product": product,
         "warehouse": warehouse,
-        "registered_quantity": registered_quantity,
-        "actual_quantity": actual_quantity,
-        "difference_quantity": actual_quantity - registered_quantity,
-        "unit_cost": unit_cost,
-        "difference_value": (actual_quantity - registered_quantity) * unit_cost,
+          "registered_quantity": registered_quantity,
+          "actual_quantity": actual_quantity,
+          "difference_quantity": difference_quantity,
+          "unit_cost": unit_cost,
+          "difference_value": difference_value,
         "reason": _to_str(payload.get("reason")).strip(),
         "notes": _to_str(payload.get("notes")).strip(),
         "adjusted_at": adjusted_at,

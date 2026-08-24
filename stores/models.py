@@ -6,7 +6,7 @@ from django.utils.text import slugify
 from django.core.exceptions import ValidationError
 from django.utils.text import slugify
 from PIL import Image, ImageOps, UnidentifiedImageError
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 from django.core.validators import MaxValueValidator, MinValueValidator
 import secrets
 import time
@@ -388,8 +388,17 @@ class InventoryAdjustment(models.Model):
 
     def save(self, *args, **kwargs):
         _touch_update_time(self, kwargs)
-        self.difference_quantity = self.actual_quantity - self.registered_quantity
-        self.difference_value = self.difference_quantity * self.unit_cost
+        qty_quant = Decimal("0.001")
+        money_quant = Decimal("0.01")
+        self.registered_quantity = Decimal(self.registered_quantity).quantize(qty_quant, rounding=ROUND_HALF_UP)
+        self.actual_quantity = Decimal(self.actual_quantity).quantize(qty_quant, rounding=ROUND_HALF_UP)
+        self.unit_cost = Decimal(self.unit_cost or 0).quantize(money_quant, rounding=ROUND_HALF_UP)
+        self.difference_quantity = (self.actual_quantity - self.registered_quantity).quantize(
+            qty_quant, rounding=ROUND_HALF_UP
+        )
+        self.difference_value = (self.difference_quantity * self.unit_cost).quantize(
+            money_quant, rounding=ROUND_HALF_UP
+        )
         self.full_clean()
         super().save(*args, **kwargs)
 
