@@ -79,3 +79,31 @@ class Expense(models.Model):
     def save(self, *args, **kwargs):
         _touch_update_time(self, kwargs)
         return super().save(*args, **kwargs)
+
+
+class AppUpdate(models.Model):
+    PLATFORM_ANDROID = "android"
+    PLATFORM_WINDOWS = "windows"
+    PLATFORM_CHOICES = [
+        (PLATFORM_ANDROID, "Android"),
+        (PLATFORM_WINDOWS, "Windows"),
+    ]
+
+    platform = models.CharField(max_length=20, choices=PLATFORM_CHOICES)
+    version = models.CharField(max_length=40)
+    build = models.PositiveIntegerField()
+    file = models.FileField(upload_to="app_updates/")
+    required = models.BooleanField(default=False)
+    notes = models.TextField(blank=True)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["platform", "-build", "-id"]
+        indexes = [
+            models.Index(fields=["platform", "is_active", "-build"]),
+        ]
+
+    def __str__(self):
+        return f"{self.platform} b{self.build} v{self.version}"

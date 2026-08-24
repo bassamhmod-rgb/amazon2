@@ -23,7 +23,7 @@ from products.models import Category
 from products.models import Product
 from products.models import ProductBarcode
 from orders.models import Order, OrderItem
-from dashboard.models import Expense, ExpenseType, ExpenseReason
+from dashboard.models import AppUpdate, Expense, ExpenseType, ExpenseReason
 from stores.models import Store
 from stores.models import TrialDevice
 from stores.models import (
@@ -1358,6 +1358,38 @@ def expenses_pull(request):
 @permission_classes([AllowAny])
 def ping(request):
     return Response({"ok": True})
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def app_update_check(request):
+    platform = _to_str(request.query_params.get("platform")).strip().lower()
+    current_build = _to_int(request.query_params.get("build")) or 0
+    if platform not in ("android", "windows"):
+        return Response(
+            {"detail": "platform must be android or windows"},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    update = (
+        AppUpdate.objects
+        .filter(platform=platform, is_active=True, build__gt=current_build)
+        .order_by("-build", "-id")
+        .first()
+    )
+    if not update:
+        return Response({"update_available": False})
+
+    file_url = request.build_absolute_uri(update.file.url) if update.file else ""
+    return Response({
+        "update_available": True,
+        "platform": update.platform,
+        "version": update.version,
+        "build": update.build,
+        "required": update.required,
+        "notes": update.notes or "",
+        "url": file_url,
+    })
 
 
 @api_view(["GET"])

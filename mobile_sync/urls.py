@@ -4,6 +4,7 @@ from . import views
 
 urlpatterns = [
     path("ping/", views.ping, name="ping"),
+    path("app-update/", views.app_update_check, name="app_update_check"),
     path("stores/", views.stores_pull, name="stores_pull"),
     path("warehouses/", views.warehouses_pull, name="warehouses_pull"),
     path("warehouse-transfers/", views.warehouse_transfers_pull, name="warehouse_transfers_pull"),
