@@ -1,5 +1,10 @@
 ﻿{% for notice in notices %}
 <tr>
+    {% if can_delete_notice %}
+        <td>
+            <input class="form-check-input notice-select" type="checkbox" name="notice_ids" value="{{ notice.id }}">
+        </td>
+    {% endif %}
     <td>{{ notice.id }}</td>
 
     <td>
@@ -23,17 +28,18 @@
     <td>{{ notice.created_at|date:"Y-m-d H:i" }}</td>
     {% if can_delete_notice %}
         <td>
-            <form method="post" action="{% url 'dashboard:notice_delete' store.slug notice.id %}" style="display:inline;">
-                {% csrf_token %}
-                <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('هل تريد حذف الإشعار؟');">حذف</button>
-            </form>
+            <button type="submit"
+                    class="btn btn-sm btn-danger"
+                    formaction="{% url 'dashboard:notice_delete' store.slug notice.id %}"
+                    onclick="return confirm('هل تريد حذف الإشعار؟');">حذف</button>
         </td>
     {% endif %}
 </tr>
 {% empty %}
 <tr>
-    <td colspan="{% if can_delete_notice %}7{% else %}6{% endif %}" class="text-center text-muted">
+    <td colspan="{% if can_delete_notice %}8{% else %}6{% endif %}" class="text-center text-muted">
         لا يوجد نتائج
     </td>
 </tr>
 {% endfor %}
+

@@ -1522,6 +1522,7 @@ def notices_filter(request, store_slug):
     return render(request, "dashboard/partials/notices_rows.html", {
         "notices": notices,
         "store": store,
+        "can_delete_notice": store.owner_id == request.user.id,
     })
 
 
@@ -1643,6 +1644,45 @@ def notice_delete(request, store_slug, notice_id):
     if request.method == "POST":
         notice.delete()
         messages.success(request, "تم حذف الإشعار.")
+
+    return redirect("dashboard:notices_list", store_slug=store.slug)
+
+
+@login_required
+def notice_bulk_delete(request, store_slug):
+    store = _get_store_for_dashboard(request, store_slug)
+    if store.owner_id != request.user.id:
+        messages.error(request, "لا تملك صلاحية حذف الإشعارات.")
+        return redirect("dashboard:notices_list", store_slug=store.slug)
+
+    if request.method != "POST":
+        return redirect("dashboard:notices_list", store_slug=store.slug)
+
+    notice_ids = []
+    for raw_id in request.POST.getlist("notice_ids"):
+        try:
+            notice_ids.append(int(raw_id))
+        except (TypeError, ValueError):
+            continue
+
+    if not notice_ids:
+        messages.warning(request, "يرجى تحديد إشعار واحد على الأقل.")
+        return redirect("dashboard:notices_list", store_slug=store.slug)
+
+    notices = Order.objects.filter(
+        id__in=notice_ids,
+        store=store,
+        document_kind=2,
+    )
+    deleted_count = 0
+    for notice in notices:
+        notice.delete()
+        deleted_count += 1
+
+    if deleted_count:
+        messages.success(request, f"تم حذف {deleted_count} إشعار.")
+    else:
+        messages.warning(request, "لم يتم العثور على إشعارات مطابقة للحذف.")
 
     return redirect("dashboard:notices_list", store_slug=store.slug)
 

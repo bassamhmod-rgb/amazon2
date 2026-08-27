@@ -151,21 +151,37 @@
 </div>
     <!-- ===== جدول الإشعارات ===== -->
     <div class="card p-3 shadow-sm">
-        <div class="table-responsive">
-            <table class="table table-striped align-middle mb-0">
-                <thead>
-      <tr>
-          <th>#</th>
-          <th>النوع</th>
-          <th>الطرف</th>
-          <th>مبلغ (صرف)</th>
-          <th>دفعة (قبض)</th>
-          <th>التاريخ</th>
-          {% if can_delete_notice %}
-              <th>حذف</th>
-          {% endif %}
-      </tr>
-  </thead>
+        <form method="post" action="{% url 'dashboard:notice_bulk_delete' store.slug %}" id="bulkDeleteForm">
+            {% csrf_token %}
+            {% if can_delete_notice %}
+                <div class="d-flex flex-wrap gap-2 justify-content-between align-items-center mb-3">
+                    <div class="form-check mb-0">
+                        <input class="form-check-input" type="checkbox" id="selectAllNotices">
+                        <label class="form-check-label fw-bold" for="selectAllNotices">تحديد الكل</label>
+                    </div>
+                    <button type="submit" class="btn btn-danger" id="deleteSelectedBtn" disabled>
+                        حذف المحدد
+                    </button>
+                </div>
+            {% endif %}
+            <div class="table-responsive">
+                <table class="table table-striped align-middle mb-0">
+                    <thead>
+          <tr>
+              {% if can_delete_notice %}
+                  <th style="width:48px;">تحديد</th>
+              {% endif %}
+              <th>#</th>
+              <th>النوع</th>
+              <th>الطرف</th>
+              <th>مبلغ (صرف)</th>
+              <th>دفعة (قبض)</th>
+              <th>التاريخ</th>
+              {% if can_delete_notice %}
+                  <th>حذف</th>
+              {% endif %}
+          </tr>
+      </thead>
 
                 <tbody id="noticesTable">
 
@@ -175,8 +191,9 @@
 
                 </tbody>
 
-            </table>
-        </div>
+                </table>
+            </div>
+        </form>
     </div>
 
 </div>
@@ -223,11 +240,53 @@ function applyNoticeFilter() {
         .then(r => r.text())
         .then(html => {
             document.getElementById("noticesTable").innerHTML = html;
+            refreshNoticeSelectionState();
         });
 }
 
 document.getElementById("filterNoticeId").addEventListener("input", applyNoticeFilter);
 document.getElementById("filterMobileNoticeId").addEventListener("input", applyNoticeFilter);
+
+function refreshNoticeSelectionState() {
+    const checkboxes = [...document.querySelectorAll(".notice-select")];
+    const selected = checkboxes.filter(item => item.checked);
+    const selectAll = document.getElementById("selectAllNotices");
+    const deleteBtn = document.getElementById("deleteSelectedBtn");
+
+    if (selectAll) {
+        selectAll.checked = checkboxes.length > 0 && selected.length === checkboxes.length;
+        selectAll.indeterminate = selected.length > 0 && selected.length < checkboxes.length;
+    }
+    if (deleteBtn) {
+        deleteBtn.disabled = selected.length === 0;
+    }
+}
+
+document.addEventListener("change", function (event) {
+    if (event.target && event.target.id === "selectAllNotices") {
+        document.querySelectorAll(".notice-select").forEach(item => {
+            item.checked = event.target.checked;
+        });
+        refreshNoticeSelectionState();
+    }
+
+    if (event.target && event.target.classList.contains("notice-select")) {
+        refreshNoticeSelectionState();
+    }
+});
+
+document.getElementById("bulkDeleteForm")?.addEventListener("submit", function (event) {
+    if (event.submitter && event.submitter.id !== "deleteSelectedBtn") {
+        return;
+    }
+
+    const selectedCount = document.querySelectorAll(".notice-select:checked").length;
+    if (!selectedCount || !confirm(`هل تريد حذف ${selectedCount} إشعار محدد؟`)) {
+        event.preventDefault();
+    }
+});
+
+refreshNoticeSelectionState();
 </script>
 <script>
     const sidebar = document.getElementById("sidebar");
