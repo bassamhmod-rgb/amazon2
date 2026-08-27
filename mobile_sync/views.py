@@ -418,6 +418,7 @@ def activate_permanent_license(request):
                 "id": store.id,
                 "name": store.name,
                 "slug": store.slug,
+                "logo": request.build_absolute_uri(store.logo.url) if store.logo else "",
                 "mobile": store.mobile,
             },
             "periodic_check_enabled": True,
@@ -1410,12 +1411,13 @@ def stores_pull(request):
             "id": s.id,
             "name": s.name,
             "slug": s.slug,
+            "logo": request.build_absolute_uri(s.logo.url) if s.logo else "",
             "mobile": s.mobile or "",
             "access_id": s.access_id,
             "is_active": s.is_active,
             "update_time": s.update_time or 0,
         }
-        for s in qs.only("id", "name", "slug", "mobile", "access_id", "is_active", "update_time")
+        for s in qs.only("id", "name", "slug", "logo", "mobile", "access_id", "is_active", "update_time")
     ]
 
     return Response(

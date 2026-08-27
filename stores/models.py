@@ -101,6 +101,7 @@ class Store(models.Model):
             self.slug = slugify(self.name)
         if not self.activation_code:
             self.activation_code = secrets.token_urlsafe(12)
+        _touch_update_time(self, kwargs)
 
         update_fields = kwargs.get("update_fields")
         should_process_logo = bool(self.logo)
