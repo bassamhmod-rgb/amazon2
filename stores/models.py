@@ -47,6 +47,11 @@ class Store(models.Model):
     description4 = models.TextField(blank=True)
     description5 = models.TextField(blank=True)
     is_active = models.BooleanField(default=True)
+    max_store_users = models.PositiveIntegerField(
+        default=1,
+        validators=[MinValueValidator(1)],
+        help_text="الحد الأقصى لمستخدمي التاجر. القيمة 1 تعني التاجر نفسه فقط.",
+    )
     allow_full_payment = models.BooleanField(default=True)   # تحويل كامل
     allow_partial_payment = models.BooleanField(default=False)  # دفعة مسبقة + باقي عند التسليم
     allow_cash_on_delivery = models.BooleanField(default=False)  # الدفع عند الاستلام

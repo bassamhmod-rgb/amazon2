@@ -799,6 +799,18 @@ def create_store_user_from_access(request):
             _clear_store_reset_marker(store.id)
             return JsonResponse({"status": "exists", "store_user_id": existing.id, "id": existing.id})
 
+        users_count = StoreUser.objects.filter(store=store).count()
+        if users_count >= store.max_store_users:
+            return JsonResponse(
+                {
+                    "error": (
+                        "Store user limit reached. "
+                        f"Allowed: {store.max_store_users}, current: {users_count}."
+                    )
+                },
+                status=403,
+            )
+
         new_user = StoreUser(
             store=store,
             access_id=access_id,

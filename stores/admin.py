@@ -9,6 +9,7 @@ class StoreAdmin(admin.ModelAdmin):
         "mobile",
         "activation_code",
         "licensed_device_id",
+        "max_store_users",
         "rkmdb",
         "rkmtb",
         "theme",
@@ -16,6 +17,42 @@ class StoreAdmin(admin.ModelAdmin):
     )
     search_fields = ("name", "owner__username", "mobile", "activation_code", "licensed_device_id")
     list_filter = ("theme", "is_active")
+    fields = (
+        "owner",
+        "name",
+        "slug",
+        "mobile",
+        "max_store_users",
+        "activation_code",
+        "licensed_device_id",
+        "rkmdb",
+        "rkmtb",
+        "logo",
+        "facebook_url",
+        "instagram_url",
+        "telegram_url",
+        "whatsapp_url",
+        "sales_paused",
+        "sales_pause_message",
+        "theme",
+        "description",
+        "description2",
+        "description3",
+        "description4",
+        "description5",
+        "is_active",
+        "allow_full_payment",
+        "allow_partial_payment",
+        "allow_cash_on_delivery",
+        "payment_required_percentage",
+        "hero_height",
+        "hero_fit",
+        "cashback_percentage",
+        "pricing_currency",
+        "exchange_rate",
+        "update_time",
+        "access_id",
+    )
 
 
 @admin.register(Warehouse)

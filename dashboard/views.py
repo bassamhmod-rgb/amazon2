@@ -311,10 +311,17 @@ def warehouse_delete(request, store_slug, warehouse_id):
 def store_users_list(request, store_slug):
     store = _get_store_for_dashboard(request, store_slug)
     users = StoreUser.objects.filter(store=store).order_by("name", "id")
+    users_count = users.count()
+    can_add_store_user = users_count < store.max_store_users
     return render(
         request,
         "dashboard/store_users_list.html",
-        {"store": store, "users": users},
+        {
+            "store": store,
+            "users": users,
+            "users_count": users_count,
+            "can_add_store_user": can_add_store_user,
+        },
     )
 
 
@@ -322,6 +329,13 @@ def store_users_list(request, store_slug):
 def store_user_create(request, store_slug):
     store = _get_store_for_dashboard(request, store_slug)
     warehouses_qs = Warehouse.objects.filter(store=store).order_by("-is_main", "name", "id")
+    users_count = StoreUser.objects.filter(store=store).count()
+    if users_count >= store.max_store_users:
+        messages.error(
+            request,
+            f"لا يمكن إضافة مستخدم جديد. الحد المسموح لهذا التاجر هو {store.max_store_users} مستخدم.",
+        )
+        return redirect("dashboard:store_users_list", store_slug=store.slug)
     if request.method == "POST":
         form = StoreUserForm(request.POST, warehouses_qs=warehouses_qs)
         if form.is_valid():
