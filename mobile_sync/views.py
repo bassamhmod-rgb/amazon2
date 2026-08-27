@@ -500,12 +500,20 @@ def _ensure_owner_store_user(store, owner_name=None):
     if owner is None:
         return None
 
+    main_warehouse = Warehouse.objects.filter(store=store, is_main=True).first()
+
     owner_profile = getattr(owner, "store_user_profile", None)
     if owner_profile and owner_profile.store_id == store.id:
+        if main_warehouse and not owner_profile.warehouse_id:
+            owner_profile.warehouse = main_warehouse
+            owner_profile.save(update_fields=["warehouse"])
         return owner_profile
 
     existing = StoreUser.objects.filter(store=store, auth_user=owner).first()
     if existing:
+        if main_warehouse and not existing.warehouse_id:
+            existing.warehouse = main_warehouse
+            existing.save(update_fields=["warehouse"])
         return existing
 
     display_name = _to_str(owner_name).strip() or (owner.get_full_name() or owner.username or store.name).strip()
@@ -518,6 +526,7 @@ def _ensure_owner_store_user(store, owner_name=None):
                 auth_user=owner,
                 identifier=identifier,
                 name=display_name,
+                warehouse=main_warehouse,
                 is_active=owner.is_active and store.is_active,
             )
     except IntegrityError:
@@ -530,6 +539,7 @@ def _ensure_owner_store_user(store, owner_name=None):
                 auth_user=owner,
                 identifier=f"{identifier}_{store.id}",
                 name=f"{display_name} ({store.id})",
+                warehouse=main_warehouse,
                 is_active=owner.is_active and store.is_active,
             )
 
@@ -1540,6 +1550,9 @@ def store_users_pull(request):
     owner_name = (
         owner_profile.name if owner_profile else owner.get_full_name() or owner.username or store.name
     ).strip()
+    owner_warehouse_id = owner_profile.warehouse_id if owner_profile else (
+        Warehouse.objects.filter(store=store, is_main=True).values_list("id", flat=True).first()
+    )
 
     data = [
         {
@@ -1547,7 +1560,7 @@ def store_users_pull(request):
             "store_id": store.id,
             "identifier": owner_profile.identifier if owner_profile else owner.username,
             "name": owner_name,
-            "warehouse_id": None,
+            "warehouse_id": owner_warehouse_id,
             "is_active": owner.is_active and store.is_active,
             "has_password": owner.has_usable_password(),
             "password": owner.password,
@@ -1753,6 +1766,9 @@ def store_user_login(request):
     if owner_candidate is not None and owner_candidate == store.owner:
         owner_profile = _ensure_owner_store_user(store, owner_candidate.get_full_name() or owner_candidate.username or store.name)
         owner_name = (owner_profile.name if owner_profile else owner_candidate.get_full_name() or owner_candidate.username or store.name).strip()
+        owner_warehouse_id = owner_profile.warehouse_id if owner_profile else (
+            Warehouse.objects.filter(store=store, is_main=True).values_list("id", flat=True).first()
+        )
         return Response(
             {
                 "status": "ok",
@@ -1766,6 +1782,7 @@ def store_user_login(request):
                     "id": owner_profile.id if owner_profile else owner_candidate.id,
                     "identifier": owner_profile.identifier if owner_profile else owner_candidate.username,
                     "name": owner_name,
+                    "warehouse_id": owner_warehouse_id,
                     "is_active": owner_candidate.is_active,
                     "is_owner": True,
                     "permissions": _all_mobile_permissions(),
