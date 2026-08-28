@@ -26,7 +26,7 @@ from stores.forms import WarehouseForm
 from orders.models import Order, OrderItem
 from accounts.models import PointsTransaction, AccountingClient, SystemNotification, DeleteSync, StoreUser
 from accounts.store_user_forms import StoreUserForm
-from cart.models import Cart
+from cart.models import Cart, CartItem
 from loyalty.models import LoyaltyPoints
 
 # 1. الزبون موجود بـ accounts (حسب كلامك)
@@ -92,12 +92,20 @@ def _ensure_owner_store_user_for_dashboard(store):
     if owner is None:
         return None
 
+    main_warehouse = Warehouse.objects.filter(store=store, is_main=True).first()
+
     owner_profile = getattr(owner, "store_user_profile", None)
     if owner_profile and owner_profile.store_id == store.id:
+        if main_warehouse and not owner_profile.warehouse_id:
+            owner_profile.warehouse = main_warehouse
+            owner_profile.save(update_fields=["warehouse"])
         return owner_profile
 
     existing = StoreUser.objects.filter(store=store, auth_user=owner).first()
     if existing:
+        if main_warehouse and not existing.warehouse_id:
+            existing.warehouse = main_warehouse
+            existing.save(update_fields=["warehouse"])
         return existing
 
     display_name = (owner.get_full_name() or owner.username or store.name).strip()
@@ -110,6 +118,7 @@ def _ensure_owner_store_user_for_dashboard(store):
                 auth_user=owner,
                 identifier=identifier,
                 name=display_name,
+                warehouse=main_warehouse,
                 is_active=owner.is_active and store.is_active,
             )
     except IntegrityError:
@@ -122,6 +131,7 @@ def _ensure_owner_store_user_for_dashboard(store):
                 auth_user=owner,
                 identifier=f"{identifier}_{store.id}",
                 name=f"{display_name} ({store.id})",
+                warehouse=main_warehouse,
                 is_active=owner.is_active and store.is_active,
             )
 
@@ -2471,6 +2481,68 @@ def reset_store_data(request, store_slug):
         return redirect(f"/dashboard/{store.slug}/settings/")
 
     return _perform_store_reset(request, store)
+
+
+@login_required
+@require_POST
+def reset_access_export_flags(request, store_slug):
+    store = _get_store_for_dashboard(request, store_slug)
+
+    if request.user != store.owner:
+        messages.error(request, "غير مسموح لك بتعديل إعدادات هذا المتجر.")
+        return redirect(f"/dashboard/{store.slug}/settings/")
+
+    password = (request.POST.get("access_reset_password") or "").strip()
+    if not password or not check_password(password, request.user.password):
+        messages.error(request, "كلمة المرور غير صحيحة.")
+        return redirect(f"/dashboard/{store.slug}/settings/")
+
+    reset_count = 0
+    access_models = [
+        (Store.objects.filter(id=store.id), {"access_id": None, "update_time": None}),
+        (Warehouse.objects.filter(store=store), {"access_id": None, "update_time": None}),
+        (StoreUser.objects.filter(store=store), {"access_id": None, "update_time": None}),
+        (Customer.objects.filter(store=store), {"access_id": None, "update_time": None}),
+        (Supplier.objects.filter(store=store), {"access_id": None, "update_time": None}),
+        (PointsTransaction.objects.filter(customer__store=store), {"access_id": None, "update_time": None}),
+        (Category.objects.filter(store=store), {"access_id": None, "update_time": None}),
+        (Product.objects.filter(store=store), {"access_id": None, "update_time": None}),
+        (ProductDetails.objects.filter(product__store=store), {"access_id": None, "update_time": None}),
+        (ProductGallery.objects.filter(product__store=store), {"access_id": None, "update_time": None}),
+        (ProductBarcode.objects.filter(product__store=store), {"access_id": None, "update_time": None}),
+        (OrderItem.objects.filter(order__store=store), {"access_id": None, "update_time": None}),
+        (ExpenseType.objects.filter(store=store), {"access_id": None, "update_time": None}),
+        (ExpenseReason.objects.filter(store=store), {"access_id": None, "update_time": None}),
+        (Expense.objects.filter(store=store), {"access_id": None, "update_time": None}),
+        (WarehouseTransfer.objects.filter(store=store), {"access_id": None, "update_time": None}),
+        (WarehouseTransferItem.objects.filter(store=store), {"access_id": None, "update_time": None}),
+        (InventoryAdjustment.objects.filter(store=store), {"access_id": None, "update_time": None}),
+        (StorePaymentMethod.objects.filter(store=store), {"access_id": None, "update_time": None}),
+        (Cart.objects.filter(store=store), {"access_id": None, "update_time": None}),
+        (CartItem.objects.filter(cart__store=store), {"access_id": None, "update_time": None}),
+    ]
+
+    with transaction.atomic():
+        for queryset, values in access_models:
+            reset_count += queryset.exclude(access_id__isnull=True, update_time__isnull=True).update(**values)
+
+        reset_count += (
+            Order.objects.filter(store=store)
+            .exclude(accounting_invoice_number__isnull=True, update_time__isnull=True)
+            .update(accounting_invoice_number=None, update_time=None)
+        )
+
+        DeleteSync.objects.filter(
+            source_flag=2,
+            store_model_name=DeleteSync.RESET_MARKER_MODEL,
+            store_record_id=store.id,
+        ).delete()
+
+    messages.success(
+        request,
+        f"تم السماح بإعادة إرسال بيانات المتجر إلى أكسس. عدد السجلات التي تم تجهيزها: {reset_count}.",
+    )
+    return redirect(f"/dashboard/{store.slug}/settings/")
 
 
 def _perform_store_reset(request, store):

@@ -94,6 +94,11 @@ path(
 #ط§ط¹ط¯ط§ط¯ط§طھ
 path("<slug:store_slug>/settings/", views.store_settings, name="store_settings"),
 path("<slug:store_slug>/settings/reset-data/", views.reset_store_data, name="reset_store_data"),
+path(
+    "<slug:store_slug>/settings/reset-access-export-flags/",
+    views.reset_access_export_flags,
+    name="reset_access_export_flags",
+),
 #ط§ظ„ط¬ط±ط¯
 path(
     "<slug:store_slug>/inventory/",
