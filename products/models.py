@@ -121,8 +121,8 @@ class Product(models.Model):
 
     # ⭐ حساب متوسط سعر الشراء (آمن 100%)
     def get_avg_buy_price(self):
-        total_qty = Decimal("0")
-        total_cost = Decimal("0")
+        total_qty = Decimal(self.stock or 0)
+        total_cost = total_qty * Decimal(self.buy_price or 0)
 
         items = (
             OrderItem.objects

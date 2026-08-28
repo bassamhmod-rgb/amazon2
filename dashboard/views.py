@@ -3094,13 +3094,19 @@ def inventory_list(request, store_slug):
         .annotate(
             # ✅ الكمية المتبقية (Decimal مضمون)
             remaining_qty=Coalesce(
+                Cast(F("stock"), DecimalField(max_digits=10, decimal_places=2)),
+                Value(0, output_field=DecimalField(max_digits=10, decimal_places=2)),
+                output_field=DecimalField(max_digits=10, decimal_places=2),
+            )
+            + Coalesce(
                 Sum(
                     ExpressionWrapper(
                         F("order_items__quantity") * F("order_items__direction"),
                         output_field=DecimalField(max_digits=10, decimal_places=2)
                     )
                 ),
-                Value(0, output_field=DecimalField(max_digits=10, decimal_places=2))
+                Value(0, output_field=DecimalField(max_digits=10, decimal_places=2)),
+                output_field=DecimalField(max_digits=10, decimal_places=2),
             ),
 
             # ✅ آخر سعر شراء (Decimal مضمون)
@@ -3109,7 +3115,9 @@ def inventory_list(request, store_slug):
                     last_buy_price_qs,
                     output_field=DecimalField(max_digits=10, decimal_places=2)
                 ),
-                Value(0, output_field=DecimalField(max_digits=10, decimal_places=2))
+                "buy_price",
+                Value(0, output_field=DecimalField(max_digits=10, decimal_places=2)),
+                output_field=DecimalField(max_digits=10, decimal_places=2),
             ),
         )
         .annotate(
