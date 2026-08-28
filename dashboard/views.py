@@ -2499,37 +2499,37 @@ def reset_access_export_flags(request, store_slug):
 
     reset_count = 0
     access_models = [
-        (Store.objects.filter(id=store.id), {"access_id": None, "update_time": None}),
-        (Warehouse.objects.filter(store=store), {"access_id": None, "update_time": None}),
-        (StoreUser.objects.filter(store=store), {"access_id": None, "update_time": None}),
-        (Customer.objects.filter(store=store), {"access_id": None, "update_time": None}),
-        (Supplier.objects.filter(store=store), {"access_id": None, "update_time": None}),
-        (PointsTransaction.objects.filter(customer__store=store), {"access_id": None, "update_time": None}),
-        (Category.objects.filter(store=store), {"access_id": None, "update_time": None}),
-        (Product.objects.filter(store=store), {"access_id": None, "update_time": None}),
-        (ProductDetails.objects.filter(product__store=store), {"access_id": None, "update_time": None}),
-        (ProductGallery.objects.filter(product__store=store), {"access_id": None, "update_time": None}),
-        (ProductBarcode.objects.filter(product__store=store), {"access_id": None, "update_time": None}),
-        (OrderItem.objects.filter(order__store=store), {"access_id": None, "update_time": None}),
-        (ExpenseType.objects.filter(store=store), {"access_id": None, "update_time": None}),
-        (ExpenseReason.objects.filter(store=store), {"access_id": None, "update_time": None}),
-        (Expense.objects.filter(store=store), {"access_id": None, "update_time": None}),
-        (WarehouseTransfer.objects.filter(store=store), {"access_id": None, "update_time": None}),
-        (WarehouseTransferItem.objects.filter(store=store), {"access_id": None, "update_time": None}),
-        (InventoryAdjustment.objects.filter(store=store), {"access_id": None, "update_time": None}),
-        (StorePaymentMethod.objects.filter(store=store), {"access_id": None, "update_time": None}),
-        (Cart.objects.filter(store=store), {"access_id": None, "update_time": None}),
-        (CartItem.objects.filter(cart__store=store), {"access_id": None, "update_time": None}),
+        Store.objects.filter(id=store.id),
+        Warehouse.objects.filter(store=store),
+        StoreUser.objects.filter(store=store),
+        Customer.objects.filter(store=store),
+        Supplier.objects.filter(store=store),
+        PointsTransaction.objects.filter(customer__store=store),
+        Category.objects.filter(store=store),
+        Product.objects.filter(store=store),
+        ProductDetails.objects.filter(product__store=store),
+        ProductGallery.objects.filter(product__store=store),
+        ProductBarcode.objects.filter(product__store=store),
+        OrderItem.objects.filter(order__store=store),
+        ExpenseType.objects.filter(store=store),
+        ExpenseReason.objects.filter(store=store),
+        Expense.objects.filter(store=store),
+        WarehouseTransfer.objects.filter(store=store),
+        WarehouseTransferItem.objects.filter(store=store),
+        InventoryAdjustment.objects.filter(store=store),
+        StorePaymentMethod.objects.filter(store=store),
+        Cart.objects.filter(store=store),
+        CartItem.objects.filter(cart__store=store),
     ]
 
     with transaction.atomic():
-        for queryset, values in access_models:
-            reset_count += queryset.exclude(access_id__isnull=True, update_time__isnull=True).update(**values)
+        for queryset in access_models:
+            reset_count += queryset.exclude(access_id__isnull=True).update(access_id=None)
 
         reset_count += (
             Order.objects.filter(store=store)
-            .exclude(accounting_invoice_number__isnull=True, update_time__isnull=True)
-            .update(accounting_invoice_number=None, update_time=None)
+            .exclude(accounting_invoice_number__isnull=True)
+            .update(accounting_invoice_number=None)
         )
 
         DeleteSync.objects.filter(
