@@ -129,7 +129,8 @@
                         <th>اسم المورد</th>
                         <th>الهاتف</th>
                         <th>العنوان</th>
-                        <th>الرصيد السابق</th>
+                        <th>الرصيد الافتتاحي</th>
+                        <th>الرصيد الحالي</th>
                         <th class="text-center">خيارات</th>
                     </tr>
                 </thead>
@@ -140,6 +141,12 @@
                         <td>{{ supplier.phone }}</td>
                         <td>{{ supplier.address }}</td>
                         <td>{{ supplier.opening_balance|floatformat:2 }} {{ currency_symbol }}</td>
+                        <td>
+                            {{ supplier.calc_balance_abs|floatformat:2 }} {{ currency_symbol }}
+                            <span class="badge {% if supplier.calc_balance > 0 %}bg-danger{% elif supplier.calc_balance < 0 %}bg-success{% else %}bg-secondary{% endif %}">
+                                {{ supplier.calc_balance_label }}
+                            </span>
+                        </td>
                         <td class="text-center">
                             <a href="{% url 'dashboard:supplier_update' store.slug supplier.id %}" class="btn btn-warning">تعديل</a>
                             <form method="post" action="{% url 'dashboard:delete_supplier' store.slug supplier.id %}" style="display:inline;">
@@ -150,7 +157,7 @@
                     </tr>
                     {% empty %}
                     <tr class="empty-initial-row">
-                        <td colspan="5" class="text-center text-muted">لا يوجد موردون بعد</td>
+                        <td colspan="6" class="text-center text-muted">لا يوجد موردون بعد</td>
                     </tr>
                     {% endfor %}
                 </tbody>

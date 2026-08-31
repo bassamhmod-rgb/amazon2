@@ -158,11 +158,6 @@
             resize:vertical;
         }
 
-        input[name="stock"],
-        label[for="id_stock"]{
-            display:none !important;
-        }
-
         label[for="id_name"]{
             font-size:0;
         }
@@ -243,6 +238,7 @@
             </div>
             {% endif %}
             {{ form.as_p }}
+            <div class="form-text mb-3">الكمية الافتتاحية تدخل ضمن الجرد مع حركات البيع والشراء.</div>
 
             <!-- 🔹 صور إضافية -->
             <hr class="my-4">

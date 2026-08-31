@@ -80,6 +80,13 @@
                            min="0" step="0.01" value="{{ customer.balance }}">
                 </div>
 
+                <div class="mb-3">
+                    <label class="form-label">الرصيد الافتتاحي</label>
+                    <input type="number" name="opening_balance" class="form-control"
+                           step="0.01" value="{{ customer.opening_balance }}">
+                    <div class="form-text">الموجب: على العميل، السالب: له.</div>
+                </div>
+
                 <div class="form-check mb-3">
                     <input class="form-check-input" type="checkbox" name="is_subscription_active" id="is_subscription_active" {% if customer.is_subscription_active %}checked{% endif %}>
                     <label class="form-check-label" for="is_subscription_active">الاشتراك مفعل</label>

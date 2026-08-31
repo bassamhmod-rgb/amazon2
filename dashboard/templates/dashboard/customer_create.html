@@ -131,6 +131,13 @@
                    min="0" step="0.01" value="{{ form_data.balance|default:'0' }}">
         </div>
 
+        <div class="mb-3">
+            <label class="form-label">الرصيد الافتتاحي</label>
+            <input type="number" name="opening_balance" class="form-control"
+                   step="0.01" value="{{ form_data.opening_balance|default:'0' }}">
+            <div class="form-text">الموجب: على العميل، السالب: له.</div>
+        </div>
+
         <div class="form-check mb-3">
             <input class="form-check-input" type="checkbox" name="is_subscription_active" id="is_subscription_active" checked>
             <label class="form-check-label" for="is_subscription_active">الاشتراك مفعل</label>

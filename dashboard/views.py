@@ -43,6 +43,15 @@ from .models import Expense, ExpenseType, ExpenseReason
 FIXED_EXPENSE_TYPES = ["صرفيات عمل", "صرفيات عامة"]
 # أما إذا كنت ناقله كمان لـ accounts، الغي السطر اللي فوق واستخدم هاد:
 from decimal import Decimal, InvalidOperation
+
+
+def _order_balance_delta(order):
+    amount = order.net_total if order.document_kind == 1 else (order.amount or Decimal("0"))
+    payment = order.payment or Decimal("0")
+    delta = amount - payment
+    if order.transaction_type in ("sale_return", "purchase_return"):
+        return -delta
+    return delta
 from datetime import date as dt_date
 from django.db.models import Sum
 ###
@@ -1047,21 +1056,21 @@ def order_create(request, store_slug):
         customer = None
         supplier = None
 
-        if transaction_type == "sale":
+        if transaction_type in ("sale", "sale_return"):
             customer_id = request.POST.get("customer_id")
             if customer_id and customer_id.isdigit():
                 customer = Customer.objects.filter(id=customer_id, store=store).first()
 
-        elif transaction_type == "purchase":
+        elif transaction_type in ("purchase", "purchase_return"):
             supplier_id = request.POST.get("supplier_id")
             if supplier_id and supplier_id.isdigit():
                 supplier = Supplier.objects.filter(id=supplier_id, store=store).first()
 
-        if transaction_type == "sale" and not customer:
+        if transaction_type in ("sale", "sale_return") and not customer:
             messages.error(request, "يجب اختيار زبون لإتمام عملية البيع.")
             return redirect("dashboard:order_create", store_slug=store.slug)
 
-        if transaction_type == "purchase" and not supplier:
+        if transaction_type in ("purchase", "purchase_return") and not supplier:
             messages.error(request, "يجب اختيار مورد لإتمام عملية الشراء.")
             return redirect("dashboard:order_create", store_slug=store.slug)
 
@@ -1087,8 +1096,8 @@ def order_create(request, store_slug):
             created_by=request.user,
             created_by_store_user=store_user,
             transaction_type=transaction_type,
-            customer=customer if transaction_type == "sale" else None,
-            supplier=supplier if transaction_type == "purchase" else None,
+            customer=customer if transaction_type in ("sale", "sale_return") else None,
+            supplier=supplier if transaction_type in ("purchase", "purchase_return") else None,
             discount=discount_value,
             payment=payment_value,
             status=status,
@@ -1110,7 +1119,7 @@ def order_create(request, store_slug):
             price = _to_decimal(prices[i])
             qty   = _to_decimal(qtys[i])
 
-            if transaction_type == "sale":
+            if transaction_type in ("sale", "purchase_return"):
                 buy_price = _to_decimal(product.get_avg_buy_price())
 
                 OrderItem.objects.create(
@@ -1126,7 +1135,7 @@ def order_create(request, store_slug):
                 # الربح = (سعر البيع - سعر الشراء) * الكمية
                 total_profit += (price - buy_price) * qty
 
-            else:  # purchase
+            else:  # purchase / sale_return
                 OrderItem.objects.create(
                     order=order,
                     product=product,
@@ -1136,7 +1145,8 @@ def order_create(request, store_slug):
                     buy_price=price,
                     warehouse=order.warehouse,
                 )
-                purchase_product_prices[product.id] = (product, price)
+                if transaction_type == "purchase":
+                    purchase_product_prices[product.id] = (product, price)
 
         if transaction_type == "purchase" and purchase_product_prices:
             for _, (product, price) in purchase_product_prices.items():
@@ -1202,12 +1212,12 @@ def order_update(request, store_slug, order_id):
         order.payment = request.POST.get("payment", 0)
 
         # 🟦 3) زبون أو مورد (حسب النوع)
-        if transaction_type == "sale":
+        if transaction_type in ("sale", "sale_return"):
             customer_id = request.POST.get("customer_id")
             order.customer_id = customer_id if customer_id else None
             order.supplier = None  # ← مهم جداً
 
-        else:  # purchase
+        else:  # purchase / purchase_return
             supplier_id = request.POST.get("supplier_id")
             order.supplier_id = supplier_id if supplier_id else None
             order.customer = None  # ← مهم جداً
@@ -1234,8 +1244,8 @@ def order_update(request, store_slug, order_id):
 
             price = _to_decimal(prices[i])
             qty = _to_decimal(qtys[i])
-            direction = -1 if transaction_type == "sale" else 1
-            if transaction_type == "sale":
+            direction = -1 if transaction_type in ("sale", "purchase_return") else 1
+            if transaction_type in ("sale", "purchase_return"):
                 buy_price = _to_decimal(product.get_avg_buy_price())
             else:
                 buy_price = _to_decimal(price)
@@ -1952,7 +1962,29 @@ def suppliers_list(request, store_slug):
             | Q(address__icontains=q)
             | Q(email__icontains=q)
         )
-    suppliers = suppliers.order_by("-id")
+    suppliers = list(suppliers.order_by("-id"))
+
+    supplier_ids = [supplier.id for supplier in suppliers]
+    supplier_balances = {}
+    orders_qs = Order.objects.filter(
+        store=store,
+        supplier_id__in=supplier_ids,
+        document_kind__in=[1, 2],
+        status="confirmed",
+    )
+    for order in orders_qs:
+        balance_delta = _order_balance_delta(order)
+        supplier_balances[order.supplier_id] = supplier_balances.get(order.supplier_id, Decimal("0")) + balance_delta
+
+    for supplier in suppliers:
+        supplier.calc_balance = (supplier.opening_balance or Decimal("0")) + supplier_balances.get(supplier.id, Decimal("0"))
+        supplier.calc_balance_abs = abs(supplier.calc_balance)
+        if supplier.calc_balance > 0:
+            supplier.calc_balance_label = "مدين"
+        elif supplier.calc_balance < 0:
+            supplier.calc_balance_label = "دائن"
+        else:
+            supplier.calc_balance_label = "متوازن"
 
     return render(request, "dashboard/suppliers_list.html", {
         "store": store,
@@ -1986,16 +2018,11 @@ def customers_list(request, store_slug):
         .prefetch_related("items")
     )
     for order in orders_qs:
-        if order.document_kind == 1:
-            amount = order.net_total
-        else:
-            amount = order.amount or Decimal("0")
-        payment = order.payment
-        balance_delta = amount - payment
+        balance_delta = _order_balance_delta(order)
         customer_balances[order.customer_id] = customer_balances.get(order.customer_id, Decimal("0")) + balance_delta
 
     for customer in customers:
-        customer.calc_balance = customer_balances.get(customer.id, Decimal("0"))
+        customer.calc_balance = (customer.opening_balance or Decimal("0")) + customer_balances.get(customer.id, Decimal("0"))
         customer.calc_balance_abs = abs(customer.calc_balance)
         if customer.calc_balance > 0:
             customer.calc_balance_label = "مدين"
@@ -2062,12 +2089,14 @@ def customer_create(request, store_slug):
         name = (request.POST.get("name") or "").strip()
         phone = (request.POST.get("phone") or "").strip()
         balance_raw = (request.POST.get("balance") or "0").strip()
+        opening_balance_raw = (request.POST.get("opening_balance") or "0").strip()
         is_subscription_active = request.POST.get("is_subscription_active") == "on"
 
         try:
             balance = Decimal(balance_raw.replace(",", "."))
+            opening_balance = Decimal(opening_balance_raw.replace(",", "."))
         except (InvalidOperation, TypeError):
-            messages.error(request, "قيمة الاشتراك غير صالحة.")
+            messages.error(request, "قيمة الاشتراك أو الرصيد الافتتاحي غير صالحة.")
             return render(request, "dashboard/customer_create.html", {
                 "store": store,
                 "form_data": request.POST,
@@ -2090,6 +2119,7 @@ def customer_create(request, store_slug):
             name=name,
             phone=phone,
             balance=balance,
+            opening_balance=opening_balance,
             is_subscription_active=is_subscription_active
         )
 
@@ -2111,6 +2141,7 @@ def customer_update(request, store_slug, customer_id):
         address = (request.POST.get("address") or "").strip()
         note = (request.POST.get("note") or "").strip()
         balance_raw = (request.POST.get("balance") or "0").strip()
+        opening_balance_raw = (request.POST.get("opening_balance") or "0").strip()
         is_subscription_active = request.POST.get("is_subscription_active") == "on"
 
         if not name:
@@ -2122,8 +2153,9 @@ def customer_update(request, store_slug, customer_id):
 
         try:
             balance = Decimal(balance_raw.replace(",", "."))
+            opening_balance = Decimal(opening_balance_raw.replace(",", "."))
         except (InvalidOperation, TypeError):
-            messages.error(request, "قيمة الاشتراك غير صالحة.")
+            messages.error(request, "قيمة الاشتراك أو الرصيد الافتتاحي غير صالحة.")
             return render(request, "dashboard/customer_update.html", {
                 "store": store,
                 "customer": customer,
@@ -2156,6 +2188,7 @@ def customer_update(request, store_slug, customer_id):
             "address": address,
             "note": note,
             "balance": balance,
+            "opening_balance": opening_balance,
             "is_subscription_active": is_subscription_active,
         }
         if customer.access_id not in (None, 0, ""):
@@ -2663,14 +2696,7 @@ def balances_report(request, store_slug):
     supplier_balances = {}
 
     for order in orders_qs:
-        if order.document_kind == 1:
-            amount = order.net_total
-            payment = order.payment
-        else:
-            amount = order.amount or Decimal("0")
-            payment = order.payment
-
-        balance_delta = amount - payment
+        balance_delta = _order_balance_delta(order)
 
         if order.customer_id:
             customer_balances[order.customer_id] = customer_balances.get(order.customer_id, Decimal("0")) + balance_delta
@@ -2681,7 +2707,7 @@ def balances_report(request, store_slug):
     supplier_total = Decimal("0.0")
 
     for customer in customers:
-        bal = customer_balances.get(customer.id, Decimal("0"))
+        bal = (customer.opening_balance or Decimal("0")) + customer_balances.get(customer.id, Decimal("0"))
         customer_total += bal
         customer.calc_balance = bal
         customer.calc_balance_abs = abs(bal)
@@ -2693,7 +2719,7 @@ def balances_report(request, store_slug):
             customer.calc_balance_label = "متوازن"
 
     for supplier in suppliers:
-        bal = supplier_balances.get(supplier.id, Decimal("0"))
+        bal = (supplier.opening_balance or Decimal("0")) + supplier_balances.get(supplier.id, Decimal("0"))
         supplier_total += bal
         supplier.calc_balance = bal
         supplier.calc_balance_abs = abs(bal)
@@ -2879,7 +2905,16 @@ def supplier_create(request, store_slug):
         phone = request.POST.get("phone", "").strip()
         address = request.POST.get("address")
         email = request.POST.get("email")
-        opening_balance = request.POST.get("opening_balance") or 0
+        opening_balance_raw = (request.POST.get("opening_balance") or "0").strip()
+
+        try:
+            opening_balance = Decimal(opening_balance_raw.replace(",", "."))
+        except (InvalidOperation, TypeError):
+            messages.error(request, "قيمة الرصيد الافتتاحي غير صالحة.")
+            return render(request, "dashboard/supplier_create.html", {
+                "store": store,
+                "form_data": request.POST,
+            })
 
         duplicate_name = bool(name) and Supplier.objects.filter(store=store, name=name).exists()
         duplicate_phone = bool(phone) and Supplier.objects.filter(store=store, phone=phone).exists()
@@ -2950,9 +2985,9 @@ def supplier_update(request, store_slug, supplier_id):
             })
 
         try:
-            opening_balance = Decimal(opening_balance_raw)
+            opening_balance = Decimal(opening_balance_raw.replace(",", "."))
         except (InvalidOperation, TypeError):
-            messages.error(request, "قيمة الرصيد السابق غير صالحة.")
+            messages.error(request, "قيمة الرصيد الافتتاحي غير صالحة.")
             return render(request, "dashboard/supplier_update.html", {
                 "store": store,
                 "supplier": supplier,

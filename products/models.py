@@ -75,7 +75,7 @@ class Product(models.Model):
         help_text="متوسط سعر شراء المنتج"
     )
 
-    stock = models.IntegerField(default=0)
+    stock = models.DecimalField(max_digits=12, decimal_places=3, default=0)
     main_image = models.ImageField(upload_to="products/", blank=True, null=True)
 
     category = models.ForeignKey(

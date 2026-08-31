@@ -10,7 +10,7 @@ class ProductForm(forms.ModelForm):
             "name": "اسم المنتج",
             "price": "السعر",
             "show_price": "إظهار السعر بصفحة العرض",
-            "stock": "الكمية بالمخزون",
+            "stock": "الكمية الافتتاحية",
             "category": "الفئة",
             "category2": "فئة فرعية",
             "main_image": "الصورة الرئيسية",
@@ -22,6 +22,10 @@ class ProductForm(forms.ModelForm):
         store = kwargs.pop("store", None)  # ًں”¥ ط§ط³طھظ„ط§ظ… ط§ظ„ظ…طھط¬ط±
         super().__init__(*args, **kwargs)
         self.store = store
+        self.fields["stock"].widget.attrs.update({
+            "step": "0.001",
+            "class": "form-control",
+        })
 
         if store:
             # ًں”¥ ظپظ„طھط±ط© ط§ظ„ظپط¦ط§طھ طھط¨ط¹ ظ†ظپط³ ط§ظ„ظ…طھط¬ط± ظپظ‚ط·

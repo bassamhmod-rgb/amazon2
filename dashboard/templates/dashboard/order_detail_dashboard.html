@@ -157,13 +157,13 @@
         <div class="row g-3">
 
             <div class="col-md-6">
-                {% if order.transaction_type == "sale" %}
+                {% if order.transaction_type == "sale" or order.transaction_type == "sale_return" %}
                     <p class="fs-5"><strong>👤 الزبون:</strong>
-                        <span class="text-primary">{{ order.customer.name }}</span>
+                        <span class="text-primary">{% if order.customer %}{{ order.customer.name }}{% else %}-{% endif %}</span>
                     </p>
                 {% else %}
                     <p class="fs-5"><strong>🏭 المورد:</strong>
-                        <span class="text-primary">{{ order.supplier.name }}</span>
+                        <span class="text-primary">{% if order.supplier %}{{ order.supplier.name }}{% else %}-{% endif %}</span>
                     </p>
                 {% endif %}
 
