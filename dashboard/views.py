@@ -2681,7 +2681,12 @@ def balances_report(request, store_slug):
         messages.error(request, "لا تملك صلاحية الاطلاع على أرصدة العملاء.")
         return redirect("dashboard:home", store_slug=store.slug)
 
-    customers = list(Customer.objects.filter(store=store).order_by("name"))
+    customers = list(
+        Customer.objects
+        .filter(store=store)
+        .exclude(name__in=HIDDEN_CUSTOMER_NAMES_IN_LISTS)
+        .order_by("name")
+    )
     suppliers = list(Supplier.objects.filter(store=store).order_by("name"))
 
     # احسب الرصيد من الطلبات: صافي الطلب - الدفعات
