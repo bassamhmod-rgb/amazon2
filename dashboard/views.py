@@ -1153,8 +1153,8 @@ def order_create(request, store_slug):
                 apply_purchase_price_to_empty_sales(product, price)
                 fix_missing_buy_price_for_product(product)
 
-        # للزبون العام: اعتبر الفاتورة مدفوعة بالكامل تلقائياً.
-        if transaction_type == "sale" and customer and (customer.name or "").strip() == "زبون عام":
+        # للزبون العام: اعتبر فاتورة البيع مدفوعة ومرتجع البيع مردوداً بالكامل تلقائياً.
+        if transaction_type in ("sale", "sale_return") and customer and (customer.name or "").strip() == "زبون عام":
             order.payment = order.net_total
             order.save(update_fields=["payment"])
 
