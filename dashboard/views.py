@@ -3107,6 +3107,20 @@ def inventory_list(request, store_slug):
         )
     ).order_by("-order__created_at", "-id").values("effective_buy_price")[:1]
 
+    inventory_adjustments_qs = (
+        InventoryAdjustment.objects
+        .filter(product=OuterRef("pk"), store=store)
+        .values("product")
+        .annotate(
+            total_difference=Coalesce(
+                Sum("difference_quantity"),
+                Value(0, output_field=DecimalField(max_digits=10, decimal_places=2)),
+                output_field=DecimalField(max_digits=10, decimal_places=2),
+            )
+        )
+        .values("total_difference")[:1]
+    )
+
     base_qs = Product.objects.filter(store=store)
 
     # 🔍 البحث
@@ -3144,6 +3158,14 @@ def inventory_list(request, store_slug):
                         F("order_items__quantity") * F("order_items__direction"),
                         output_field=DecimalField(max_digits=10, decimal_places=2)
                     )
+                ),
+                Value(0, output_field=DecimalField(max_digits=10, decimal_places=2)),
+                output_field=DecimalField(max_digits=10, decimal_places=2),
+            )
+            + Coalesce(
+                Subquery(
+                    inventory_adjustments_qs,
+                    output_field=DecimalField(max_digits=10, decimal_places=2),
                 ),
                 Value(0, output_field=DecimalField(max_digits=10, decimal_places=2)),
                 output_field=DecimalField(max_digits=10, decimal_places=2),
