@@ -2617,9 +2617,13 @@ def _perform_store_reset(request, store):
             "stores.WarehouseTransferItem": list(
                 WarehouseTransferItem.objects.filter(store=store).values_list("id", flat=True)
             ),
+            "stores.InventoryAdjustment": list(
+                InventoryAdjustment.objects.filter(store=store).values_list("id", flat=True)
+            ),
             "accounts.StoreUser": list(StoreUser.objects.filter(store=store).values_list("id", flat=True)),
         }
 
+        InventoryAdjustment.objects.filter(store=store).delete()
         WarehouseTransferItem.objects.filter(store=store).delete()
         WarehouseTransfer.objects.filter(store=store).delete()
 
