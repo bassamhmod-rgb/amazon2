@@ -38,9 +38,23 @@ def _touch_update_time(instance, kwargs):
         update_fields = set(update_fields)
         update_fields.add("update_time")
         kwargs["update_fields"] = update_fields
+
+
+def _touch_mobile_update_time(instance, kwargs):
+    if getattr(instance, "_skip_mobile_update_time_touch", False):
+        return
+    instance.mobile_update_time = int(time.time() // 60)
+    update_fields = kwargs.get("update_fields")
+    if update_fields:
+        update_fields = set(update_fields)
+        update_fields.add("mobile_update_time")
+        kwargs["update_fields"] = update_fields
+
+
 class Order(models.Model):
     is_seen_by_store = models.BooleanField(default=False)
     update_time = models.BigIntegerField(blank=True, null=True)
+    mobile_update_time = models.BigIntegerField(blank=True, null=True)
     created_by = models.ForeignKey(
         User,
         on_delete=models.SET_NULL,
@@ -205,6 +219,7 @@ class Order(models.Model):
         return f"Order #{self.id} â€“ {self.store.name}"
 
     def save(self, *args, **kwargs):
+        _touch_mobile_update_time(self, kwargs)
         if not getattr(self, "_skip_update_time_touch", False):
             should_touch = False
             # لا نعبّي وقت التعديل عند الإنشاء.
@@ -242,6 +257,7 @@ class Order(models.Model):
 
 class OrderItem(models.Model):
     update_time = models.BigIntegerField(blank=True, null=True)
+    mobile_update_time = models.BigIntegerField(blank=True, null=True)
     access_id = models.BigIntegerField(blank=True, null=True)
     warehouse = models.ForeignKey(
         "stores.Warehouse",
@@ -305,4 +321,5 @@ class OrderItem(models.Model):
 
     def save(self, *args, **kwargs):
         _touch_update_time(self, kwargs)
+        _touch_mobile_update_time(self, kwargs)
         return super().save(*args, **kwargs)

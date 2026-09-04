@@ -20,6 +20,15 @@ def _touch_update_time(instance, kwargs):
         kwargs["update_fields"] = update_fields
 
 
+def _touch_mobile_update_time(instance, kwargs):
+    instance.mobile_update_time = int(time.time() // 60)
+    update_fields = kwargs.get("update_fields")
+    if update_fields:
+        update_fields = set(update_fields)
+        update_fields.add("mobile_update_time")
+        kwargs["update_fields"] = update_fields
+
+
 def normalize_phone_number(value):
     phone = str(value or "").strip()
     if not phone:
@@ -90,6 +99,7 @@ def default_store_user_permissions():
 class StoreUser(models.Model):
     store = models.ForeignKey(Store, on_delete=models.CASCADE, related_name="store_users")
     update_time = models.BigIntegerField(blank=True, null=True)
+    mobile_update_time = models.BigIntegerField(blank=True, null=True)
     access_id = models.BigIntegerField(blank=True, null=True)
 
     auth_user = models.OneToOneField(
@@ -132,6 +142,7 @@ class StoreUser(models.Model):
 
     def save(self, *args, **kwargs):
         _touch_update_time(self, kwargs)
+        _touch_mobile_update_time(self, kwargs)
         super().save(*args, **kwargs)
         if self.auth_user_id:
             self._sync_auth_user()
@@ -197,6 +208,7 @@ class StoreUser(models.Model):
 class Customer(models.Model):
     store = models.ForeignKey(Store, on_delete=models.CASCADE)
     update_time = models.BigIntegerField(blank=True, null=True)
+    mobile_update_time = models.BigIntegerField(blank=True, null=True)
     access_id = models.BigIntegerField(blank=True, null=True)
 
     name = models.CharField(max_length=150)
@@ -239,6 +251,7 @@ class Customer(models.Model):
         ]
     def save(self, *args, **kwargs):
         _touch_update_time(self, kwargs)
+        _touch_mobile_update_time(self, kwargs)
         self.phone = normalize_phone_number(self.phone)
         if not self.name and self.phone:
             self.name = self.phone
@@ -259,6 +272,7 @@ class PointsTransaction(models.Model):
     ]
 
     update_time = models.BigIntegerField(blank=True, null=True)
+    mobile_update_time = models.BigIntegerField(blank=True, null=True)
     customer = models.ForeignKey(Customer, on_delete=models.CASCADE, related_name="points")
     customer_name = models.CharField(max_length=150)
     points = models.DecimalField(max_digits=10, decimal_places=2)
@@ -275,6 +289,7 @@ class PointsTransaction(models.Model):
 
     def save(self, *args, **kwargs):
         _touch_update_time(self, kwargs)
+        _touch_mobile_update_time(self, kwargs)
         return super().save(*args, **kwargs)
 # ط§ظ„ظ…ظˆط±ط¯ظٹظ†
 
@@ -285,6 +300,7 @@ class Supplier(models.Model):
         related_name="suppliers"
     )
     update_time = models.BigIntegerField(blank=True, null=True)
+    mobile_update_time = models.BigIntegerField(blank=True, null=True)
     access_id = models.BigIntegerField(blank=True, null=True)
 
     name = models.CharField(max_length=200)
@@ -329,6 +345,7 @@ class Supplier(models.Model):
 
     def save(self, *args, **kwargs):
         _touch_update_time(self, kwargs)
+        _touch_mobile_update_time(self, kwargs)
         return super().save(*args, **kwargs)
 #ط±ط³ط§ط¦ظ„ ظ„ظ„ط¨ط±ط§ظ…ط¬ ظˆ ط§ظ„ظ…طھط§ط¬ط±
 

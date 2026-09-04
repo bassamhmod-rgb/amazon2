@@ -117,6 +117,17 @@ def _now_minute():
     return int(time.time() // 60)
 
 
+def _mobile_time(obj):
+    return getattr(obj, "mobile_update_time", None) or getattr(obj, "update_time", None) or 0
+
+
+def _mobile_since_q(since_int):
+    return Q(mobile_update_time__gt=since_int) | Q(
+        mobile_update_time__isnull=True,
+        update_time__gt=since_int,
+    )
+
+
 def _to_int(value, default=None):
     if value in (None, ""):
         return default
@@ -184,7 +195,7 @@ def _ensure_mobile_default_records(store):
             "balance": Decimal("0"),
             "opening_balance": Decimal("0"),
             "is_subscription_active": True,
-            "update_time": now_minute,
+            "mobile_update_time": now_minute,
         },
     )
     Supplier.objects.get_or_create(
@@ -196,7 +207,7 @@ def _ensure_mobile_default_records(store):
             "email": "",
             "balance": Decimal("0"),
             "opening_balance": Decimal("0"),
-            "update_time": now_minute,
+            "mobile_update_time": now_minute,
         },
     )
 
@@ -206,7 +217,7 @@ def _serialize_category(category):
         "id": category.id,
         "name": category.name,
         "access_id": category.access_id,
-        "update_time": category.update_time or 0,
+        "update_time": _mobile_time(category),
     }
 
 
@@ -228,7 +239,7 @@ def _serialize_product(product):
         "category_id": product.category_id,
         "category2_id": product.category2_id,
         "active": product.active,
-        "update_time": product.update_time or 0,
+        "update_time": _mobile_time(product),
     }
 
 
@@ -238,7 +249,7 @@ def _serialize_barcode(barcode):
         "value": barcode.value,
         "product_id": barcode.product_id,
         "access_id": barcode.access_id,
-        "update_time": barcode.update_time or 0,
+        "update_time": _mobile_time(barcode),
     }
 
 
@@ -253,7 +264,7 @@ def _serialize_customer(customer):
         "opening_balance": float(customer.opening_balance),
         "is_subscription_active": customer.is_subscription_active,
         "access_id": customer.access_id,
-        "update_time": customer.update_time or 0,
+        "update_time": _mobile_time(customer),
     }
 
 
@@ -267,7 +278,7 @@ def _serialize_supplier(supplier):
         "balance": float(supplier.balance),
         "opening_balance": float(supplier.opening_balance),
         "access_id": supplier.access_id,
-        "update_time": supplier.update_time or 0,
+        "update_time": _mobile_time(supplier),
     }
 
 
@@ -284,7 +295,7 @@ def _serialize_warehouse(warehouse):
         "is_main": warehouse.is_main,
         "is_active": warehouse.is_active,
         "access_id": warehouse.access_id,
-        "update_time": warehouse.update_time or 0,
+        "update_time": _mobile_time(warehouse),
     }
 
 
@@ -297,7 +308,7 @@ def _serialize_warehouse_transfer(transfer):
         "transfer_date": transfer.transfer_date.isoformat() if transfer.transfer_date else "",
         "notes": transfer.notes or "",
         "access_id": transfer.access_id,
-        "update_time": transfer.update_time or 0,
+        "update_time": _mobile_time(transfer),
         "items": [
             {
                 "id": item.id,
@@ -307,7 +318,7 @@ def _serialize_warehouse_transfer(transfer):
                 "unit_factor": float(item.unit_factor or 1),
                 "notes": item.notes or "",
                 "access_id": item.access_id,
-                "update_time": item.update_time or 0,
+                "update_time": _mobile_time(item),
             }
             for item in transfer.items.all()
         ],
@@ -332,7 +343,7 @@ def _serialize_inventory_adjustment(adjustment):
         else "",
         "created_by_store_user_id": adjustment.created_by_store_user_id,
         "access_id": adjustment.access_id,
-        "update_time": adjustment.update_time or 0,
+        "update_time": _mobile_time(adjustment),
     }
 
 
@@ -341,7 +352,7 @@ def _serialize_expense_type(expense_type):
         "id": expense_type.id,
         "name": expense_type.name,
         "access_id": expense_type.access_id,
-        "update_time": expense_type.update_time or 0,
+        "update_time": _mobile_time(expense_type),
     }
 
 
@@ -350,7 +361,7 @@ def _serialize_expense_reason(expense_reason):
         "id": expense_reason.id,
         "name": expense_reason.name,
         "access_id": expense_reason.access_id,
-        "update_time": expense_reason.update_time or 0,
+        "update_time": _mobile_time(expense_reason),
     }
 
 
@@ -365,7 +376,7 @@ def _serialize_expense(expense):
         "expense_reason": expense.expense_reason.name if expense.expense_reason else "",
         "notes": expense.notes or "",
         "access_id": expense.access_id,
-        "update_time": expense.update_time or 0,
+        "update_time": _mobile_time(expense),
     }
 
 
@@ -636,7 +647,7 @@ def _apply_category_change(store, payload, server_id=None):
         obj = Category.objects.filter(store=store, name=name).first()
 
     if obj:
-        update_fields = {"name": name, "update_time": now_minute}
+        update_fields = {"name": name, "mobile_update_time": now_minute}
         if access_id is not None and obj.access_id in (None, 0, ""):
             update_fields["access_id"] = access_id
         Category.objects.filter(id=obj.id, store=store).update(**update_fields)
@@ -647,7 +658,7 @@ def _apply_category_change(store, payload, server_id=None):
         store=store,
         access_id=access_id,
         name=name,
-        update_time=now_minute,
+        mobile_update_time=now_minute,
     )
     return obj, "created"
 
@@ -683,7 +694,7 @@ def _apply_product_change(store, payload, server_id=None, category_resolver=None
         "buy_price": _to_float(payload.get("buy_price")),
         "stock": int(_to_float(payload.get("stock"))),
         "active": _to_bool(payload.get("active"), True),
-        "update_time": now_minute,
+        "mobile_update_time": now_minute,
     }
     if category is not None:
         update_fields["category"] = category
@@ -715,7 +726,7 @@ def _apply_product_change(store, payload, server_id=None, category_resolver=None
         category=category,
         category2=category2,
         active=update_fields["active"],
-        update_time=now_minute,
+        mobile_update_time=now_minute,
     )
     return obj, "created"
 
@@ -742,7 +753,7 @@ def _apply_barcode_change(store, payload, server_id=None, product_resolver=None)
         ProductBarcode.objects.filter(id=obj.id).update(
             product=product,
             value=value,
-            update_time=now_minute,
+            mobile_update_time=now_minute,
         )
         obj.refresh_from_db()
         return obj, "updated"
@@ -750,7 +761,7 @@ def _apply_barcode_change(store, payload, server_id=None, product_resolver=None)
     obj = ProductBarcode.objects.create(
         product=product,
         value=value,
-        update_time=now_minute,
+        mobile_update_time=now_minute,
     )
     return obj, "created"
 
@@ -799,7 +810,7 @@ def _apply_customer_change(store, payload, server_id=None):
         "balance": Decimal(str(_to_float(payload.get("balance"), 0.0))),
         "opening_balance": Decimal(str(_to_float(payload.get("opening_balance"), 0.0))),
         "is_subscription_active": _to_bool(payload.get("is_subscription_active")),
-        "update_time": now_minute,
+        "mobile_update_time": now_minute,
     }
     if access_id is not None:
         update_fields["access_id"] = access_id
@@ -819,7 +830,7 @@ def _apply_customer_change(store, payload, server_id=None):
         balance=update_fields["balance"],
         opening_balance=update_fields["opening_balance"],
         is_subscription_active=update_fields["is_subscription_active"],
-        update_time=now_minute,
+        mobile_update_time=now_minute,
     )
     return obj, "created"
 
@@ -854,7 +865,7 @@ def _apply_supplier_change(store, payload, server_id=None):
         "email": email,
         "balance": Decimal(str(_to_float(payload.get("balance"), 0.0))),
         "opening_balance": Decimal(str(_to_float(payload.get("opening_balance"), 0.0))),
-        "update_time": now_minute,
+        "mobile_update_time": now_minute,
     }
     if name == GENERAL_CUSTOMER_NAME and not phone:
         update_fields["phone"] = GENERAL_CUSTOMER_PHONE
@@ -875,7 +886,7 @@ def _apply_supplier_change(store, payload, server_id=None):
         email=email,
         balance=update_fields["balance"],
         opening_balance=update_fields["opening_balance"],
-        update_time=now_minute,
+        mobile_update_time=now_minute,
     )
     return obj, "created"
 
@@ -908,7 +919,7 @@ def _apply_warehouse_change(store, payload, server_id=None):
         "is_representative": _to_bool(payload.get("is_representative"), False),
         "is_main": is_main,
         "is_active": _to_bool(payload.get("is_active"), True),
-        "update_time": now_minute,
+        "mobile_update_time": now_minute,
     }
 
     if obj:
@@ -952,7 +963,7 @@ def _apply_warehouse_transfer_change(store, payload, server_id=None, product_res
         "to_warehouse": to_warehouse,
         "transfer_date": transfer_date,
         "notes": _to_str(payload.get("notes")).strip(),
-        "update_time": now_minute,
+        "mobile_update_time": now_minute,
     }
     if obj:
         WarehouseTransfer.objects.filter(id=obj.id, store=store).update(**fields)
@@ -986,7 +997,7 @@ def _apply_warehouse_transfer_change(store, payload, server_id=None, product_res
             unit_name=_to_str(item_payload.get("unit_name")).strip(),
             unit_factor=Decimal(str(_to_float(item_payload.get("unit_factor"), 1.0) or 1.0)),
             notes=_to_str(item_payload.get("notes")).strip(),
-            update_time=now_minute,
+            mobile_update_time=now_minute,
         )
     return obj, action
 
@@ -1056,7 +1067,7 @@ def _apply_inventory_adjustment_change(
         "notes": _to_str(payload.get("notes")).strip(),
         "adjusted_at": adjusted_at,
         "created_by_store_user": created_by_store_user,
-        "update_time": now_minute,
+        "mobile_update_time": now_minute,
     }
     if obj:
         InventoryAdjustment.objects.filter(id=obj.id, store=store).update(**fields)
@@ -1075,10 +1086,10 @@ def _apply_expense_type_change(store, payload, server_id=None):
     if not obj:
         obj = ExpenseType.objects.filter(store=store, name=name).first()
     if obj:
-        ExpenseType.objects.filter(id=obj.id, store=store).update(name=name, update_time=now_minute)
+        ExpenseType.objects.filter(id=obj.id, store=store).update(name=name, mobile_update_time=now_minute)
         obj.refresh_from_db()
         return obj, "updated"
-    return ExpenseType.objects.create(store=store, name=name, update_time=now_minute), "created"
+    return ExpenseType.objects.create(store=store, name=name, mobile_update_time=now_minute), "created"
 
 
 def _apply_expense_reason_change(store, payload, server_id=None):
@@ -1090,10 +1101,10 @@ def _apply_expense_reason_change(store, payload, server_id=None):
     if not obj:
         obj = ExpenseReason.objects.filter(store=store, name=name).first()
     if obj:
-        ExpenseReason.objects.filter(id=obj.id, store=store).update(name=name, update_time=now_minute)
+        ExpenseReason.objects.filter(id=obj.id, store=store).update(name=name, mobile_update_time=now_minute)
         obj.refresh_from_db()
         return obj, "updated"
-    return ExpenseReason.objects.create(store=store, name=name, update_time=now_minute), "created"
+    return ExpenseReason.objects.create(store=store, name=name, mobile_update_time=now_minute), "created"
 
 
 def _apply_expense_change(store, payload, server_id=None):
@@ -1126,7 +1137,7 @@ def _apply_expense_change(store, payload, server_id=None):
         "expense_type": expense_type,
         "expense_reason": expense_reason,
         "notes": _to_str(payload.get("notes")),
-        "update_time": now_minute,
+        "mobile_update_time": now_minute,
     }
     obj = Expense.objects.filter(id=server_id, store=store).first() if server_id else None
     if obj:
@@ -1167,16 +1178,16 @@ def categories_pull(request):
                 {"detail": "since must be an integer (minutes)"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        qs = qs.filter(update_time__gt=since_int)
+        qs = qs.filter(_mobile_since_q(since_int))
 
     data = [
         {
             "id": c.id,
             "name": c.name,
             "access_id": c.access_id,
-            "update_time": c.update_time or 0,
+            "update_time": _mobile_time(c),
         }
-        for c in qs.only("id", "name", "access_id", "update_time")
+        for c in qs.only("id", "name", "access_id", "update_time", "mobile_update_time")
     ]
 
     return Response(
@@ -1213,7 +1224,7 @@ def customers_pull(request):
             since_int = int(since)
         except (TypeError, ValueError):
             return Response({"detail": "since must be an integer"}, status=status.HTTP_400_BAD_REQUEST)
-        qs = qs.filter(update_time__gt=since_int)
+        qs = qs.filter(_mobile_since_q(since_int))
 
     data = [
         _serialize_customer(customer)
@@ -1228,6 +1239,7 @@ def customers_pull(request):
             "is_subscription_active",
             "access_id",
             "update_time",
+            "mobile_update_time",
         )
     ]
 
@@ -1265,7 +1277,7 @@ def suppliers_pull(request):
             since_int = int(since)
         except (TypeError, ValueError):
             return Response({"detail": "since must be an integer"}, status=status.HTTP_400_BAD_REQUEST)
-        qs = qs.filter(update_time__gt=since_int)
+        qs = qs.filter(_mobile_since_q(since_int))
 
     data = [
         _serialize_supplier(supplier)
@@ -1279,6 +1291,7 @@ def suppliers_pull(request):
             "opening_balance",
             "access_id",
             "update_time",
+            "mobile_update_time",
         )
     ]
 
@@ -1313,7 +1326,7 @@ def _pull_store_rows(request, model, serializer, only_fields):
             since_int = int(since)
         except (TypeError, ValueError):
             return Response({"detail": "since must be an integer"}, status=status.HTTP_400_BAD_REQUEST)
-        qs = qs.filter(update_time__gt=since_int)
+        qs = qs.filter(_mobile_since_q(since_int))
 
     data = [serializer(row) for row in qs.only(*only_fields)]
     return Response({
@@ -1330,7 +1343,7 @@ def expense_types_pull(request):
         request,
         ExpenseType,
         _serialize_expense_type,
-        ["id", "name", "access_id", "update_time"],
+        ["id", "name", "access_id", "update_time", "mobile_update_time"],
     )
 
 
@@ -1341,7 +1354,7 @@ def expense_reasons_pull(request):
         request,
         ExpenseReason,
         _serialize_expense_reason,
-        ["id", "name", "access_id", "update_time"],
+        ["id", "name", "access_id", "update_time", "mobile_update_time"],
     )
 
 
@@ -1361,6 +1374,7 @@ def expenses_pull(request):
             "notes",
             "access_id",
             "update_time",
+            "mobile_update_time",
         ],
     )
 
@@ -1414,7 +1428,7 @@ def stores_pull(request):
             since_int = int(since)
         except (TypeError, ValueError):
             return Response({"detail": "since must be an integer"}, status=status.HTTP_400_BAD_REQUEST)
-        qs = qs.filter(update_time__gt=since_int)
+        qs = qs.filter(_mobile_since_q(since_int))
 
     data = [
         {
@@ -1425,9 +1439,9 @@ def stores_pull(request):
             "mobile": s.mobile or "",
             "access_id": s.access_id,
             "is_active": s.is_active,
-            "update_time": s.update_time or 0,
+            "update_time": _mobile_time(s),
         }
-        for s in qs.only("id", "name", "slug", "logo", "mobile", "access_id", "is_active", "update_time")
+        for s in qs.only("id", "name", "slug", "logo", "mobile", "access_id", "is_active", "update_time", "mobile_update_time")
     ]
 
     return Response(
@@ -1468,7 +1482,7 @@ def products_pull(request):
                 {"detail": "since must be an integer (minutes)"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        qs = qs.filter(update_time__gt=since_int)
+        qs = qs.filter(_mobile_since_q(since_int))
 
     data = [
         {
@@ -1490,7 +1504,7 @@ def products_pull(request):
             "category_id": p.category_id,
             "category2_id": p.category2_id,
             "active": p.active,
-            "update_time": p.update_time or 0,
+            "update_time": _mobile_time(p),
         }
         for p in qs.only(
             "id",
@@ -1510,6 +1524,7 @@ def products_pull(request):
             "category2_id",
             "active",
             "update_time",
+            "mobile_update_time",
         )
     ]
 
@@ -1627,7 +1642,7 @@ def warehouses_pull(request):
             since_int = int(since)
         except (TypeError, ValueError):
             return Response({"detail": "since must be an integer"}, status=status.HTTP_400_BAD_REQUEST)
-        qs = qs.filter(update_time__gt=since_int)
+        qs = qs.filter(_mobile_since_q(since_int))
 
     data = [
         _serialize_warehouse(warehouse)
@@ -1644,6 +1659,7 @@ def warehouses_pull(request):
             "is_active",
             "access_id",
             "update_time",
+            "mobile_update_time",
         )
     ]
 
@@ -1684,7 +1700,7 @@ def warehouse_transfers_pull(request):
             since_int = int(since)
         except (TypeError, ValueError):
             return Response({"detail": "since must be an integer"}, status=status.HTTP_400_BAD_REQUEST)
-        qs = qs.filter(update_time__gt=since_int)
+        qs = qs.filter(_mobile_since_q(since_int))
 
     data = [_serialize_warehouse_transfer(transfer) for transfer in qs]
 
@@ -1725,7 +1741,7 @@ def inventory_adjustments_pull(request):
             since_int = int(since)
         except (TypeError, ValueError):
             return Response({"detail": "since must be an integer"}, status=status.HTTP_400_BAD_REQUEST)
-        qs = qs.filter(update_time__gt=since_int)
+        qs = qs.filter(_mobile_since_q(since_int))
 
     data = [_serialize_inventory_adjustment(adjustment) for adjustment in qs]
 
@@ -2634,7 +2650,7 @@ def orders_push(request):
                 order.shipping_address = _to_str(order_payload.get("shipping_address"), "") or None
                 order.is_seen_by_store = is_seen_by_store
                 order.created_at = created_at
-                order.update_time = _now_minute()
+                order.mobile_update_time = _now_minute()
                 order._skip_update_time_touch = True
                 order.save()
 
@@ -2661,14 +2677,14 @@ def orders_push(request):
                         warehouse=warehouse,
                         access_id=None,
                     )
-                    order_item.update_time = order.update_time
+                    order_item.mobile_update_time = order.mobile_update_time
                     order_item._skip_update_time_touch = True
                     order_item.save()
 
                     created_items.append({
                         "local_item_id": _to_int(item_payload.get("local_item_id")),
                         "server_item_id": order_item.id,
-                        "server_update_time": order_item.update_time or 0,
+                        "server_update_time": _mobile_time(order_item),
                     })
 
                 cashback_entry = _sync_mobile_invoice_cashback(store, order, customer)
@@ -2676,7 +2692,7 @@ def orders_push(request):
                 applied.append({
                     "local_order_id": local_order_id,
                     "server_order_id": order.id,
-                    "server_update_time": order.update_time or 0,
+                    "server_update_time": _mobile_time(order),
                     "created_by_store_user_id": order.created_by_store_user_id,
                     "accounting_invoice_number": order.accounting_invoice_number,
                     "document_kind": order.document_kind,
@@ -2704,7 +2720,7 @@ def _serialize_order_item_for_mobile(item):
         if item.buy_price is None
         else float(item.buy_price if isinstance(item.buy_price, Decimal) else item.buy_price),
         "item_note": item.item_note or "",
-        "update_time": item.update_time or 0,
+        "update_time": _mobile_time(item),
     }
 
 
@@ -2715,7 +2731,7 @@ def _serialize_order_for_mobile(order):
     ]
     return {
         "id": order.id,
-        "update_time": order.update_time or 0,
+        "update_time": _mobile_time(order),
         "customer_id": order.customer_id,
         "supplier_id": order.supplier_id,
         "warehouse_id": order.warehouse_id,
@@ -2776,7 +2792,7 @@ def orders_pull(request):
             since_int = int(since)
         except (TypeError, ValueError):
             return Response({"detail": "since must be an integer"}, status=status.HTTP_400_BAD_REQUEST)
-        qs = qs.filter(Q(update_time__gt=since_int) | Q(update_time__isnull=True))
+        qs = qs.filter(_mobile_since_q(since_int) | Q(mobile_update_time__isnull=True, update_time__isnull=True))
 
     data = [_serialize_order_for_mobile(order) for order in qs]
     return Response({
@@ -2858,7 +2874,7 @@ def barcodes_pull(request):
                 {"detail": "since must be an integer (minutes)"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        qs = qs.filter(update_time__gt=since_int)
+        qs = qs.filter(_mobile_since_q(since_int))
 
     data = [
         {
@@ -2866,9 +2882,9 @@ def barcodes_pull(request):
             "value": b.value,
             "product_id": b.product_id,
             "access_id": b.access_id,
-            "update_time": b.update_time or 0,
+            "update_time": _mobile_time(b),
         }
-        for b in qs.only("id", "value", "product_id", "access_id", "update_time")
+        for b in qs.only("id", "value", "product_id", "access_id", "update_time", "mobile_update_time")
     ]
 
     return Response(

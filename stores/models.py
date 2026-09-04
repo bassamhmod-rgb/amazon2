@@ -22,8 +22,18 @@ def _touch_update_time(instance, kwargs):
         update_fields.add("update_time")
         kwargs["update_fields"] = update_fields
 
+
+def _touch_mobile_update_time(instance, kwargs):
+    instance.mobile_update_time = int(time.time() // 60)
+    update_fields = kwargs.get("update_fields")
+    if update_fields:
+        update_fields = set(update_fields)
+        update_fields.add("mobile_update_time")
+        kwargs["update_fields"] = update_fields
+
 class Store(models.Model):
     update_time = models.BigIntegerField(blank=True, null=True)
+    mobile_update_time = models.BigIntegerField(blank=True, null=True)
     access_id = models.BigIntegerField(blank=True, null=True)
     owner = models.ForeignKey(User, on_delete=models.CASCADE, related_name="stores")
     name = models.CharField(max_length=200)
@@ -102,6 +112,7 @@ class Store(models.Model):
         if not self.activation_code:
             self.activation_code = secrets.token_urlsafe(12)
         _touch_update_time(self, kwargs)
+        _touch_mobile_update_time(self, kwargs)
 
         update_fields = kwargs.get("update_fields")
         should_process_logo = bool(self.logo)
@@ -199,6 +210,7 @@ class Warehouse(models.Model):
 
     store = models.ForeignKey(Store, on_delete=models.CASCADE, related_name="warehouses")
     update_time = models.BigIntegerField(blank=True, null=True)
+    mobile_update_time = models.BigIntegerField(blank=True, null=True)
     access_id = models.BigIntegerField(blank=True, null=True)
 
     is_main = models.BooleanField(default=False)
@@ -254,6 +266,7 @@ class Warehouse(models.Model):
 
     def save(self, *args, **kwargs):
         _touch_update_time(self, kwargs)
+        _touch_mobile_update_time(self, kwargs)
         if self.is_main:
             if self.pk:
                 old_name = (
@@ -276,6 +289,7 @@ class Warehouse(models.Model):
 class WarehouseTransfer(models.Model):
     store = models.ForeignKey(Store, on_delete=models.CASCADE, related_name="warehouse_transfers")
     update_time = models.BigIntegerField(blank=True, null=True)
+    mobile_update_time = models.BigIntegerField(blank=True, null=True)
     access_id = models.BigIntegerField(blank=True, null=True)
     from_warehouse = models.ForeignKey(
         Warehouse,
@@ -303,6 +317,7 @@ class WarehouseTransfer(models.Model):
 
     def save(self, *args, **kwargs):
         _touch_update_time(self, kwargs)
+        _touch_mobile_update_time(self, kwargs)
         self.full_clean()
         super().save(*args, **kwargs)
 
@@ -318,6 +333,7 @@ class WarehouseTransferItem(models.Model):
     )
     store = models.ForeignKey(Store, on_delete=models.CASCADE, related_name="warehouse_transfer_items")
     update_time = models.BigIntegerField(blank=True, null=True)
+    mobile_update_time = models.BigIntegerField(blank=True, null=True)
     access_id = models.BigIntegerField(blank=True, null=True)
     product = models.ForeignKey("products.Product", on_delete=models.PROTECT, related_name="warehouse_transfer_items")
     quantity = models.DecimalField(max_digits=12, decimal_places=3)
@@ -341,6 +357,7 @@ class WarehouseTransferItem(models.Model):
 
     def save(self, *args, **kwargs):
         _touch_update_time(self, kwargs)
+        _touch_mobile_update_time(self, kwargs)
         if self.transfer_id and not self.store_id:
             self.store_id = self.transfer.store_id
         self.full_clean()
@@ -357,6 +374,7 @@ class WarehouseTransferItem(models.Model):
 class InventoryAdjustment(models.Model):
     store = models.ForeignKey(Store, on_delete=models.CASCADE, related_name="inventory_adjustments")
     update_time = models.BigIntegerField(blank=True, null=True)
+    mobile_update_time = models.BigIntegerField(blank=True, null=True)
     access_id = models.BigIntegerField(blank=True, null=True)
     product = models.ForeignKey("products.Product", on_delete=models.PROTECT, related_name="inventory_adjustments")
     warehouse = models.ForeignKey(
@@ -394,6 +412,7 @@ class InventoryAdjustment(models.Model):
 
     def save(self, *args, **kwargs):
         _touch_update_time(self, kwargs)
+        _touch_mobile_update_time(self, kwargs)
         qty_quant = Decimal("0.001")
         money_quant = Decimal("0.01")
         self.registered_quantity = Decimal(self.registered_quantity).quantize(qty_quant, rounding=ROUND_HALF_UP)
@@ -413,6 +432,7 @@ class InventoryAdjustment(models.Model):
 #طرق الدفع
 class StorePaymentMethod(models.Model):
     update_time = models.BigIntegerField(blank=True, null=True)
+    mobile_update_time = models.BigIntegerField(blank=True, null=True)
     access_id = models.BigIntegerField(blank=True, null=True)
 
     PAYMENT_TYPES = [

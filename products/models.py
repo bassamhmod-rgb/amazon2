@@ -17,8 +17,18 @@ def _touch_update_time(instance, kwargs):
         kwargs["update_fields"] = update_fields
 
 
+def _touch_mobile_update_time(instance, kwargs):
+    instance.mobile_update_time = int(time.time() // 60)
+    update_fields = kwargs.get("update_fields")
+    if update_fields:
+        update_fields = set(update_fields)
+        update_fields.add("mobile_update_time")
+        kwargs["update_fields"] = update_fields
+
+
 class Category(models.Model):
     update_time = models.BigIntegerField(blank=True, null=True)
+    mobile_update_time = models.BigIntegerField(blank=True, null=True)
     access_id = models.BigIntegerField(blank=True, null=True)
     store = models.ForeignKey("stores.Store", on_delete=models.CASCADE, related_name="categories")
     name = models.CharField(max_length=255)
@@ -36,6 +46,7 @@ class Category(models.Model):
 
     def save(self, *args, **kwargs):
         _touch_update_time(self, kwargs)
+        _touch_mobile_update_time(self, kwargs)
         return super().save(*args, **kwargs)
 
 
@@ -43,6 +54,7 @@ class Category(models.Model):
 
 class Product(models.Model):
     update_time = models.BigIntegerField(blank=True, null=True)
+    mobile_update_time = models.BigIntegerField(blank=True, null=True)
     access_id = models.BigIntegerField(blank=True, null=True)
     store = models.ForeignKey(
         Store,
@@ -109,6 +121,7 @@ class Product(models.Model):
 
     def save(self, *args, **kwargs):
         _touch_update_time(self, kwargs)
+        _touch_mobile_update_time(self, kwargs)
         return super().save(*args, **kwargs)
 
     # ⭐⭐⭐ المخزون الحقيقي = المخزون الابتدائي + الحركات
@@ -188,6 +201,7 @@ class ProductGallery(models.Model):
 
 class ProductBarcode(models.Model):
     update_time = models.BigIntegerField(blank=True, null=True)
+    mobile_update_time = models.BigIntegerField(blank=True, null=True)
     access_id = models.BigIntegerField(blank=True, null=True)
     product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="barcodes")
     value = models.CharField(max_length=120)
@@ -205,4 +219,5 @@ class ProductBarcode(models.Model):
 
     def save(self, *args, **kwargs):
         _touch_update_time(self, kwargs)
+        _touch_mobile_update_time(self, kwargs)
         return super().save(*args, **kwargs)
