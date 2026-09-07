@@ -33,7 +33,7 @@ from stores.models import (
     WarehouseTransferItem,
 )
 from django.db import IntegrityError, transaction
-from django.db.models import Q
+from django.db.models import Prefetch, Q
 
 
 STORE_WEB_LOGIN_SIGNER_SALT = "mobile_sync.store_web_login"
@@ -2725,10 +2725,10 @@ def _serialize_order_item_for_mobile(item):
 
 def _serialize_order_for_mobile(order):
     created_by_store_user = getattr(order, "created_by_store_user", None)
-    items = [
-        _serialize_order_item_for_mobile(item)
-        for item in order.items.select_related("product", "warehouse").order_by("id")
-    ]
+    prefetched_items = getattr(order, "prefetched_mobile_items", None)
+    if prefetched_items is None:
+        prefetched_items = order.items.select_related("product", "warehouse").order_by("id")
+    items = [_serialize_order_item_for_mobile(item) for item in prefetched_items]
     return {
         "id": order.id,
         "update_time": _mobile_time(order),
@@ -2764,6 +2764,10 @@ def orders_pull(request):
     try:
         merchant_id = request.query_params.get("merchant_id")
         since = request.query_params.get("since")
+        limit = _to_int(request.query_params.get("limit")) or 250
+        offset = _to_int(request.query_params.get("offset")) or 0
+        limit = max(1, min(limit, 500))
+        offset = max(0, offset)
 
         if not merchant_id:
             return Response({"detail": "merchant_id is required"}, status=status.HTTP_400_BAD_REQUEST)
@@ -2785,7 +2789,6 @@ def orders_pull(request):
                 | Q(status="confirmed")
             )
             .select_related("customer", "supplier", "warehouse", "created_by_store_user")
-            .prefetch_related("items")
             .order_by("id")
         )
         if since not in (None, "", "0"):
@@ -2795,11 +2798,33 @@ def orders_pull(request):
                 return Response({"detail": "since must be an integer"}, status=status.HTTP_400_BAD_REQUEST)
             qs = qs.filter(_mobile_since_q(since_int) | Q(mobile_update_time__isnull=True, update_time__isnull=True))
 
-        data = [_serialize_order_for_mobile(order) for order in qs]
+        page_rows = list(qs.prefetch_related(
+            Prefetch(
+                "items",
+                queryset=OrderItem.objects.select_related("product", "warehouse").order_by("id"),
+                to_attr="prefetched_mobile_items",
+            )
+        )[offset:offset + limit + 1])
+        has_more = len(page_rows) > limit
+        data = []
+        errors = []
+        for order in page_rows[:limit]:
+            try:
+                data.append(_serialize_order_for_mobile(order))
+            except Exception as exc:
+                errors.append({
+                    "order_id": getattr(order, "id", None),
+                    "mobile_order_id": getattr(order, "mobile_local_order_id", None),
+                    "accounting_invoice_number": getattr(order, "accounting_invoice_number", None),
+                    "error": str(exc),
+                })
         return Response({
             "merchant_id": merchant_id_int,
             "items": data,
             "max_update_time": max((x["update_time"] for x in data), default=0),
+            "has_more": has_more,
+            "next_offset": offset + len(data),
+            "errors": errors,
         })
     except Exception as exc:
         return Response({"detail": str(exc)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
