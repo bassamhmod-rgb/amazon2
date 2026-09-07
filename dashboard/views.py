@@ -8,6 +8,7 @@ import csv
 import codecs
 import io
 import html
+import logging
 import zipfile
 import time
 from io import BytesIO
@@ -65,6 +66,8 @@ from django.db.models.functions import Coalesce, Cast
 from stores.models import Store
 from products.models import Product, Category
 from orders.models import OrderItem
+
+logger = logging.getLogger(__name__)
 
 
 def _current_warehouse_for_request(request, store):
@@ -1314,48 +1317,74 @@ def order_update(request, store_slug, order_id):
 @login_required
 def orders_list(request, store_slug):
     store = _get_store_for_dashboard(request, store_slug)
-
-    status = request.GET.get("status", "")
+    status_filter = request.GET.get("status", "")
     order_id = request.GET.get("order_id", "")
     mobile_order_id = request.GET.get("mobile_order_id", "")
     transaction_type = request.GET.get("transaction_type", "")
+    order_load_errors = []
+    orders = []
 
-    # كل طلبات المتجر (الطلبات فقط بدون إشعارات القبض/الصرف)
-    orders = Order.objects.filter(store=store, document_kind=1)
+    try:
+        # كل طلبات المتجر (الطلبات فقط بدون إشعارات القبض/الصرف)
+        orders_qs = (
+            Order.objects
+            .filter(store=store, document_kind=1)
+            .prefetch_related("items")
+        )
 
-    # فلترة حسب الحالة
-    if status:
-        orders = orders.filter(status=status)
+        # فلترة حسب الحالة
+        if status_filter:
+            orders_qs = orders_qs.filter(status=status_filter)
 
-    # فلترة حسب رقم الطلب
-    if order_id:
-        orders = orders.filter(id=order_id)
+        # فلترة حسب رقم الطلب
+        if order_id:
+            orders_qs = orders_qs.filter(id=order_id)
 
-    # فلترة حسب رقم الطلب في التطبيق
-    if mobile_order_id:
-        orders = orders.filter(mobile_local_order_id=mobile_order_id)
+        # فلترة حسب رقم الطلب في التطبيق
+        if mobile_order_id:
+            orders_qs = orders_qs.filter(mobile_local_order_id=mobile_order_id)
 
-    # فلترة حسب نوع المعاملة (بيع / شراء)
-    if transaction_type:
-        orders = orders.filter(transaction_type=transaction_type)
+        # فلترة حسب نوع المعاملة (بيع / شراء)
+        if transaction_type:
+            orders_qs = orders_qs.filter(transaction_type=transaction_type)
 
-    # ترتيب حسب التاريخ (الأحدث أولاً)
-    orders = orders.order_by("-created_at", "-id")
+        # ترتيب حسب التاريخ (الأحدث أولاً)
+        orders = list(orders_qs.order_by("-created_at", "-id"))
 
-    # 🟢 عدد الطلبات الجديدة (لسّا is_seen_by_store = False)
-    new_orders_count = Order.objects.filter(
-        store=store,
-        is_seen_by_store=False
-    ).count()
+        for order in orders:
+            try:
+                order.display_items_total = order.items_total
+            except Exception as exc:
+                order.display_items_total = Decimal("0")
+                order_load_errors.append({
+                    "order_id": order.id,
+                    "mobile_order_id": order.mobile_local_order_id,
+                    "accounting_invoice_number": order.accounting_invoice_number,
+                    "error": f"{type(exc).__name__}: {exc}",
+                })
+                logger.exception("Failed to calculate order total for order_id=%s", order.id)
+
+        # 🟢 عدد الطلبات الجديدة (لسّا is_seen_by_store = False)
+        new_orders_count = Order.objects.filter(
+            store=store,
+            is_seen_by_store=False
+        ).count()
+        orders_page_error = ""
+    except Exception as exc:
+        logger.exception("Failed to load orders list for store_id=%s", store.id)
+        orders_page_error = f"{type(exc).__name__}: {exc}"
+        new_orders_count = 0
 
     context = {
         "store": store,
         "orders": orders,
-        "current_status": status,
+        "current_status": status_filter,
         "current_id": order_id,
         "current_mobile_id": mobile_order_id,
         "current_transaction_type": transaction_type,
         "new_orders_count": new_orders_count,  # مهم للـ sidebar
+        "orders_page_error": orders_page_error,
+        "order_load_errors": order_load_errors,
     }
 
     # 🔴 انتبه: هون ما عم نغيّر is_seen_by_store

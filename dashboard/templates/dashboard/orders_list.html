@@ -130,6 +130,41 @@
         </div>
     {% endif %}
 
+    {% if orders_page_error %}
+        <div class="alert alert-danger">
+            <div class="fw-bold mb-1">خطأ أثناء تحميل صفحة الطلبات</div>
+            <div dir="ltr" class="small">{{ orders_page_error }}</div>
+        </div>
+    {% endif %}
+
+    {% if order_load_errors %}
+        <div class="alert alert-warning">
+            <div class="fw-bold mb-2">فواتير فيها بيانات غير صالحة من الاستيراد</div>
+            <div class="table-responsive">
+                <table class="table table-sm mb-0">
+                    <thead>
+                        <tr>
+                            <th>رقم الطلب</th>
+                            <th>رقم التطبيق</th>
+                            <th>رقم المحاسبة</th>
+                            <th>الخطأ</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in order_load_errors %}
+                            <tr>
+                                <td>{{ item.order_id }}</td>
+                                <td>{{ item.mobile_order_id|default:"-" }}</td>
+                                <td>{{ item.accounting_invoice_number|default:"-" }}</td>
+                                <td dir="ltr" class="small">{{ item.error }}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    {% endif %}
+
     <!-- فلترة -->
     <form method="get" class="row g-2 mb-3">
         <div class="col-12 col-md-2">
@@ -198,7 +233,7 @@
                             {% endif %}
                         </td>
 
-                        <td>{{ order.items_total|floatformat:2 }} $</td>
+                        <td>{{ order.display_items_total|floatformat:2 }} $</td>
 
                         <td>
                             {% if order.status == "pending" %}
