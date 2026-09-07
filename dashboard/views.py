@@ -1326,10 +1326,20 @@ def orders_list(request, store_slug):
 
     try:
         # كل طلبات المتجر (الطلبات فقط بدون إشعارات القبض/الصرف)
+        item_total = ExpressionWrapper(
+            F("items__price") * F("items__quantity"),
+            output_field=DecimalField(max_digits=14, decimal_places=2),
+        )
         orders_qs = (
             Order.objects
             .filter(store=store, document_kind=1)
-            .prefetch_related("items")
+            .annotate(
+                display_items_total=Coalesce(
+                    Sum(item_total),
+                    Decimal("0"),
+                    output_field=DecimalField(max_digits=14, decimal_places=2),
+                )
+            )
         )
 
         # فلترة حسب الحالة
@@ -1349,20 +1359,8 @@ def orders_list(request, store_slug):
             orders_qs = orders_qs.filter(transaction_type=transaction_type)
 
         # ترتيب حسب التاريخ (الأحدث أولاً)
-        orders = list(orders_qs.order_by("-created_at", "-id"))
-
-        for order in orders:
-            try:
-                order.display_items_total = order.items_total
-            except Exception as exc:
-                order.display_items_total = Decimal("0")
-                order_load_errors.append({
-                    "order_id": order.id,
-                    "mobile_order_id": order.mobile_local_order_id,
-                    "accounting_invoice_number": order.accounting_invoice_number,
-                    "error": f"{type(exc).__name__}: {exc}",
-                })
-                logger.exception("Failed to calculate order total for order_id=%s", order.id)
+        paginator = Paginator(orders_qs.order_by("-created_at", "-id"), 100)
+        orders = paginator.get_page(request.GET.get("page"))
 
         # 🟢 عدد الطلبات الجديدة (لسّا is_seen_by_store = False)
         new_orders_count = Order.objects.filter(
