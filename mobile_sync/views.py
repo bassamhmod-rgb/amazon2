@@ -2709,22 +2709,22 @@ def orders_push(request):
 
 
 def _serialize_order_item_for_mobile(item):
+    buy_price = getattr(item, "buy_price", None)
     return {
         "id": item.id,
-        "product_id": item.product_id,
-        "warehouse_id": item.warehouse_id,
-        "quantity": float(item.quantity if isinstance(item.quantity, Decimal) else item.quantity),
-        "price": float(item.price if isinstance(item.price, Decimal) else item.price),
-        "direction": item.direction,
-        "buy_price": None
-        if item.buy_price is None
-        else float(item.buy_price if isinstance(item.buy_price, Decimal) else item.buy_price),
-        "item_note": item.item_note or "",
+        "product_id": getattr(item, "product_id", None),
+        "warehouse_id": getattr(item, "warehouse_id", None),
+        "quantity": _to_float(getattr(item, "quantity", 0)),
+        "price": _to_float(getattr(item, "price", 0)),
+        "direction": getattr(item, "direction", -1),
+        "buy_price": None if buy_price is None else _to_float(buy_price),
+        "item_note": getattr(item, "item_note", "") or "",
         "update_time": _mobile_time(item),
     }
 
 
 def _serialize_order_for_mobile(order):
+    created_by_store_user = getattr(order, "created_by_store_user", None)
     items = [
         _serialize_order_item_for_mobile(item)
         for item in order.items.select_related("product", "warehouse").order_by("id")
@@ -2737,23 +2737,23 @@ def _serialize_order_for_mobile(order):
         "warehouse_id": order.warehouse_id,
         "created_by_store_user_id": order.created_by_store_user_id,
         "created_by_store_user_name": (
-            order.created_by_store_user.name if order.created_by_store_user_id else ""
+            getattr(created_by_store_user, "name", "") if created_by_store_user else ""
         ),
-        "transaction_type": order.transaction_type,
-        "status": "completed" if order.status == "confirmed" else order.status,
-        "discount": float(order.discount if isinstance(order.discount, Decimal) else order.discount),
-        "payment": float(order.payment if isinstance(order.payment, Decimal) else order.payment),
-        "amount": float(order.amount if isinstance(order.amount, Decimal) else order.amount),
-        "accounting_invoice_number": order.accounting_invoice_number,
-        "document_kind": order.document_kind,
-        "payment_type": order.payment_type or "",
-        "payment_method_name": order.payment_method_name or "",
-        "payment_recipient_name": order.payment_recipient_name or "",
-        "payment_account_info": order.payment_account_info or "",
-        "payment_additional_info": order.payment_additional_info or "",
-        "shipping_address": order.shipping_address or "",
-        "is_seen_by_store": order.is_seen_by_store,
-        "created_at": order.created_at.isoformat() if order.created_at else "",
+        "transaction_type": getattr(order, "transaction_type", ""),
+        "status": "completed" if getattr(order, "status", "") == "confirmed" else getattr(order, "status", ""),
+        "discount": _to_float(getattr(order, "discount", 0)),
+        "payment": _to_float(getattr(order, "payment", 0)),
+        "amount": _to_float(getattr(order, "amount", 0)),
+        "accounting_invoice_number": getattr(order, "accounting_invoice_number", None),
+        "document_kind": getattr(order, "document_kind", 1),
+        "payment_type": getattr(order, "payment_type", "") or "",
+        "payment_method_name": getattr(order, "payment_method_name", "") or "",
+        "payment_recipient_name": getattr(order, "payment_recipient_name", "") or "",
+        "payment_account_info": getattr(order, "payment_account_info", "") or "",
+        "payment_additional_info": getattr(order, "payment_additional_info", "") or "",
+        "shipping_address": getattr(order, "shipping_address", "") or "",
+        "is_seen_by_store": getattr(order, "is_seen_by_store", False),
+        "created_at": order.created_at.isoformat() if getattr(order, "created_at", None) else "",
         "items": items,
     }
 
@@ -2761,45 +2761,48 @@ def _serialize_order_for_mobile(order):
 @api_view(["GET"])
 @permission_classes([AllowAny])
 def orders_pull(request):
-    merchant_id = request.query_params.get("merchant_id")
-    since = request.query_params.get("since")
-
-    if not merchant_id:
-        return Response({"detail": "merchant_id is required"}, status=status.HTTP_400_BAD_REQUEST)
-
     try:
-        merchant_id_int = int(merchant_id)
-    except (TypeError, ValueError):
-        return Response({"detail": "merchant_id must be an integer"}, status=status.HTTP_400_BAD_REQUEST)
+        merchant_id = request.query_params.get("merchant_id")
+        since = request.query_params.get("since")
 
-    store = Store.objects.filter(id=merchant_id_int).first()
-    if not store:
-        return Response({"detail": "Store not found"}, status=status.HTTP_404_NOT_FOUND)
+        if not merchant_id:
+            return Response({"detail": "merchant_id is required"}, status=status.HTTP_400_BAD_REQUEST)
 
-    qs = (
-        Order.objects.filter(store_id=merchant_id_int)
-        .filter(
-            ~Q(transaction_type="sale")
-            | ~Q(document_kind=1)
-            | Q(status="confirmed")
-        )
-        .select_related("customer", "supplier", "warehouse", "created_by_store_user")
-        .prefetch_related("items")
-        .order_by("id")
-    )
-    if since not in (None, "", "0"):
         try:
-            since_int = int(since)
+            merchant_id_int = int(merchant_id)
         except (TypeError, ValueError):
-            return Response({"detail": "since must be an integer"}, status=status.HTTP_400_BAD_REQUEST)
-        qs = qs.filter(_mobile_since_q(since_int) | Q(mobile_update_time__isnull=True, update_time__isnull=True))
+            return Response({"detail": "merchant_id must be an integer"}, status=status.HTTP_400_BAD_REQUEST)
 
-    data = [_serialize_order_for_mobile(order) for order in qs]
-    return Response({
-        "merchant_id": merchant_id_int,
-        "items": data,
-        "max_update_time": max((x["update_time"] for x in data), default=0),
-    })
+        store = Store.objects.filter(id=merchant_id_int).first()
+        if not store:
+            return Response({"detail": "Store not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        qs = (
+            Order.objects.filter(store_id=merchant_id_int)
+            .filter(
+                ~Q(transaction_type="sale")
+                | ~Q(document_kind=1)
+                | Q(status="confirmed")
+            )
+            .select_related("customer", "supplier", "warehouse", "created_by_store_user")
+            .prefetch_related("items")
+            .order_by("id")
+        )
+        if since not in (None, "", "0"):
+            try:
+                since_int = int(since)
+            except (TypeError, ValueError):
+                return Response({"detail": "since must be an integer"}, status=status.HTTP_400_BAD_REQUEST)
+            qs = qs.filter(_mobile_since_q(since_int) | Q(mobile_update_time__isnull=True, update_time__isnull=True))
+
+        data = [_serialize_order_for_mobile(order) for order in qs]
+        return Response({
+            "merchant_id": merchant_id_int,
+            "items": data,
+            "max_update_time": max((x["update_time"] for x in data), default=0),
+        })
+    except Exception as exc:
+        return Response({"detail": str(exc)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(["GET"])
