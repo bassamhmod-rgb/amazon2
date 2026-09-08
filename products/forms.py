@@ -5,10 +5,11 @@ from .models import Product, Category
 class ProductForm(forms.ModelForm):
     class Meta:
         model = Product
-        fields = ["name", "price", "show_price", "stock", "category", "category2", "main_image", "description", "active"]
+        fields = ["name", "price", "buy_price", "show_price", "stock", "category", "category2", "main_image", "description", "active"]
         labels = {
             "name": "اسم المنتج",
             "price": "السعر",
+            "buy_price": "سعر التكلفة",
             "show_price": "إظهار السعر بصفحة العرض",
             "stock": "الكمية الافتتاحية",
             "category": "الفئة",
@@ -24,6 +25,10 @@ class ProductForm(forms.ModelForm):
         self.store = store
         self.fields["stock"].widget.attrs.update({
             "step": "0.001",
+            "class": "form-control",
+        })
+        self.fields["buy_price"].widget.attrs.update({
+            "step": "0.01",
             "class": "form-control",
         })
 
