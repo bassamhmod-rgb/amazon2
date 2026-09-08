@@ -123,6 +123,7 @@ class StoreUser(models.Model):
 
     password = models.CharField(max_length=128, blank=True, default="")
     permissions = models.JSONField(default=default_store_user_permissions)
+    sync_device_id = models.CharField(max_length=128, blank=True, default="")
 
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)

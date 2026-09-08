@@ -183,6 +183,52 @@ def _normalize_mobile(value):
     return _to_str(value).strip().replace(" ", "")
 
 
+def _request_value(request, key):
+    if request.method == "GET":
+        return request.query_params.get(key)
+    data = request.data if isinstance(request.data, dict) else {}
+    return data.get(key)
+
+
+def _ensure_store_user_sync_device(request, merchant_id):
+    device_id = _to_str(_request_value(request, "device_id")).strip()
+    store_user_id = _to_int(_request_value(request, "store_user_id"))
+    store_user_identifier = _to_str(_request_value(request, "store_user_identifier")).strip()
+
+    if not device_id:
+        return None, Response({"detail": "device_id is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+    qs = StoreUser.objects.filter(store_id=merchant_id)
+    if store_user_id is not None:
+        qs = qs.filter(id=store_user_id)
+    elif store_user_identifier:
+        qs = qs.filter(identifier__iexact=store_user_identifier)
+    else:
+        return None, Response(
+            {"detail": "store_user_id or store_user_identifier is required"},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    store_user = qs.first()
+    if not store_user:
+        return None, Response({"detail": "Store user not found"}, status=status.HTTP_404_NOT_FOUND)
+    if not store_user.is_active:
+        return None, Response({"detail": "Store user is inactive"}, status=status.HTTP_409_CONFLICT)
+
+    registered_device_id = _to_str(store_user.sync_device_id).strip()
+    if registered_device_id and registered_device_id != device_id:
+        return None, Response(
+            {"detail": "هذا المستخدم مرتبط بجهاز آخر. لا يمكن استخدام نفس الحساب على أكثر من جهاز."},
+            status=status.HTTP_403_FORBIDDEN,
+        )
+
+    if registered_device_id != device_id:
+        StoreUser.objects.filter(pk=store_user.pk).update(sync_device_id=device_id)
+        store_user.sync_device_id = device_id
+
+    return store_user, None
+
+
 def _ensure_mobile_default_records(store):
     now_minute = _now_minute()
     Customer.objects.get_or_create(
@@ -1168,6 +1214,10 @@ def categories_pull(request):
             status=status.HTTP_400_BAD_REQUEST,
         )
 
+    _, device_error = _ensure_store_user_sync_device(request, merchant_id_int)
+    if device_error:
+        return device_error
+
     qs = Category.objects.filter(store_id=merchant_id_int).order_by("id")
 
     if since not in (None, "", "0"):
@@ -1216,6 +1266,9 @@ def customers_pull(request):
     store = Store.objects.filter(id=merchant_id_int).first()
     if not store:
         return Response({"detail": "Store not found"}, status=status.HTTP_404_NOT_FOUND)
+    _, device_error = _ensure_store_user_sync_device(request, merchant_id_int)
+    if device_error:
+        return device_error
     _ensure_mobile_default_records(store)
 
     qs = Customer.objects.filter(store_id=merchant_id_int).order_by("id")
@@ -1269,6 +1322,9 @@ def suppliers_pull(request):
     store = Store.objects.filter(id=merchant_id_int).first()
     if not store:
         return Response({"detail": "Store not found"}, status=status.HTTP_404_NOT_FOUND)
+    _, device_error = _ensure_store_user_sync_device(request, merchant_id_int)
+    if device_error:
+        return device_error
     _ensure_mobile_default_records(store)
 
     qs = Supplier.objects.filter(store_id=merchant_id_int).order_by("id")
@@ -1319,6 +1375,9 @@ def _pull_store_rows(request, model, serializer, only_fields):
     store = Store.objects.filter(id=merchant_id_int).first()
     if not store:
         return Response({"detail": "Store not found"}, status=status.HTTP_404_NOT_FOUND)
+    _, device_error = _ensure_store_user_sync_device(request, merchant_id_int)
+    if device_error:
+        return device_error
 
     qs = model.objects.filter(store_id=merchant_id_int).order_by("id")
     if since not in (None, "", "0"):
@@ -1471,6 +1530,10 @@ def products_pull(request):
             {"detail": "merchant_id must be an integer"},
             status=status.HTTP_400_BAD_REQUEST,
         )
+
+    _, device_error = _ensure_store_user_sync_device(request, merchant_id_int)
+    if device_error:
+        return device_error
 
     qs = Product.objects.filter(store_id=merchant_id_int).order_by("id")
 
@@ -1635,6 +1698,9 @@ def warehouses_pull(request):
     store = Store.objects.filter(id=merchant_id_int).first()
     if not store:
         return Response({"detail": "Store not found"}, status=status.HTTP_404_NOT_FOUND)
+    _, device_error = _ensure_store_user_sync_device(request, merchant_id_int)
+    if device_error:
+        return device_error
 
     qs = Warehouse.objects.filter(store_id=merchant_id_int).order_by("-is_main", "name")
     if since not in (None, "", "0"):
@@ -1689,6 +1755,9 @@ def warehouse_transfers_pull(request):
     store = Store.objects.filter(id=merchant_id_int).first()
     if not store:
         return Response({"detail": "Store not found"}, status=status.HTTP_404_NOT_FOUND)
+    _, device_error = _ensure_store_user_sync_device(request, merchant_id_int)
+    if device_error:
+        return device_error
 
     qs = (
         WarehouseTransfer.objects.filter(store_id=merchant_id_int)
@@ -1730,6 +1799,9 @@ def inventory_adjustments_pull(request):
     store = Store.objects.filter(id=merchant_id_int).first()
     if not store:
         return Response({"detail": "Store not found"}, status=status.HTTP_404_NOT_FOUND)
+    _, device_error = _ensure_store_user_sync_device(request, merchant_id_int)
+    if device_error:
+        return device_error
 
     qs = (
         InventoryAdjustment.objects.filter(store_id=merchant_id_int)
@@ -1970,6 +2042,9 @@ def sync_push(request):
     store = Store.objects.filter(id=merchant_id).first()
     if not store:
         return Response({"detail": "Merchant not found"}, status=status.HTTP_404_NOT_FOUND)
+    _, device_error = _ensure_store_user_sync_device(request, merchant_id)
+    if device_error:
+        return device_error
     _ensure_mobile_default_records(store)
 
     applied = []
@@ -2411,6 +2486,9 @@ def orders_push(request):
     store = Store.objects.filter(id=merchant_id).first()
     if not store:
         return Response({"detail": "Merchant not found"}, status=status.HTTP_404_NOT_FOUND)
+    _, device_error = _ensure_store_user_sync_device(request, merchant_id)
+    if device_error:
+        return device_error
     _ensure_mobile_default_records(store)
 
     applied = []
@@ -2780,6 +2858,9 @@ def orders_pull(request):
         store = Store.objects.filter(id=merchant_id_int).first()
         if not store:
             return Response({"detail": "Store not found"}, status=status.HTTP_404_NOT_FOUND)
+        _, device_error = _ensure_store_user_sync_device(request, merchant_id_int)
+        if device_error:
+            return device_error
 
         qs = (
             Order.objects.filter(store_id=merchant_id_int)
@@ -2844,6 +2925,10 @@ def deletes_pull(request):
     except (TypeError, ValueError):
         return Response({"detail": "merchant_id must be an integer"}, status=status.HTTP_400_BAD_REQUEST)
 
+    _, device_error = _ensure_store_user_sync_device(request, merchant_id_int)
+    if device_error:
+        return device_error
+
     qs = MobileDeleteSync.objects.filter(merchant_id=merchant_id_int).order_by("id")
     if since not in (None, "", "0"):
         try:
@@ -2891,6 +2976,10 @@ def barcodes_pull(request):
             {"detail": "merchant_id must be an integer"},
             status=status.HTTP_400_BAD_REQUEST,
         )
+
+    _, device_error = _ensure_store_user_sync_device(request, merchant_id_int)
+    if device_error:
+        return device_error
 
     qs = ProductBarcode.objects.filter(product__store_id=merchant_id_int).order_by("id")
 
