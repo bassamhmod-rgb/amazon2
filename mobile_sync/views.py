@@ -118,14 +118,14 @@ def _now_minute():
 
 
 def _mobile_time(obj):
-    return getattr(obj, "mobile_update_time", None) or getattr(obj, "update_time", None) or 0
+    return max(
+        getattr(obj, "mobile_update_time", None) or 0,
+        getattr(obj, "update_time", None) or 0,
+    )
 
 
 def _mobile_since_q(since_int):
-    return Q(mobile_update_time__gt=since_int) | Q(
-        mobile_update_time__isnull=True,
-        update_time__gt=since_int,
-    )
+    return Q(mobile_update_time__gt=since_int) | Q(update_time__gt=since_int)
 
 
 def _to_int(value, default=None):

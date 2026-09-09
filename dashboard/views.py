@@ -2238,9 +2238,8 @@ def customer_update(request, store_slug, customer_id):
             "opening_balance": opening_balance,
             "preferred_price_level": preferred_price_level,
             "is_subscription_active": is_subscription_active,
+            "update_time": int(timezone.now().timestamp() // 60),
         }
-        if customer.access_id not in (None, 0, ""):
-            update_data["update_time"] = int(timezone.now().timestamp() // 60)
         Customer.objects.filter(id=customer.id, store=store).update(**update_data)
         messages.success(request, "تم تعديل بيانات العميل بنجاح.")
         return redirect("dashboard:customers_list", store_slug=store.slug)
