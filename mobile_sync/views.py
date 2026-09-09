@@ -240,6 +240,7 @@ def _ensure_mobile_default_records(store):
             "note": "",
             "balance": Decimal("0"),
             "opening_balance": Decimal("0"),
+            "preferred_price_level": 1,
             "is_subscription_active": True,
             "mobile_update_time": now_minute,
         },
@@ -308,6 +309,7 @@ def _serialize_customer(customer):
         "note": customer.note or "",
         "balance": float(customer.balance),
         "opening_balance": float(customer.opening_balance),
+        "preferred_price_level": getattr(customer, "preferred_price_level", 1) or 1,
         "is_subscription_active": customer.is_subscription_active,
         "access_id": customer.access_id,
         "update_time": _mobile_time(customer),
@@ -818,6 +820,9 @@ def _apply_customer_change(store, payload, server_id=None):
     address = _to_str(payload.get("address")).strip()
     note = _to_str(payload.get("note")).strip()
     access_id = _to_int(payload.get("access_id"))
+    preferred_price_level = _to_int(payload.get("preferred_price_level"), 1)
+    if preferred_price_level not in (1, 2, 3):
+        preferred_price_level = 1
     if not name and not phone:
         raise ValueError("Customer name or phone is required")
 
@@ -855,6 +860,7 @@ def _apply_customer_change(store, payload, server_id=None):
         "note": note,
         "balance": Decimal(str(_to_float(payload.get("balance"), 0.0))),
         "opening_balance": Decimal(str(_to_float(payload.get("opening_balance"), 0.0))),
+        "preferred_price_level": preferred_price_level,
         "is_subscription_active": _to_bool(payload.get("is_subscription_active")),
         "mobile_update_time": now_minute,
     }
@@ -875,6 +881,7 @@ def _apply_customer_change(store, payload, server_id=None):
         note=note,
         balance=update_fields["balance"],
         opening_balance=update_fields["opening_balance"],
+        preferred_price_level=preferred_price_level,
         is_subscription_active=update_fields["is_subscription_active"],
         mobile_update_time=now_minute,
     )
@@ -1289,6 +1296,7 @@ def customers_pull(request):
             "note",
             "balance",
             "opening_balance",
+            "preferred_price_level",
             "is_subscription_active",
             "access_id",
             "update_time",

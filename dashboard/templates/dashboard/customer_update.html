@@ -1,8 +1,8 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <title>تعديل عميل - {{ store.name }}</title>
+    <title>طھط¹ط¯ظٹظ„ ط¹ظ…ظٹظ„ - {{ store.name }}</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
     <style>
@@ -39,8 +39,8 @@
 <body>
 <div class="page-wrap">
     <div class="page-head">
-        <h3 class="m-0">تعديل بيانات العميل</h3>
-        <a href="{% url 'dashboard:customers_list' store.slug %}" class="btn btn-outline-secondary">العودة لقائمة العملاء</a>
+        <h3 class="m-0">طھط¹ط¯ظٹظ„ ط¨ظٹط§ظ†ط§طھ ط§ظ„ط¹ظ…ظٹظ„</h3>
+        <a href="{% url 'dashboard:customers_list' store.slug %}" class="btn btn-outline-secondary">ط§ظ„ط¹ظˆط¯ط© ظ„ظ‚ط§ط¦ظ…ط© ط§ظ„ط¹ظ…ظ„ط§ط،</a>
     </div>
 
     {% if messages %}
@@ -55,46 +55,55 @@
                 {% csrf_token %}
 
                 <div class="mb-3">
-                    <label class="form-label">اسم العميل</label>
+                    <label class="form-label">ط§ط³ظ… ط§ظ„ط¹ظ…ظٹظ„</label>
                     <input type="text" name="name" class="form-control" value="{{ customer.name }}" required>
                 </div>
 
                 <div class="mb-3">
-                    <label class="form-label">رقم الموبايل</label>
+                    <label class="form-label">ط±ظ‚ظ… ط§ظ„ظ…ظˆط¨ط§ظٹظ„</label>
                     <input type="text" name="phone" class="form-control" value="{{ customer.phone }}">
                 </div>
 
                 <div class="mb-3">
-                    <label class="form-label">العنوان</label>
+                    <label class="form-label">ط§ظ„ط¹ظ†ظˆط§ظ†</label>
                     <input type="text" name="address" class="form-control" value="{{ customer.address|default:'' }}">
                 </div>
 
                 <div class="mb-3">
-                    <label class="form-label">ملاحظة</label>
+                    <label class="form-label">ظ…ظ„ط§ط­ط¸ط©</label>
                     <textarea name="note" class="form-control" rows="3">{{ customer.note|default:'' }}</textarea>
                 </div>
 
                 <div class="mb-3">
-                    <label class="form-label">قيمة الاشتراك</label>
+                    <label class="form-label">السعر الخاص للعميل</label>
+                    <select name="preferred_price_level" class="form-select">
+                        <option value="1" {% if customer.preferred_price_level == 1 %}selected{% endif %}>سعر المفرق</option>
+                        <option value="2" {% if customer.preferred_price_level == 2 %}selected{% endif %}>سعر نص جملة</option>
+                        <option value="3" {% if customer.preferred_price_level == 3 %}selected{% endif %}>سعر جملة</option>
+                    </select>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">ظ‚ظٹظ…ط© ط§ظ„ط§ط´طھط±ط§ظƒ</label>
                     <input type="number" name="balance" class="form-control"
                            min="0" step="0.01" value="{{ customer.balance }}">
                 </div>
 
                 <div class="mb-3">
-                    <label class="form-label">الرصيد الافتتاحي</label>
+                    <label class="form-label">ط§ظ„ط±طµظٹط¯ ط§ظ„ط§ظپطھطھط§ط­ظٹ</label>
                     <input type="number" name="opening_balance" class="form-control"
                            step="0.01" value="{{ customer.opening_balance }}">
-                    <div class="form-text">الموجب: على العميل، السالب: له.</div>
+                    <div class="form-text">ط§ظ„ظ…ظˆط¬ط¨: ط¹ظ„ظ‰ ط§ظ„ط¹ظ…ظٹظ„طŒ ط§ظ„ط³ط§ظ„ط¨: ظ„ظ‡.</div>
                 </div>
 
                 <div class="form-check mb-3">
                     <input class="form-check-input" type="checkbox" name="is_subscription_active" id="is_subscription_active" {% if customer.is_subscription_active %}checked{% endif %}>
-                    <label class="form-check-label" for="is_subscription_active">الاشتراك مفعل</label>
+                    <label class="form-check-label" for="is_subscription_active">ط§ظ„ط§ط´طھط±ط§ظƒ ظ…ظپط¹ظ„</label>
                 </div>
 
                 <div class="d-flex gap-2 flex-wrap actions">
-                    <button class="btn btn-primary">حفظ التعديل</button>
-                    <a href="{% url 'dashboard:customers_list' store.slug %}" class="btn btn-secondary">إلغاء</a>
+                    <button class="btn btn-primary">ط­ظپط¸ ط§ظ„طھط¹ط¯ظٹظ„</button>
+                    <a href="{% url 'dashboard:customers_list' store.slug %}" class="btn btn-secondary">ط¥ظ„ط؛ط§ط،</a>
                 </div>
             </form>
         </div>

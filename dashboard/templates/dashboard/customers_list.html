@@ -182,6 +182,7 @@
                         <th style="width:45px;"></th>
                         <th>اسم العميل</th>
                         <th>رقم الهاتف</th>
+                        <th>السعر الخاص</th>
                         <th>الرصيد</th>
                         <th>الاشتراك</th>
                         <th class="text-center" style="min-width:120px;">خيارات</th>
@@ -199,6 +200,7 @@
                         </td>
                         <td>{{ customer.name }}</td>
                         <td>{{ customer.phone }}</td>
+                        <td>{{ customer.get_preferred_price_level_display|default:"سعر المفرق" }}</td>
                         <td>
                             {% if customer.calc_balance > 0 %}
                                 <span class="text-danger fw-bold">{{ customer.calc_balance|floatformat:2 }} مدين</span>

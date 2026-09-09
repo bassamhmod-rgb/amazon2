@@ -53,6 +53,14 @@ def _order_balance_delta(order):
     if order.transaction_type in ("sale_return", "purchase_return"):
         return -delta
     return delta
+
+
+def _preferred_price_level_from_request(value):
+    try:
+        level = int(value)
+    except (TypeError, ValueError):
+        return 1
+    return level if level in (1, 2, 3) else 1
 from datetime import date as dt_date
 from django.db.models import Sum
 ###
@@ -1438,7 +1446,12 @@ def search_customers(request, store_slug):
     )
 
     results = [
-        {"id": c.id, "name": c.name, "phone": c.phone}
+        {
+            "id": c.id,
+            "name": c.name,
+            "phone": c.phone,
+            "preferred_price_level": getattr(c, "preferred_price_level", 1) or 1,
+        }
         for c in customers
     ]
 
@@ -2117,6 +2130,9 @@ def customer_create(request, store_slug):
         phone = (request.POST.get("phone") or "").strip()
         balance_raw = (request.POST.get("balance") or "0").strip()
         opening_balance_raw = (request.POST.get("opening_balance") or "0").strip()
+        preferred_price_level = _preferred_price_level_from_request(
+            request.POST.get("preferred_price_level")
+        )
         is_subscription_active = request.POST.get("is_subscription_active") == "on"
 
         try:
@@ -2147,6 +2163,7 @@ def customer_create(request, store_slug):
             phone=phone,
             balance=balance,
             opening_balance=opening_balance,
+            preferred_price_level=preferred_price_level,
             is_subscription_active=is_subscription_active
         )
 
@@ -2169,6 +2186,9 @@ def customer_update(request, store_slug, customer_id):
         note = (request.POST.get("note") or "").strip()
         balance_raw = (request.POST.get("balance") or "0").strip()
         opening_balance_raw = (request.POST.get("opening_balance") or "0").strip()
+        preferred_price_level = _preferred_price_level_from_request(
+            request.POST.get("preferred_price_level")
+        )
         is_subscription_active = request.POST.get("is_subscription_active") == "on"
 
         if not name:
@@ -2216,6 +2236,7 @@ def customer_update(request, store_slug, customer_id):
             "note": note,
             "balance": balance,
             "opening_balance": opening_balance,
+            "preferred_price_level": preferred_price_level,
             "is_subscription_active": is_subscription_active,
         }
         if customer.access_id not in (None, 0, ""):

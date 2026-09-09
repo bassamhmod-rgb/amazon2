@@ -235,6 +235,14 @@ class Customer(models.Model):
     )
 
     is_subscription_active = models.BooleanField(default=False)
+    preferred_price_level = models.PositiveSmallIntegerField(
+        default=1,
+        choices=[
+            (1, "سعر المفرق"),
+            (2, "سعر نص جملة"),
+            (3, "سعر جملة"),
+        ],
+    )
 
     created_at = models.DateTimeField(auto_now_add=True)
 
