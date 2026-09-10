@@ -469,6 +469,10 @@ def activate_permanent_license(request):
         store.licensed_device_id = device_id
         store.save(update_fields=["licensed_device_id"])
 
+    owner_profile = _ensure_owner_store_user(store)
+    if owner_profile and _to_str(owner_profile.sync_device_id).strip() != device_id:
+        StoreUser.objects.filter(pk=owner_profile.pk).update(sync_device_id=device_id)
+
     return Response(
         {
             "license_type": 1,
