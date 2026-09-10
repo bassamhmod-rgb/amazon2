@@ -24,6 +24,16 @@ def create_main_warehouse_for_store(sender, instance, created, **kwargs):
     )
 
 
+@receiver(post_save, sender=Store)
+def create_owner_store_user_for_store(sender, instance, created, **kwargs):
+    if not created:
+        return
+
+    from accounts.models import ensure_owner_store_user
+
+    ensure_owner_store_user(instance)
+
+
 @receiver(pre_delete, sender=Warehouse)
 def prevent_main_warehouse_delete(sender, instance, **kwargs):
     if instance.is_main:

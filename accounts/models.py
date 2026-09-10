@@ -96,6 +96,78 @@ def default_store_user_permissions():
     }
 
 
+def ensure_owner_store_user(store, owner_name=None):
+    owner = getattr(store, "owner", None)
+    if owner is None:
+        return None
+
+    main_warehouse = Warehouse.objects.filter(store=store, is_main=True).first()
+
+    owner_profile = getattr(owner, "store_user_profile", None)
+    if owner_profile and owner_profile.store_id == store.id:
+        update_fields = []
+        if main_warehouse and not owner_profile.warehouse_id:
+            owner_profile.warehouse = main_warehouse
+            update_fields.append("warehouse")
+        if owner.password and owner_profile.password != owner.password:
+            owner_profile.password = owner.password
+            update_fields.append("password")
+        if owner_profile.is_active != (owner.is_active and store.is_active):
+            owner_profile.is_active = owner.is_active and store.is_active
+            update_fields.append("is_active")
+        if update_fields:
+            owner_profile.save(update_fields=update_fields)
+        return owner_profile
+
+    existing = StoreUser.objects.filter(store=store, auth_user=owner).first()
+    if existing:
+        update_fields = []
+        if main_warehouse and not existing.warehouse_id:
+            existing.warehouse = main_warehouse
+            update_fields.append("warehouse")
+        if owner.password and existing.password != owner.password:
+            existing.password = owner.password
+            update_fields.append("password")
+        if existing.is_active != (owner.is_active and store.is_active):
+            existing.is_active = owner.is_active and store.is_active
+            update_fields.append("is_active")
+        if update_fields:
+            existing.save(update_fields=update_fields)
+        return existing
+
+    display_name = (
+        str(owner_name or "").strip()
+        or (owner.get_full_name() or owner.username or store.name).strip()
+    )
+    identifier = (owner.username or f"owner_{store.id}").strip()
+
+    try:
+        with transaction.atomic():
+            return StoreUser.objects.create(
+                store=store,
+                auth_user=owner,
+                identifier=identifier,
+                name=display_name,
+                warehouse=main_warehouse,
+                password=owner.password,
+                is_active=owner.is_active and store.is_active,
+            )
+    except IntegrityError:
+        with transaction.atomic():
+            existing = StoreUser.objects.filter(store=store, auth_user=owner).first()
+            if existing:
+                return existing
+            return StoreUser.objects.create(
+                store=store,
+                auth_user=owner,
+                identifier=f"{identifier}_{store.id}",
+                name=f"{display_name} ({store.id})",
+                warehouse=main_warehouse,
+                password=owner.password,
+                is_active=owner.is_active and store.is_active,
+            )
+
+
 class StoreUser(models.Model):
     store = models.ForeignKey(Store, on_delete=models.CASCADE, related_name="store_users")
     update_time = models.BigIntegerField(blank=True, null=True)

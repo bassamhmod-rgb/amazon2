@@ -555,52 +555,9 @@ def _resolve_mobile_warehouse(store, warehouse_server_id):
 
 
 def _ensure_owner_store_user(store, owner_name=None):
-    owner = getattr(store, "owner", None)
-    if owner is None:
-        return None
+    from accounts.models import ensure_owner_store_user
 
-    main_warehouse = Warehouse.objects.filter(store=store, is_main=True).first()
-
-    owner_profile = getattr(owner, "store_user_profile", None)
-    if owner_profile and owner_profile.store_id == store.id:
-        if main_warehouse and not owner_profile.warehouse_id:
-            owner_profile.warehouse = main_warehouse
-            owner_profile.save(update_fields=["warehouse"])
-        return owner_profile
-
-    existing = StoreUser.objects.filter(store=store, auth_user=owner).first()
-    if existing:
-        if main_warehouse and not existing.warehouse_id:
-            existing.warehouse = main_warehouse
-            existing.save(update_fields=["warehouse"])
-        return existing
-
-    display_name = _to_str(owner_name).strip() or (owner.get_full_name() or owner.username or store.name).strip()
-    identifier = _to_str(owner.username).strip() or f"owner_{store.id}"
-
-    try:
-        with transaction.atomic():
-            return StoreUser.objects.create(
-                store=store,
-                auth_user=owner,
-                identifier=identifier,
-                name=display_name,
-                warehouse=main_warehouse,
-                is_active=owner.is_active and store.is_active,
-            )
-    except IntegrityError:
-        with transaction.atomic():
-            existing = StoreUser.objects.filter(store=store, auth_user=owner).first()
-            if existing:
-                return existing
-            return StoreUser.objects.create(
-                store=store,
-                auth_user=owner,
-                identifier=f"{identifier}_{store.id}",
-                name=f"{display_name} ({store.id})",
-                warehouse=main_warehouse,
-                is_active=owner.is_active and store.is_active,
-            )
+    return ensure_owner_store_user(store, owner_name=owner_name)
 
 
 def _sync_mobile_invoice_cashback(store, order, customer):
