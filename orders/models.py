@@ -148,6 +148,11 @@ class Order(models.Model):
         default=0
     )
 
+    note = models.TextField(
+        blank=True,
+        default=""
+    )
+
     payment_method = models.ForeignKey(
         StorePaymentMethod,
         on_delete=models.SET_NULL,

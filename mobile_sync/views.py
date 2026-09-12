@@ -2603,6 +2603,7 @@ def orders_push(request):
                 discount = _to_float(order_payload.get("discount"), 0.0)
                 payment = _to_float(order_payload.get("payment"), 0.0)
                 amount = _to_float(order_payload.get("amount"), 0.0)
+                note = _to_str(order_payload.get("note"), "").strip()
                 is_seen_by_store = _to_bool(order_payload.get("is_seen_by_store"), True)
                 items_payload = order_payload.get("items", [])
                 if not isinstance(items_payload, list):
@@ -2689,6 +2690,7 @@ def orders_push(request):
                 order.discount = Decimal(str(discount))
                 order.payment = Decimal(str(payment))
                 order.amount = Decimal(str(amount))
+                order.note = note
                 order.payment_type = _to_str(order_payload.get("payment_type"), "") or None
                 order.payment_method_name = _to_str(order_payload.get("payment_method_name"), "") or None
                 order.payment_recipient_name = _to_str(order_payload.get("payment_recipient_name"), "") or None
@@ -2791,6 +2793,7 @@ def _serialize_order_for_mobile(order):
         "discount": _to_float(getattr(order, "discount", 0)),
         "payment": _to_float(getattr(order, "payment", 0)),
         "amount": _to_float(getattr(order, "amount", 0)),
+        "note": getattr(order, "note", "") or "",
         "accounting_invoice_number": getattr(order, "accounting_invoice_number", None),
         "document_kind": getattr(order, "document_kind", 1),
         "payment_type": getattr(order, "payment_type", "") or "",
