@@ -101,6 +101,11 @@
 
                     <p><strong>📅 التاريخ:</strong> {{ order.created_at|date:"Y-m-d H:i" }}</p>
 
+                    {% if order.note %}
+                        <p><strong>ملاحظة:</strong></p>
+                        <div class="note-box">{{ order.note|linebreaksbr }}</div>
+                    {% endif %}
+
                     <p>
                         <strong>الحالة:</strong>
                         {% if order.status == "pending" %}

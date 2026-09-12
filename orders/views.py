@@ -274,6 +274,7 @@ def confirm_order(request, store_slug):
         customer=customer,
         status="pending",
         shipping_address=data.get("customer_address", ""),
+        note=data.get("customer_note", ""),
         payment_type=data.get("payment_type"),
         payment_method=method,
         payment_method_name=method.name if method else "",

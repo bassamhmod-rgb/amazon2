@@ -156,15 +156,13 @@
         <div id="customerBox" class="card p-3 mb-3">
             <label class="fw-bold">الزبون</label>
 
-            <div id="customerSearchContainer" class="position-relative"
-                 style="{% if order.customer %}display:none{% endif %}">
+            <div id="customerSearchContainer" class="position-relative{% if order.customer %} d-none{% endif %}">
                 <input type="text" id="customerSearch" class="form-control" placeholder="ابحث عن زبون..." autocomplete="off">
                 <div id="customerResults" class="list-group mt-1"></div>
             </div>
 
             <div id="selectedCustomerCard"
-                 class="alert alert-success d-flex justify-content-between align-items-center m-0"
-                 style="{% if order.customer %}display:flex{% else %}display:none{% endif %}">
+                 class="alert alert-success {% if order.customer %}d-flex{% else %}d-none{% endif %} justify-content-between align-items-center m-0">
                 <span id="selectedCustomerName">{% if order.customer %}{{ order.customer }}{% endif %}</span>
                 <button type="button" class="btn btn-sm btn-outline-danger bg-white" onclick="removeCustomer()">❌</button>
             </div>
@@ -258,6 +256,12 @@
             </div>
         </div>
 
+        <div class="row g-3 mt-3">
+            <div class="col-12">
+                <label>&#1605;&#1604;&#1575;&#1581;&#1592;&#1577;</label>
+                <textarea name="note" class="form-control" rows="2" placeholder="&#1575;&#1603;&#1578;&#1576; &#1605;&#1604;&#1575;&#1581;&#1592;&#1577;">{{ order.note|default:'' }}</textarea>
+            </div>
+        </div>
 <button class="btn btn-primary mt-4" name="save_only">💾 حفظ التعديلات</button>
     </form>
 </div>

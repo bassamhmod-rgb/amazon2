@@ -217,6 +217,14 @@
                     </tr>
                 </thead>
                 <tbody>
+                    {% if order.note %}
+                    <tr>
+                        <td colspan="4">
+                            <strong>&#1605;&#1604;&#1575;&#1581;&#1592;&#1577;:</strong>
+                            <div class="note-box mt-2">{{ order.note|linebreaksbr }}</div>
+                        </td>
+                    </tr>
+                    {% endif %}
                     {% for item in order.items.all %}
                     <tr>
                         <td>{{ item.product.name }}</td>

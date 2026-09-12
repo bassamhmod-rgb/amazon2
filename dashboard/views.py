@@ -1045,6 +1045,7 @@ def order_create(request, store_slug):
         status = "confirmed"
         discount_value = _to_decimal(request.POST.get("discount", 0))
         payment_value = _to_decimal(request.POST.get("payment", 0))
+        note_value = (request.POST.get("note") or "").strip()
         warehouse = _current_warehouse_for_request(request, store)
 
         # 3) إنشاء الطلب
@@ -1068,6 +1069,7 @@ def order_create(request, store_slug):
             supplier=supplier if transaction_type in ("purchase", "purchase_return") else None,
             discount=discount_value,
             payment=payment_value,
+            note=note_value,
             status=status,
         )
 
@@ -1178,6 +1180,7 @@ def order_update(request, store_slug, order_id):
         # 🟦 2) خصم ودفع (❌ بدون total)
         order.discount = request.POST.get("discount", 0)
         order.payment = request.POST.get("payment", 0)
+        order.note = (request.POST.get("note") or "").strip()
 
         # 🟦 3) زبون أو مورد (حسب النوع)
         if transaction_type in ("sale", "sale_return"):
