@@ -1912,11 +1912,10 @@ def store_web_login(request):
             return Response({"detail": "User is inactive"}, status=status.HTTP_409_CONFLICT)
         if not user.check_password(password):
             return Response({"detail": "Invalid credentials"}, status=status.HTTP_401_UNAUTHORIZED)
-        ticket_payload = {
-            "kind": "store_user",
-            "store_id": store.id,
-            "store_user_id": user.id,
-        }
+        return Response(
+            {"detail": "فتح المتجر متاح للمدير فقط."},
+            status=status.HTTP_403_FORBIDDEN,
+        )
 
     signer = TimestampSigner(salt=STORE_WEB_LOGIN_SIGNER_SALT)
     ticket = signer.sign(json.dumps(ticket_payload, separators=(",", ":")))
