@@ -134,9 +134,10 @@
                             {% if u.permissions.sales_orders %}<span class="badge bg-success">بيع</span>{% endif %}
                             {% if u.permissions.purchase_orders %}<span class="badge bg-success">شراء</span>{% endif %}
                             {% if u.permissions.products %}<span class="badge bg-success">منتجات</span>{% endif %}
+                            {% if u.permissions.stock_movement %}<span class="badge bg-secondary">حركة مادة</span>{% endif %}
                             {% if u.permissions.customer_balances %}<span class="badge bg-info text-dark">أرصدة</span>{% endif %}
                             {% if u.permissions.receipt_notices %}<span class="badge bg-warning text-dark">قبض</span>{% endif %}
-                            {% if not u.permissions.sales_orders and not u.permissions.purchase_orders and not u.permissions.products and not u.permissions.customer_balances and not u.permissions.receipt_notices %}
+                            {% if not u.permissions.sales_orders and not u.permissions.purchase_orders and not u.permissions.products and not u.permissions.stock_movement and not u.permissions.customer_balances and not u.permissions.receipt_notices %}
                                 <span class="text-muted">بدون</span>
                             {% endif %}
                         </td>

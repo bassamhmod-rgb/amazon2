@@ -312,6 +312,11 @@ def warehouse_delete(request, store_slug, warehouse_id):
 def store_users_list(request, store_slug):
     store = _get_store_for_dashboard(request, store_slug)
     users = StoreUser.objects.filter(store=store).order_by("name", "id")
+    for user in users:
+        permissions = user.permissions or {}
+        if permissions.get("stock.movement"):
+            permissions["stock_movement"] = True
+        user.permissions = permissions
     users_count = users.count()
     can_add_store_user = users_count < store.max_store_users
     return render(
