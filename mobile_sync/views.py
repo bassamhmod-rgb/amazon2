@@ -1608,7 +1608,7 @@ def store_users_pull(request):
             "identifier": owner_profile.identifier if owner_profile else owner.username,
             "name": owner_name,
             "warehouse_id": owner_warehouse_id,
-            "is_active": owner.is_active and store.is_active,
+            "is_active": owner.is_active,
             "has_password": owner.has_usable_password(),
             "password": owner.password,
             "is_owner": True,
@@ -1816,9 +1816,6 @@ def store_user_login(request):
     store = Store.objects.filter(id=merchant_id).first()
     if not store:
         return Response({"detail": "Store not found"}, status=status.HTTP_404_NOT_FOUND)
-    if not store.is_active:
-        return Response({"detail": "Store is inactive"}, status=status.HTTP_409_CONFLICT)
-
     owner_candidate = authenticate(username=identifier, password=password)
     if owner_candidate is not None and owner_candidate == store.owner:
         owner_profile = _ensure_owner_store_user(store, owner_candidate.get_full_name() or owner_candidate.username or store.name)
@@ -1897,8 +1894,6 @@ def store_web_login(request):
     store = Store.objects.filter(id=merchant_id).first()
     if not store:
         return Response({"detail": "Store not found"}, status=status.HTTP_404_NOT_FOUND)
-    if not store.is_active:
-        return Response({"detail": "Store is inactive"}, status=status.HTTP_409_CONFLICT)
 
     owner_candidate = authenticate(username=identifier, password=password)
     ticket_payload = None
@@ -1958,10 +1953,12 @@ def store_web_login_open(request):
         return Response({"detail": "invalid ticket payload"}, status=status.HTTP_400_BAD_REQUEST)
 
     store = Store.objects.filter(id=store_id).first()
-    if not store or not store.is_active:
+    if not store:
         return Response({"detail": "Store not found"}, status=status.HTTP_404_NOT_FOUND)
 
     next_url = reverse("stores:store_front", kwargs={"slug": store.slug})
+    if not store.is_active:
+        next_url = reverse("dashboard:store_users_list", kwargs={"store_slug": store.slug})
 
     if kind == "owner":
         user_id = _to_int(payload.get("user_id"))

@@ -112,8 +112,8 @@ def ensure_owner_store_user(store, owner_name=None):
         if owner.password and owner_profile.password != owner.password:
             owner_profile.password = owner.password
             update_fields.append("password")
-        if owner_profile.is_active != (owner.is_active and store.is_active):
-            owner_profile.is_active = owner.is_active and store.is_active
+        if owner_profile.is_active != owner.is_active:
+            owner_profile.is_active = owner.is_active
             update_fields.append("is_active")
         if update_fields:
             owner_profile.save(update_fields=update_fields)
@@ -128,8 +128,8 @@ def ensure_owner_store_user(store, owner_name=None):
         if owner.password and existing.password != owner.password:
             existing.password = owner.password
             update_fields.append("password")
-        if existing.is_active != (owner.is_active and store.is_active):
-            existing.is_active = owner.is_active and store.is_active
+        if existing.is_active != owner.is_active:
+            existing.is_active = owner.is_active
             update_fields.append("is_active")
         if update_fields:
             existing.save(update_fields=update_fields)
@@ -150,7 +150,7 @@ def ensure_owner_store_user(store, owner_name=None):
                 name=display_name,
                 warehouse=main_warehouse,
                 password=owner.password,
-                is_active=owner.is_active and store.is_active,
+                is_active=owner.is_active,
             )
     except IntegrityError:
         with transaction.atomic():
@@ -164,7 +164,7 @@ def ensure_owner_store_user(store, owner_name=None):
                 name=f"{display_name} ({store.id})",
                 warehouse=main_warehouse,
                 password=owner.password,
-                is_active=owner.is_active and store.is_active,
+                is_active=owner.is_active,
             )
 
 

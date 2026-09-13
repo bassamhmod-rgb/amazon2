@@ -77,6 +77,13 @@ from orders.models import OrderItem
 
 logger = logging.getLogger(__name__)
 
+INACTIVE_STORE_ALLOWED_DASHBOARD_VIEWS = {
+    "store_users_list",
+    "store_user_create",
+    "store_user_update",
+    "store_user_delete",
+}
+
 
 def _current_warehouse_for_request(request, store):
     store_user_id = request.session.get("store_user_id")
@@ -127,7 +134,14 @@ def _get_store_for_dashboard(request, store_slug):
     if not store:
         raise Http404
 
-    if store.owner_id == request.user.id:
+    is_owner = store.owner_id == request.user.id
+
+    if not store.is_active:
+        url_name = getattr(getattr(request, "resolver_match", None), "url_name", "")
+        if not is_owner or url_name not in INACTIVE_STORE_ALLOWED_DASHBOARD_VIEWS:
+            raise Http404
+
+    if is_owner:
         return store
 
     store_user_id = request.session.get("store_user_id")
