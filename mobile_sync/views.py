@@ -209,6 +209,11 @@ def _ensure_store_user_sync_device(request, merchant_id):
         )
 
     store_user = qs.first()
+    if not store_user and store_user_id is not None and store_user_identifier:
+        store_user = StoreUser.objects.filter(
+            store_id=merchant_id,
+            identifier__iexact=store_user_identifier,
+        ).first()
     if not store_user:
         return None, Response({"detail": "Store user not found"}, status=status.HTTP_404_NOT_FOUND)
     if not store_user.is_active:
