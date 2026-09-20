@@ -12,6 +12,7 @@ import logging
 import zipfile
 import time
 from io import BytesIO
+from contextlib import contextmanager
 from django.contrib.auth.models import User
 from django.db import IntegrityError, transaction
 from django.db.models import Sum
@@ -29,6 +30,7 @@ from accounts.models import PointsTransaction, AccountingClient, SystemNotificat
 from accounts.store_user_forms import StoreUserForm
 from cart.models import Cart, CartItem
 from loyalty.models import LoyaltyPoints
+from mobile_sync.models import MobileDeleteSync
 
 # 1. الزبون موجود بـ accounts (حسب كلامك)
 from accounts.models import Customer
@@ -44,6 +46,71 @@ from .models import Expense, ExpenseType, ExpenseReason
 FIXED_EXPENSE_TYPES = ["صرفيات عمل", "صرفيات عامة"]
 # أما إذا كنت ناقله كمان لـ accounts، الغي السطر اللي فوق واستخدم هاد:
 from decimal import Decimal, InvalidOperation
+
+
+@contextmanager
+def _store_reset_delete_logging_disabled():
+    from django.db.models.signals import pre_delete
+    from accounts import signals as account_signals
+    from mobile_sync import signals as mobile_signals
+
+    receivers = [
+        (account_signals.log_supplier_delete, Supplier),
+        (account_signals.log_customer_delete, Customer),
+        (account_signals.log_category_delete, Category),
+        (account_signals.log_product_delete, Product),
+        (account_signals.log_product_barcode_delete, ProductBarcode),
+        (account_signals.log_order_delete, Order),
+        (account_signals.log_order_item_delete, OrderItem),
+        (account_signals.log_points_delete, PointsTransaction),
+        (account_signals.log_expense_delete, Expense),
+        (account_signals.log_warehouse_delete, Warehouse),
+        (account_signals.log_store_user_delete, StoreUser),
+        (mobile_signals.log_category_delete, Category),
+        (mobile_signals.log_product_delete, Product),
+        (mobile_signals.log_store_user_delete, StoreUser),
+        (mobile_signals.log_customer_delete, Customer),
+        (mobile_signals.log_order_delete, Order),
+        (mobile_signals.log_product_barcode_delete, ProductBarcode),
+        (mobile_signals.log_inventory_adjustment_delete, InventoryAdjustment),
+    ]
+
+    for receiver, sender in receivers:
+        pre_delete.disconnect(receiver=receiver, sender=sender)
+    try:
+        yield
+    finally:
+        for receiver, sender in receivers:
+            pre_delete.connect(receiver, sender=sender)
+
+
+def _delete_reset_sync_rows(store, main_warehouse_id):
+    delete_sync_targets = {
+        "accounts.Supplier": Supplier.objects.filter(store=store).values("id"),
+        "accounts.Customer": Customer.objects.filter(store=store).values("id"),
+        "products.Category": Category.objects.filter(store=store).values("id"),
+        "products.Product": Product.objects.filter(store=store).values("id"),
+        "products.ProductBarcode": ProductBarcode.objects.filter(product__store=store).values("id"),
+        "orders.Order": Order.objects.filter(store=store).values("id"),
+        "orders.OrderItem": OrderItem.objects.filter(order__store=store).values("id"),
+        "accounts.PointsTransaction": PointsTransaction.objects.filter(customer__store=store).values("id"),
+        "dashboard.Expense": Expense.objects.filter(store=store).values("id"),
+        "stores.Warehouse": Warehouse.objects.filter(store=store)
+        .exclude(id=main_warehouse_id)
+        .values("id"),
+        "stores.WarehouseTransfer": WarehouseTransfer.objects.filter(store=store).values("id"),
+        "stores.WarehouseTransferItem": WarehouseTransferItem.objects.filter(store=store).values("id"),
+        "stores.InventoryAdjustment": InventoryAdjustment.objects.filter(store=store).values("id"),
+        "accounts.StoreUser": StoreUser.objects.filter(store=store).values("id"),
+    }
+
+    for model_name, ids in delete_sync_targets.items():
+        DeleteSync.objects.filter(
+            store_model_name=model_name,
+            store_record_id__in=ids,
+        ).delete()
+
+    MobileDeleteSync.objects.filter(merchant_id=store.id).delete()
 
 
 def _order_balance_delta(order):
@@ -2618,71 +2685,37 @@ def _perform_store_reset(request, store):
             .values_list("id", flat=True)
             .first()
         )
-        delete_sync_targets = {
-            "accounts.Supplier": list(Supplier.objects.filter(store=store).values_list("id", flat=True)),
-            "accounts.Customer": list(Customer.objects.filter(store=store).values_list("id", flat=True)),
-            "products.Category": list(Category.objects.filter(store=store).values_list("id", flat=True)),
-            "products.Product": list(Product.objects.filter(store=store).values_list("id", flat=True)),
-            "products.ProductBarcode": list(
-                ProductBarcode.objects.filter(product__store=store).values_list("id", flat=True)
-            ),
-            "orders.Order": list(Order.objects.filter(store=store).values_list("id", flat=True)),
-            "orders.OrderItem": list(
-                OrderItem.objects.filter(order__store=store).values_list("id", flat=True)
-            ),
-            "accounts.PointsTransaction": list(
-                PointsTransaction.objects.filter(customer__store=store).values_list("id", flat=True)
-            ),
-            "dashboard.Expense": list(Expense.objects.filter(store=store).values_list("id", flat=True)),
-            "stores.Warehouse": list(
-                Warehouse.objects.filter(store=store).exclude(id=main_warehouse_id).values_list("id", flat=True)
-            ),
-            "stores.WarehouseTransfer": list(
-                WarehouseTransfer.objects.filter(store=store).values_list("id", flat=True)
-            ),
-            "stores.WarehouseTransferItem": list(
-                WarehouseTransferItem.objects.filter(store=store).values_list("id", flat=True)
-            ),
-            "stores.InventoryAdjustment": list(
-                InventoryAdjustment.objects.filter(store=store).values_list("id", flat=True)
-            ),
-            "accounts.StoreUser": list(StoreUser.objects.filter(store=store).values_list("id", flat=True)),
-        }
-
-        InventoryAdjustment.objects.filter(store=store).delete()
-        WarehouseTransferItem.objects.filter(store=store).delete()
-        WarehouseTransfer.objects.filter(store=store).delete()
-
-        Order.objects.filter(store=store).delete()
-        Cart.objects.filter(store=store).delete()
-
-        Product.objects.filter(store=store).delete()
-        Category.objects.filter(store=store).delete()
-
-        Customer.objects.filter(store=store).delete()
-        Supplier.objects.filter(store=store).delete()
-        LoyaltyPoints.objects.filter(store=store).delete()
-
-        StorePaymentMethod.objects.filter(store=store).delete()
-
-        Expense.objects.filter(store=store).delete()
-        ExpenseReason.objects.filter(store=store).delete()
-        ExpenseType.objects.filter(store=store).delete()
-
-        # Clear store users and warehouses, but keep the main warehouse record.
-        StoreUser.objects.filter(store=store).delete()
-        Warehouse.objects.filter(store=store).exclude(id=main_warehouse_id).delete()
-
-        AccountingClient.objects.filter(store=store).delete()
-        SystemNotification.objects.filter(target_store=store).delete()
 
         # Remove pending delete-log records for rows cleared by store reset.
-        for model_name, ids in delete_sync_targets.items():
-            if ids:
-                DeleteSync.objects.filter(
-                    store_model_name=model_name,
-                    store_record_id__in=ids,
-                ).delete()
+        _delete_reset_sync_rows(store, main_warehouse_id)
+
+        with _store_reset_delete_logging_disabled():
+            InventoryAdjustment.objects.filter(store=store).delete()
+            WarehouseTransferItem.objects.filter(store=store).delete()
+            WarehouseTransfer.objects.filter(store=store).delete()
+
+            Order.objects.filter(store=store).delete()
+            Cart.objects.filter(store=store).delete()
+
+            Product.objects.filter(store=store).delete()
+            Category.objects.filter(store=store).delete()
+
+            Customer.objects.filter(store=store).delete()
+            Supplier.objects.filter(store=store).delete()
+            LoyaltyPoints.objects.filter(store=store).delete()
+
+            StorePaymentMethod.objects.filter(store=store).delete()
+
+            Expense.objects.filter(store=store).delete()
+            ExpenseReason.objects.filter(store=store).delete()
+            ExpenseType.objects.filter(store=store).delete()
+
+            # Clear store users and warehouses, but keep the main warehouse record.
+            StoreUser.objects.filter(store=store).delete()
+            Warehouse.objects.filter(store=store).exclude(id=main_warehouse_id).delete()
+
+            AccountingClient.objects.filter(store=store).delete()
+            SystemNotification.objects.filter(target_store=store).delete()
 
         # Mark that this store was fully reset, so sync clients can warn
         # the user to enable full re-send from Access settings.
