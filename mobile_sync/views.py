@@ -406,14 +406,14 @@ def _serialize_expense_reason(expense_reason):
 
 
 def _serialize_expense(expense):
+    store = expense.store
+    payment_currency = getattr(store, "pricing_currency", "SYP") or "SYP"
     return {
         "id": expense.id,
         "amount": float(expense.amount or 0),
-        "payment_currency": expense.payment_currency or "SYP",
-        "exchange_rate": float(expense.exchange_rate or 1),
-        "amount_payment_currency": float(
-            expense.amount_payment_currency or expense.amount or 0
-        ),
+        "payment_currency": payment_currency,
+        "exchange_rate": float(getattr(store, "exchange_rate", 1) or 1),
+        "amount_payment_currency": float(expense.amount or 0),
         "date": expense.date.strftime("%Y-%m-%d"),
         "expense_type_server_id": expense.expense_type_id,
         "expense_type": expense.expense_type.name if expense.expense_type else "",
@@ -1142,17 +1142,8 @@ def _apply_expense_change(store, payload, server_id=None):
         date_value = date_value.date()
 
     now_minute = _now_minute()
-    amount = Decimal(str(_to_float(payload.get("amount"), 0.0)))
-    payment_currency = _to_str(payload.get("payment_currency"), "SYP").strip().upper() or "SYP"
-    exchange_rate = Decimal(str(_to_float(payload.get("exchange_rate"), 1.0) or 1.0))
-    amount_payment_currency = Decimal(
-        str(_to_float(payload.get("amount_payment_currency"), float(amount)))
-    )
     update_fields = {
-        "amount": amount,
-        "payment_currency": payment_currency[:3],
-        "exchange_rate": exchange_rate,
-        "amount_payment_currency": amount_payment_currency,
+        "amount": Decimal(str(_to_float(payload.get("amount"), 0.0))),
         "date": date_value,
         "expense_type": expense_type,
         "expense_reason": expense_reason,
@@ -1402,9 +1393,6 @@ def expenses_pull(request):
         [
             "id",
             "amount",
-            "payment_currency",
-            "exchange_rate",
-            "amount_payment_currency",
             "date",
             "expense_type_id",
             "expense_reason_id",

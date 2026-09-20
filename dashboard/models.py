@@ -70,9 +70,6 @@ class Expense(models.Model):
     access_id = models.BigIntegerField(blank=True, null=True)
     store = models.ForeignKey(Store, on_delete=models.CASCADE, related_name="expenses")
     amount = models.DecimalField(max_digits=14, decimal_places=2, default=Decimal("0.00"))
-    payment_currency = models.CharField(max_length=3, default="SYP")
-    exchange_rate = models.DecimalField(max_digits=14, decimal_places=4, default=Decimal("1.0000"))
-    amount_payment_currency = models.DecimalField(max_digits=14, decimal_places=2, default=Decimal("0.00"))
     date = models.DateField(default=timezone.now)
     expense_type = models.ForeignKey(
         ExpenseType,
