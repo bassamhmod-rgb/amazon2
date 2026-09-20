@@ -110,7 +110,6 @@ LEGACY_MOBILE_PERMISSION_MAP = {
 }
 GENERAL_CUSTOMER_NAME = "زبون عام"
 GENERAL_CUSTOMER_PHONE = "GENERAL_CUSTOMER"
-OPENING_INVENTORY_SUPPLIER_NAME = "بضاعة أول المدة"
 
 
 def _now_minute():
@@ -242,18 +241,6 @@ def _ensure_mobile_default_records(store):
             "opening_balance": Decimal("0"),
             "preferred_price_level": 1,
             "is_subscription_active": True,
-            "mobile_update_time": now_minute,
-        },
-    )
-    Supplier.objects.get_or_create(
-        store=store,
-        name=OPENING_INVENTORY_SUPPLIER_NAME,
-        defaults={
-            "phone": "",
-            "address": "",
-            "email": "",
-            "balance": Decimal("0"),
-            "opening_balance": Decimal("0"),
             "mobile_update_time": now_minute,
         },
     )
@@ -2339,14 +2326,6 @@ def sync_push(request):
                 elif entity == "supplier":
                     obj = Supplier.objects.filter(id=server_id, store_id=merchant_id).first()
                     if obj:
-                        if obj.name == OPENING_INVENTORY_SUPPLIER_NAME:
-                            applied.append({
-                                "entity": "supplier",
-                                "action": "protected",
-                                "local_id": local_id,
-                                "server_id": server_id,
-                            })
-                            continue
                         obj._skip_mobile_delete_sync = True
                         obj.delete()
                         applied.append({
