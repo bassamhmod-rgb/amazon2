@@ -2758,6 +2758,11 @@ def _serialize_order_for_mobile(order):
     if prefetched_items is None:
         prefetched_items = order.items.select_related("product", "warehouse").order_by("id")
     items = [_serialize_order_item_for_mobile(item) for item in prefetched_items]
+    if getattr(order, "document_kind", 1) == 1:
+        items_total = sum(Decimal(str(item.get("price", 0))) * Decimal(str(abs(item.get("quantity", 0)))) for item in items)
+        sync_amount = items_total - Decimal(str(getattr(order, "discount", 0) or 0))
+    else:
+        sync_amount = getattr(order, "amount", 0)
     return {
         "id": order.id,
         "update_time": _mobile_time(order),
@@ -2772,7 +2777,7 @@ def _serialize_order_for_mobile(order):
         "status": "completed" if getattr(order, "status", "") == "confirmed" else getattr(order, "status", ""),
         "discount": _to_float(getattr(order, "discount", 0)),
         "payment": _to_float(getattr(order, "payment", 0)),
-        "amount": _to_float(getattr(order, "amount", 0)),
+        "amount": _to_float(sync_amount),
         "note": getattr(order, "note", "") or "",
         "accounting_invoice_number": getattr(order, "accounting_invoice_number", None),
         "document_kind": getattr(order, "document_kind", 1),
