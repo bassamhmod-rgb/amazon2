@@ -1474,6 +1474,32 @@ def stores_pull(request):
 
 @api_view(["GET"])
 @permission_classes([AllowAny])
+def store_currency_settings(request):
+    merchant_id = request.query_params.get("merchant_id")
+    try:
+        merchant_id_int = int(merchant_id)
+    except (TypeError, ValueError):
+        return Response(
+            {"detail": "merchant_id is required"},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    store = Store.objects.filter(pk=merchant_id_int, is_active=True).only(
+        "id", "pricing_currency", "exchange_rate"
+    ).first()
+    if store is None:
+        return Response({"detail": "Store not found"}, status=status.HTTP_404_NOT_FOUND)
+
+    return Response(
+        {
+            "base_currency": store.pricing_currency,
+            "exchange_rate": float(store.exchange_rate or 0),
+        }
+    )
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
 def products_pull(request):
     merchant_id = request.query_params.get("merchant_id")
     since = request.query_params.get("since")
@@ -2778,6 +2804,10 @@ def _serialize_order_for_mobile(order):
         "discount": _to_float(getattr(order, "discount", 0)),
         "payment": _to_float(getattr(order, "payment", 0)),
         "amount": _to_float(sync_amount),
+        "base_currency": getattr(order.store, "pricing_currency", "SYP") or "SYP",
+        "payment_currency": getattr(order.store, "pricing_currency", "SYP") or "SYP",
+        "exchange_rate": _to_float(getattr(order.store, "exchange_rate", 1)),
+        "amount_payment_currency": _to_float(getattr(order, "payment", 0)),
         "note": getattr(order, "note", "") or "",
         "accounting_invoice_number": getattr(order, "accounting_invoice_number", None),
         "document_kind": getattr(order, "document_kind", 1),
@@ -2826,7 +2856,9 @@ def orders_pull(request):
                 | ~Q(document_kind=1)
                 | Q(status="confirmed")
             )
-            .select_related("customer", "supplier", "warehouse", "created_by_store_user")
+            .select_related(
+                "store", "customer", "supplier", "warehouse", "created_by_store_user"
+            )
             .order_by("id")
         )
         if since not in (None, "", "0"):

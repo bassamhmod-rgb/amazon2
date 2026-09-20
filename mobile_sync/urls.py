@@ -6,6 +6,7 @@ urlpatterns = [
     path("ping/", views.ping, name="ping"),
     path("app-update/", views.app_update_check, name="app_update_check"),
     path("stores/", views.stores_pull, name="stores_pull"),
+    path("store-currency/", views.store_currency_settings, name="store_currency_settings"),
     path("warehouses/", views.warehouses_pull, name="warehouses_pull"),
     path("warehouse-transfers/", views.warehouse_transfers_pull, name="warehouse_transfers_pull"),
     path("inventory-adjustments/", views.inventory_adjustments_pull, name="inventory_adjustments_pull"),
