@@ -3165,14 +3165,10 @@ def inventory_list(request, store_slug):
     # 🔹 آخر سعر شراء لكل منتج
     last_buy_price_qs = OrderItem.objects.filter(
         product=OuterRef("pk"),
+        order__document_kind=1,
+        order__status__in=["confirmed", "completed"],
         order__transaction_type="purchase",
-    ).annotate(
-        effective_buy_price=Coalesce(
-            "buy_price",
-            "price",
-            output_field=DecimalField(max_digits=10, decimal_places=2),
-        )
-    ).order_by("-order__created_at", "-id").values("effective_buy_price")[:1]
+    ).order_by("-order__created_at", "-id").values("price")[:1]
 
     inventory_adjustments_qs = (
         InventoryAdjustment.objects
@@ -3224,7 +3220,11 @@ def inventory_list(request, store_slug):
                     ExpressionWrapper(
                         F("order_items__quantity") * F("order_items__direction"),
                         output_field=DecimalField(max_digits=10, decimal_places=2)
-                    )
+                    ),
+                    filter=Q(
+                        order_items__order__document_kind=1,
+                        order_items__order__status__in=["confirmed", "completed"],
+                    ),
                 ),
                 Value(0, output_field=DecimalField(max_digits=10, decimal_places=2)),
                 output_field=DecimalField(max_digits=10, decimal_places=2),
