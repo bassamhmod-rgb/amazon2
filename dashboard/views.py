@@ -73,6 +73,9 @@ def _store_reset_delete_logging_disabled():
         (mobile_signals.log_order_delete, Order),
         (mobile_signals.log_product_barcode_delete, ProductBarcode),
         (mobile_signals.log_inventory_adjustment_delete, InventoryAdjustment),
+        (mobile_signals.log_expense_delete, Expense),
+        (mobile_signals.log_expense_type_delete, ExpenseType),
+        (mobile_signals.log_expense_reason_delete, ExpenseReason),
     ]
 
     for receiver, sender in receivers:
