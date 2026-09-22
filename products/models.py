@@ -89,6 +89,7 @@ class Product(models.Model):
     )
 
     stock = models.DecimalField(max_digits=12, decimal_places=3, default=0)
+    allow_negative_stock_sale = models.BooleanField(default=False)
     main_image = models.ImageField(upload_to="products/", blank=True, null=True)
 
     category = models.ForeignKey(
