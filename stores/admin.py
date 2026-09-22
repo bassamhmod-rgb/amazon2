@@ -77,6 +77,8 @@ class WarehouseAdmin(admin.ModelAdmin):
 
     def has_delete_permission(self, request, obj=None):
         if obj and obj.is_main:
+            if request.user.is_superuser or request.user.has_perm("stores.delete_store"):
+                return True
             return False
         return super().has_delete_permission(request, obj=obj)
 
