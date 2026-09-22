@@ -32,6 +32,7 @@ class Category(models.Model):
     access_id = models.BigIntegerField(blank=True, null=True)
     store = models.ForeignKey("stores.Store", on_delete=models.CASCADE, related_name="categories")
     name = models.CharField(max_length=255)
+    image = models.ImageField(upload_to="categories/", blank=True, null=True)
 
     class Meta:
         constraints = [

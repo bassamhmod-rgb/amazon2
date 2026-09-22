@@ -641,6 +641,7 @@ def _sync_mobile_invoice_cashback(store, order, customer):
 
 def _apply_category_change(store, payload, server_id=None):
     name = _to_str(payload.get("name")).strip()
+    image = _to_str(payload.get("image")).strip()
     access_id = _to_int(payload.get("access_id"))
     if not name:
         raise ValueError("Category name is required")
@@ -654,6 +655,8 @@ def _apply_category_change(store, payload, server_id=None):
 
     if obj:
         update_fields = {"name": name, "mobile_update_time": now_minute}
+        if image or "image" in payload:
+            update_fields["image"] = image or None
         if access_id is not None and obj.access_id in (None, 0, ""):
             update_fields["access_id"] = access_id
         Category.objects.filter(id=obj.id, store=store).update(**update_fields)
@@ -664,9 +667,19 @@ def _apply_category_change(store, payload, server_id=None):
         store=store,
         access_id=access_id,
         name=name,
+        image=image or None,
         mobile_update_time=now_minute,
     )
     return obj, "created"
+
+
+def _category_image_url(request, category):
+    if not category.image:
+        return ""
+    name = str(category.image.name or "").strip()
+    if name.startswith(("http://", "https://")):
+        return name
+    return request.build_absolute_uri(category.image.url)
 
 
 def _apply_product_change(store, payload, server_id=None, category_resolver=None):
@@ -1199,10 +1212,11 @@ def categories_pull(request):
         {
             "id": c.id,
             "name": c.name,
+            "image": _category_image_url(request, c),
             "access_id": c.access_id,
             "update_time": _mobile_time(c),
         }
-        for c in qs.only("id", "name", "access_id", "update_time", "mobile_update_time")
+        for c in qs.only("id", "name", "image", "access_id", "update_time", "mobile_update_time")
     ]
 
     return Response(
@@ -2205,7 +2219,7 @@ def sync_push(request):
                         "action": action,
                         "local_id": local_id,
                         "server_id": obj.id,
-                        "update_time": obj.update_time or 0,
+                        "update_time": _mobile_time(obj),
                     })
                 elif entity == "warehouse":
                     obj, action = _apply_warehouse_change(

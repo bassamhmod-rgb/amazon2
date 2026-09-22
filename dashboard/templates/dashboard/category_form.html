@@ -77,13 +77,27 @@
 <div class="content">
     <h3 class="mb-3">{% if is_edit %}تعديل الفئة{% else %}إضافة فئة جديدة{% endif %}</h3>
 
-    <form method="post" class="bg-white p-4 rounded shadow-sm" style="max-width: 500px;">
+    <form method="post" enctype="multipart/form-data" class="bg-white p-4 rounded shadow-sm" style="max-width: 500px;">
         {% csrf_token %}
         {% if error %}<div class="alert alert-danger">{{ error }}</div>{% endif %}
 
         <div class="mb-3">
             <label for="name" class="form-label">اسم الفئة</label>
             <input type="text" name="name" id="name" class="form-control" value="{% if category %}{{ category.name }}{% endif %}" required>
+        </div>
+
+        <div class="mb-3">
+            <label for="image" class="form-label">صورة الفئة</label>
+            {% if category and category.image %}
+                <div class="mb-2 d-flex align-items-center gap-2">
+                    <img src="{{ category.image.url }}" alt="{{ category.name }}" style="width:64px;height:64px;object-fit:cover;border-radius:8px;border:1px solid #dee2e6;">
+                    <label class="form-check-label">
+                        <input type="checkbox" name="clear_image" value="1" class="form-check-input">
+                        حذف الصورة
+                    </label>
+                </div>
+            {% endif %}
+            <input type="file" name="image" id="image" class="form-control" accept="image/*">
         </div>
 
         <div class="d-flex gap-2 flex-wrap">

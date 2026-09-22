@@ -819,7 +819,8 @@ def add_category(request, store_slug):
     store = _get_store_for_dashboard(request, store_slug)
 
     if request.method == "POST":
-        name = request.POST.get("name")
+        name = (request.POST.get("name") or "").strip()
+        image = request.FILES.get("image")
 
         if not name:
             return render(request, "dashboard/category_form.html", {
@@ -830,7 +831,8 @@ def add_category(request, store_slug):
         # إنشاء الفئة وربطها تلقائياً بالمتجر
         Category.objects.create(
             name=name,
-            store=store
+            store=store,
+            image=image,
         )
 
         return redirect("dashboard:categories_list", store_slug=store.slug)
@@ -847,6 +849,8 @@ def edit_category(request, store_slug, category_id):
 
     if request.method == "POST":
         name = (request.POST.get("name") or "").strip()
+        image = request.FILES.get("image")
+        clear_image = request.POST.get("clear_image") == "1"
 
         if not name:
             return render(request, "dashboard/category_form.html", {
@@ -865,6 +869,10 @@ def edit_category(request, store_slug, category_id):
             })
 
         category.name = name
+        if clear_image:
+            category.image = None
+        elif image:
+            category.image = image
         # save() يحدّث update_time تلقائياً إذا كانت الفئة مربوطة بالمحاسبة.
         category.save()
         return redirect("dashboard:categories_list", store_slug=store.slug)
