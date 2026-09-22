@@ -1,11 +1,14 @@
+import base64
 import time
 import json
 import time
+import uuid
 from urllib.parse import quote
 from decimal import Decimal, ROUND_HALF_UP
 
 from django.contrib.auth import authenticate
 from django.contrib.auth import login as auth_login
+from django.core.files.base import ContentFile
 from django.core.signing import BadSignature, SignatureExpired, TimestampSigner
 from django.shortcuts import redirect
 from django.urls import reverse
@@ -260,7 +263,16 @@ def _serialize_category(category):
     }
 
 
-def _serialize_product(product):
+def _product_main_image_url(request, product):
+    if not product.main_image:
+        return ""
+    name = str(product.main_image.name or "").strip()
+    if name.startswith(("http://", "https://")):
+        return name
+    return request.build_absolute_uri(product.main_image.url)
+
+
+def _serialize_product(product, request=None):
     return {
         "id": product.id,
         "name": product.name,
@@ -275,7 +287,11 @@ def _serialize_product(product):
         "buy_price": float(product.buy_price if isinstance(product.buy_price, Decimal) else product.buy_price),
         "stock": product.stock,
         "allow_negative_stock_sale": product.allow_negative_stock_sale,
-        "main_image": product.main_image.name if product.main_image else "",
+        "main_image": (
+            _product_main_image_url(request, product)
+            if request is not None
+            else (product.main_image.name if product.main_image else "")
+        ),
         "category_id": product.category_id,
         "category2_id": product.category2_id,
         "active": product.active,
@@ -694,6 +710,31 @@ def _category_image_url(request, category):
     return request.build_absolute_uri(category.image.url)
 
 
+def _content_file_from_data_url(value, default_prefix="image"):
+    text = _to_str(value).strip()
+    if not text.startswith("data:image/") or "," not in text:
+        return None
+
+    header, encoded = text.split(",", 1)
+    image_type = header.split(";", 1)[0].split("/", 1)[1].lower()
+    extension = {
+        "jpeg": "jpg",
+        "jpg": "jpg",
+        "png": "png",
+        "webp": "webp",
+        "gif": "gif",
+    }.get(image_type)
+    if not extension:
+        return None
+
+    try:
+        raw = base64.b64decode(encoded)
+    except (TypeError, ValueError):
+        return None
+
+    return ContentFile(raw, name=f"{default_prefix}_{uuid.uuid4().hex}.{extension}")
+
+
 def _apply_product_change(store, payload, server_id=None, category_resolver=None):
     name = _to_str(payload.get("name")).strip()
     if not name:
@@ -705,6 +746,8 @@ def _apply_product_change(store, payload, server_id=None, category_resolver=None
     if category_resolver:
         category = category_resolver(payload.get("category_server_id"), payload.get("category_local_id"))
         category2 = category_resolver(payload.get("category2_server_id"), payload.get("category2_local_id"))
+    main_image_file = _content_file_from_data_url(payload.get("main_image"), "product")
+    clear_main_image = "main_image" in payload and _to_str(payload.get("main_image")).strip() == ""
 
     obj = None
     if server_id:
@@ -739,6 +782,15 @@ def _apply_product_change(store, payload, server_id=None, category_resolver=None
                 update_fields["access_id"] = access_id
         Product.objects.filter(id=obj.id, store=store).update(**update_fields)
         obj.refresh_from_db()
+        if main_image_file is not None:
+            obj.main_image.save(main_image_file.name, main_image_file, save=True)
+            obj.mobile_update_time = now_minute
+            obj.save(update_fields=["main_image", "mobile_update_time"])
+        elif clear_main_image and obj.main_image:
+            obj.main_image.delete(save=False)
+            obj.main_image = None
+            obj.mobile_update_time = now_minute
+            obj.save(update_fields=["main_image", "mobile_update_time"])
         return obj, "updated"
 
     obj = Product.objects.create(
@@ -761,6 +813,10 @@ def _apply_product_change(store, payload, server_id=None, category_resolver=None
         active=update_fields["active"],
         mobile_update_time=now_minute,
     )
+    if main_image_file is not None:
+        obj.main_image.save(main_image_file.name, main_image_file, save=True)
+        obj.mobile_update_time = now_minute
+        obj.save(update_fields=["main_image", "mobile_update_time"])
     return obj, "created"
 
 
@@ -1634,7 +1690,7 @@ def products_pull(request):
             "buy_price": float(p.buy_price if isinstance(p.buy_price, Decimal) else p.buy_price),
             "stock": p.stock,
             "allow_negative_stock_sale": p.allow_negative_stock_sale,
-            "main_image": p.main_image.name if p.main_image else "",
+            "main_image": _product_main_image_url(request, p),
             "category_id": p.category_id,
             "category2_id": p.category2_id,
             "active": p.active,
