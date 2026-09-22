@@ -23,7 +23,7 @@ from products.models import Category
 from products.models import Product
 from products.models import ProductBarcode
 from orders.models import Order, OrderItem
-from dashboard.models import AppUpdate, Expense, ExpenseType, ExpenseReason
+from dashboard.models import AppUpdate, Expense, ExpenseType, ExpenseReason, FixedAsset
 from stores.models import Store
 from stores.models import TrialDevice
 from stores.models import (
@@ -423,6 +423,17 @@ def _serialize_expense(expense):
         "notes": expense.notes or "",
         "access_id": expense.access_id,
         "update_time": _mobile_time(expense),
+    }
+
+
+def _serialize_fixed_asset(asset):
+    return {
+        "id": asset.id,
+        "name": asset.name,
+        "value": float(asset.value or 0),
+        "existed_before_program": asset.existed_before_program,
+        "access_id": asset.access_id,
+        "update_time": _mobile_time(asset),
     }
 
 
@@ -1175,6 +1186,37 @@ def _apply_expense_change(store, payload, server_id=None):
     return obj, "created"
 
 
+def _apply_fixed_asset_change(store, payload, server_id=None):
+    name = _to_str(payload.get("name")).strip()
+    if not name:
+        raise ValueError("Fixed asset name is required")
+
+    now_minute = _now_minute()
+    access_id = _to_int(payload.get("access_id"))
+    obj = FixedAsset.objects.filter(id=server_id, store=store).first() if server_id else None
+    if not obj and access_id not in (None, 0, ""):
+        obj = FixedAsset.objects.filter(store=store, access_id=access_id).first()
+    if not obj:
+        obj = FixedAsset.objects.filter(store=store, name=name).first()
+
+    update_fields = {
+        "name": name,
+        "value": Decimal(str(_to_float(payload.get("value"), 0.0))),
+        "existed_before_program": _to_bool(payload.get("existed_before_program"), True),
+        "mobile_update_time": now_minute,
+    }
+    if access_id is not None:
+        update_fields["access_id"] = access_id
+
+    if obj:
+        FixedAsset.objects.filter(id=obj.id, store=store).update(**update_fields)
+        obj.refresh_from_db()
+        return obj, "updated"
+
+    obj = FixedAsset.objects.create(store=store, **update_fields)
+    return obj, "created"
+
+
 @api_view(["GET"])
 @permission_classes([AllowAny])
 def categories_pull(request):
@@ -1414,6 +1456,25 @@ def expenses_pull(request):
             "expense_type_id",
             "expense_reason_id",
             "notes",
+            "access_id",
+            "update_time",
+            "mobile_update_time",
+        ],
+    )
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def fixed_assets_pull(request):
+    return _pull_store_rows(
+        request,
+        FixedAsset,
+        _serialize_fixed_asset,
+        [
+            "id",
+            "name",
+            "value",
+            "existed_before_program",
             "access_id",
             "update_time",
             "mobile_update_time",
@@ -2124,6 +2185,7 @@ def sync_push(request):
             "product": 1,
             "barcode": 2,
             "expense": 2,
+            "fixed_asset": 2,
             "warehouse_transfer": 3,
             "inventory_adjustment": 4,
         }.get(str(item.get("entity")), 99)
@@ -2308,6 +2370,19 @@ def sync_push(request):
                         "server_id": obj.id,
                         "update_time": obj.update_time or 0,
                     })
+                elif entity == "fixed_asset":
+                    obj, action = _apply_fixed_asset_change(
+                        store,
+                        payload_item,
+                        server_id=_to_int(server_id),
+                    )
+                    applied.append({
+                        "entity": "fixed_asset",
+                        "action": action,
+                        "local_id": local_id,
+                        "server_id": obj.id,
+                        "update_time": obj.update_time or 0,
+                    })
 
             for item in deletes:
                 entity = str(item.get("entity", "")).lower()
@@ -2436,6 +2511,17 @@ def sync_push(request):
                         obj.delete()
                         applied.append({
                             "entity": "expense",
+                            "action": "deleted",
+                            "local_id": local_id,
+                            "server_id": server_id,
+                        })
+                elif entity == "fixed_asset":
+                    obj = FixedAsset.objects.filter(id=server_id, store_id=merchant_id).first()
+                    if obj:
+                        obj._skip_mobile_delete_sync = True
+                        obj.delete()
+                        applied.append({
+                            "entity": "fixed_asset",
                             "action": "deleted",
                             "local_id": local_id,
                             "server_id": server_id,

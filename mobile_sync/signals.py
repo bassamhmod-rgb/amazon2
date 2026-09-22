@@ -3,7 +3,7 @@ from django.dispatch import receiver
 
 from mobile_sync.models import MobileDeleteSync
 from accounts.models import Customer, StoreUser
-from dashboard.models import Expense, ExpenseReason, ExpenseType
+from dashboard.models import Expense, ExpenseReason, ExpenseType, FixedAsset
 from orders.models import Order
 from products.models import Category, Product, ProductBarcode
 from stores.models import InventoryAdjustment, Store
@@ -91,3 +91,8 @@ def log_expense_type_delete(sender, instance, **kwargs):
 @receiver(pre_delete, sender=ExpenseReason)
 def log_expense_reason_delete(sender, instance, **kwargs):
     _log_mobile_delete(instance, instance.access_id, "expense_reasons")
+
+
+@receiver(pre_delete, sender=FixedAsset)
+def log_fixed_asset_delete(sender, instance, **kwargs):
+    _log_mobile_delete(instance, instance.access_id, "fixed_assets")

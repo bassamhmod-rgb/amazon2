@@ -23,6 +23,7 @@ urlpatterns = [
     path("expense-types/", views.expense_types_pull, name="expense_types_pull"),
     path("expense-reasons/", views.expense_reasons_pull, name="expense_reasons_pull"),
     path("expenses/", views.expenses_pull, name="expenses_pull"),
+    path("fixed-assets/", views.fixed_assets_pull, name="fixed_assets_pull"),
     path("products/", views.products_pull, name="products_pull"),
     path("barcodes/", views.barcodes_pull, name="barcodes_pull"),
     path("deletes/", views.deletes_pull, name="deletes_pull"),

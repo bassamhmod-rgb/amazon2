@@ -98,6 +98,28 @@ class Expense(models.Model):
         return super().save(*args, **kwargs)
 
 
+class FixedAsset(models.Model):
+    update_time = models.BigIntegerField(blank=True, null=True)
+    mobile_update_time = models.BigIntegerField(blank=True, null=True)
+    access_id = models.BigIntegerField(blank=True, null=True)
+    store = models.ForeignKey(Store, on_delete=models.CASCADE, related_name="fixed_assets")
+    name = models.CharField(max_length=160)
+    value = models.DecimalField(max_digits=14, decimal_places=2, default=Decimal("0.00"))
+    existed_before_program = models.BooleanField(default=True)
+    created_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ["-id"]
+
+    def __str__(self):
+        return f"{self.store} - {self.name}"
+
+    def save(self, *args, **kwargs):
+        _touch_update_time(self, kwargs)
+        _touch_mobile_update_time(self, kwargs)
+        return super().save(*args, **kwargs)
+
+
 class AppUpdate(models.Model):
     PLATFORM_ANDROID = "android"
     PLATFORM_WINDOWS = "windows"

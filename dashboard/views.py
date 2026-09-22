@@ -41,7 +41,7 @@ from django.db.models import Q
 from accounts.models import Supplier
 from django.http import JsonResponse
 # Expenses
-from .models import Expense, ExpenseType, ExpenseReason
+from .models import Expense, ExpenseType, ExpenseReason, FixedAsset
 
 FIXED_EXPENSE_TYPES = ["صرفيات عمل", "صرفيات عامة"]
 # أما إذا كنت ناقله كمان لـ accounts، الغي السطر اللي فوق واستخدم هاد:
@@ -1898,6 +1898,61 @@ def expenses_list(request, store_slug):
         "selected_type_id": type_id,
         "selected_reason_id": reason_id,
         "total_amount": total_amount,
+    })
+
+
+@login_required
+def fixed_assets_list(request, store_slug):
+    store = _get_store_for_dashboard(request, store_slug)
+
+    if request.method == "POST":
+        asset_id = request.POST.get("asset_id")
+        action = request.POST.get("action", "save")
+        if action == "delete" and asset_id:
+            asset = get_object_or_404(FixedAsset, id=asset_id, store=store)
+            asset.delete()
+            messages.success(request, "تم حذف الأصل.")
+            return redirect("dashboard:fixed_assets_list", store_slug=store.slug)
+
+        name = (request.POST.get("name") or "").strip()
+        value_raw = (request.POST.get("value") or "0").replace(",", ".")
+        existed_before_program = request.POST.get("existed_before_program") == "on"
+        try:
+            value = Decimal(value_raw)
+        except Exception:
+            value = Decimal("0")
+
+        if not name:
+            messages.error(request, "اسم الأصل مطلوب.")
+        else:
+            if asset_id:
+                asset = get_object_or_404(FixedAsset, id=asset_id, store=store)
+                asset.name = name
+                asset.value = value
+                asset.existed_before_program = existed_before_program
+                asset.save()
+                messages.success(request, "تم تعديل الأصل.")
+            else:
+                FixedAsset.objects.create(
+                    store=store,
+                    name=name,
+                    value=value,
+                    existed_before_program=existed_before_program,
+                )
+                messages.success(request, "تمت إضافة الأصل.")
+            return redirect("dashboard:fixed_assets_list", store_slug=store.slug)
+
+    assets = FixedAsset.objects.filter(store=store).order_by("-id")
+    total_value = assets.aggregate(total=Sum("value"))["total"] or Decimal("0")
+    opening_value = (
+        assets.filter(existed_before_program=True).aggregate(total=Sum("value"))["total"]
+        or Decimal("0")
+    )
+    return render(request, "dashboard/fixed_assets_list.html", {
+        "store": store,
+        "assets": assets,
+        "total_value": total_value,
+        "opening_value": opening_value,
     })
 
 
