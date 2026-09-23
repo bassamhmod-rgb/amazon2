@@ -669,7 +669,9 @@ def _sync_mobile_invoice_cashback(store, order, customer):
 
 def _apply_category_change(store, payload, server_id=None):
     name = _to_str(payload.get("name")).strip()
-    image = _to_str(payload.get("image")).strip()
+    image_text = _to_str(payload.get("image")).strip()
+    image_file = _content_file_from_data_url(image_text, "category")
+    image_value = "" if image_text.startswith("data:image/") else image_text
     access_id = _to_int(payload.get("access_id"))
     if not name:
         raise ValueError("Category name is required")
@@ -683,21 +685,29 @@ def _apply_category_change(store, payload, server_id=None):
 
     if obj:
         update_fields = {"name": name, "mobile_update_time": now_minute}
-        if image or "image" in payload:
-            update_fields["image"] = image or None
+        if image_file is None and (image_value or "image" in payload):
+            update_fields["image"] = image_value or None
         if access_id is not None and obj.access_id in (None, 0, ""):
             update_fields["access_id"] = access_id
         Category.objects.filter(id=obj.id, store=store).update(**update_fields)
         obj.refresh_from_db()
+        if image_file is not None:
+            obj.image.save(image_file.name, image_file, save=True)
+            obj.mobile_update_time = now_minute
+            obj.save(update_fields=["image", "mobile_update_time"])
         return obj, "updated"
 
     obj = Category.objects.create(
         store=store,
         access_id=access_id,
         name=name,
-        image=image or None,
+        image=image_value or None,
         mobile_update_time=now_minute,
     )
+    if image_file is not None:
+        obj.image.save(image_file.name, image_file, save=True)
+        obj.mobile_update_time = now_minute
+        obj.save(update_fields=["image", "mobile_update_time"])
     return obj, "created"
 
 
