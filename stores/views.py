@@ -97,7 +97,7 @@ def store_front(request, slug):
         Product.objects
         .filter(store=store, active=True)
         .annotate(real_stock_calc=real_stock_calc, sold_qty=sold_qty)
-        .filter(real_stock_calc__gt=0)
+        .filter(Q(real_stock_calc__gt=0) | Q(allow_negative_stock_sale=True))
         .order_by("-sold_qty", "-id")
     )
 
