@@ -43,8 +43,9 @@ def merchant_products_api(request, merchant_id):
     if not store:
         return JsonResponse([], safe=False)
 
+    pending_q = Q(access_id__isnull=True) | Q(access_id=0) | Q(update_time__isnull=False)
     products = Product.objects.filter(store=store).filter(
-        Q(access_id__isnull=True) | Q(access_id=0) | Q(update_time__isnull=False)
+        pending_q
     ).values(
         "id",
         "name",
@@ -60,6 +61,16 @@ def merchant_products_api(request, merchant_id):
         category=F("category__name"),
         category_name=F("category__name"),
     )
+
+    if request.GET.get("debug") == "1":
+        all_products = Product.objects.filter(store=store)
+        hidden_by_access = all_products.exclude(pending_q).count()
+        return JsonResponse({
+            "merchant_id": merchant_id,
+            "pending_count": products.count(),
+            "hidden_by_access_count": hidden_by_access,
+            "products": list(products),
+        }, safe=False)
 
     return JsonResponse(list(products), safe=False)
 
@@ -83,12 +94,14 @@ def merchant_products_confirm_api(request):
     data = json.loads(request.body)
 
     for item in data:
-        Product.objects.filter(
-            id=int(item["product_id"])
-        ).update(
-            access_id=int(item["access_id"]),
-            update_time=None
-        )
+        try:
+            product_id = int(item["product_id"])
+            access_id = int(item["access_id"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        if product_id <= 0 or access_id <= 0:
+            continue
+        Product.objects.filter(id=product_id).update(access_id=access_id, update_time=None)
 
     return JsonResponse({"status": "ok"})
 
