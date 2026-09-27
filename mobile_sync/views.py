@@ -119,6 +119,11 @@ def _now_minute():
     return int(time.time() // 60)
 
 
+def _mark_access_update_if_linked(obj, fields, now_minute):
+    if getattr(obj, "access_id", None) not in (None, 0, ""):
+        fields["update_time"] = now_minute
+
+
 def _mobile_time(obj):
     return max(
         getattr(obj, "mobile_update_time", None) or 0,
@@ -689,6 +694,7 @@ def _apply_category_change(store, payload, server_id=None):
             update_fields["image"] = image_value or None
         if access_id is not None and obj.access_id in (None, 0, ""):
             update_fields["access_id"] = access_id
+        _mark_access_update_if_linked(obj, update_fields, now_minute)
         Category.objects.filter(id=obj.id, store=store).update(**update_fields)
         obj.refresh_from_db()
         if image_file is not None:
@@ -790,6 +796,7 @@ def _apply_product_change(store, payload, server_id=None, category_resolver=None
         if access_id := _to_int(payload.get("access_id")):
             if obj.access_id in (None, 0, ""):
                 update_fields["access_id"] = access_id
+        _mark_access_update_if_linked(obj, update_fields, now_minute)
         Product.objects.filter(id=obj.id, store=store).update(**update_fields)
         obj.refresh_from_db()
         if main_image_file is not None:
@@ -849,11 +856,13 @@ def _apply_barcode_change(store, payload, server_id=None, product_resolver=None)
         obj = ProductBarcode.objects.filter(product=product, value=value).first()
 
     if obj:
-        ProductBarcode.objects.filter(id=obj.id).update(
-            product=product,
-            value=value,
-            mobile_update_time=now_minute,
-        )
+        update_fields = {
+            "product": product,
+            "value": value,
+            "mobile_update_time": now_minute,
+        }
+        _mark_access_update_if_linked(obj, update_fields, now_minute)
+        ProductBarcode.objects.filter(id=obj.id).update(**update_fields)
         obj.refresh_from_db()
         return obj, "updated"
 
@@ -1204,7 +1213,9 @@ def _apply_expense_type_change(store, payload, server_id=None):
     if not obj:
         obj = ExpenseType.objects.filter(store=store, name=name).first()
     if obj:
-        ExpenseType.objects.filter(id=obj.id, store=store).update(name=name, mobile_update_time=now_minute)
+        update_fields = {"name": name, "mobile_update_time": now_minute}
+        _mark_access_update_if_linked(obj, update_fields, now_minute)
+        ExpenseType.objects.filter(id=obj.id, store=store).update(**update_fields)
         obj.refresh_from_db()
         return obj, "updated"
     return ExpenseType.objects.create(store=store, name=name, mobile_update_time=now_minute), "created"
@@ -1219,7 +1230,9 @@ def _apply_expense_reason_change(store, payload, server_id=None):
     if not obj:
         obj = ExpenseReason.objects.filter(store=store, name=name).first()
     if obj:
-        ExpenseReason.objects.filter(id=obj.id, store=store).update(name=name, mobile_update_time=now_minute)
+        update_fields = {"name": name, "mobile_update_time": now_minute}
+        _mark_access_update_if_linked(obj, update_fields, now_minute)
+        ExpenseReason.objects.filter(id=obj.id, store=store).update(**update_fields)
         obj.refresh_from_db()
         return obj, "updated"
     return ExpenseReason.objects.create(store=store, name=name, mobile_update_time=now_minute), "created"
@@ -1259,6 +1272,7 @@ def _apply_expense_change(store, payload, server_id=None):
     }
     obj = Expense.objects.filter(id=server_id, store=store).first() if server_id else None
     if obj:
+        _mark_access_update_if_linked(obj, update_fields, now_minute)
         Expense.objects.filter(id=obj.id, store=store).update(**update_fields)
         obj.refresh_from_db()
         return obj, "updated"
