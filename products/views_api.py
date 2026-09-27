@@ -45,28 +45,23 @@ def merchant_products_api(request, merchant_id):
 
     products = Product.objects.filter(store=store).filter(
         Q(access_id__isnull=True) | Q(access_id=0) | Q(update_time__isnull=False)
-    ).select_related("category")
+    ).values(
+        "id",
+        "name",
+        "price",
+        "description",
+        "access_id",
+        "update_time",
+        searg=F("price2"),
+        a3=F("price3"),
+        wahda2=F("unit2"),
+        motger=F("unit2_pieces"),
+        nshra=F("unit2_price"),
+        category=F("category__name"),
+        category_name=F("category__name"),
+    )
 
-    data = []
-    for product in products:
-        category_name = product.category.name if product.category else ""
-        data.append({
-            "id": product.id,
-            "name": product.name,
-            "price": product.price,
-            "description": product.description,
-            "access_id": product.access_id,
-            "update_time": product.update_time,
-            "searg": product.price2,
-            "a3": product.price3,
-            "wahda2": product.unit2,
-            "motger": product.unit2_pieces,
-            "nshra": product.unit2_price,
-            "category": category_name,
-            "category_name": category_name,
-        })
-
-    return JsonResponse(data, safe=False)
+    return JsonResponse(list(products), safe=False)
 
 @csrf_exempt
 def merchant_categories_confirm_api(request):
