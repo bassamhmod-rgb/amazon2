@@ -119,11 +119,6 @@ def _now_minute():
     return int(time.time() // 60)
 
 
-def _mark_access_update_if_linked(obj, fields, now_minute):
-    if getattr(obj, "access_id", None) not in (None, 0, ""):
-        fields["update_time"] = now_minute
-
-
 def _mobile_time(obj):
     return max(
         getattr(obj, "mobile_update_time", None) or 0,
@@ -694,7 +689,6 @@ def _apply_category_change(store, payload, server_id=None):
             update_fields["image"] = image_value or None
         if access_id is not None and obj.access_id in (None, 0, ""):
             update_fields["access_id"] = access_id
-        _mark_access_update_if_linked(obj, update_fields, now_minute)
         Category.objects.filter(id=obj.id, store=store).update(**update_fields)
         obj.refresh_from_db()
         if image_file is not None:
@@ -796,7 +790,6 @@ def _apply_product_change(store, payload, server_id=None, category_resolver=None
         if access_id := _to_int(payload.get("access_id")):
             if obj.access_id in (None, 0, ""):
                 update_fields["access_id"] = access_id
-        _mark_access_update_if_linked(obj, update_fields, now_minute)
         Product.objects.filter(id=obj.id, store=store).update(**update_fields)
         obj.refresh_from_db()
         if main_image_file is not None:
@@ -856,13 +849,11 @@ def _apply_barcode_change(store, payload, server_id=None, product_resolver=None)
         obj = ProductBarcode.objects.filter(product=product, value=value).first()
 
     if obj:
-        update_fields = {
-            "product": product,
-            "value": value,
-            "mobile_update_time": now_minute,
-        }
-        _mark_access_update_if_linked(obj, update_fields, now_minute)
-        ProductBarcode.objects.filter(id=obj.id).update(**update_fields)
+        ProductBarcode.objects.filter(id=obj.id).update(
+            product=product,
+            value=value,
+            mobile_update_time=now_minute,
+        )
         obj.refresh_from_db()
         return obj, "updated"
 
@@ -1089,15 +1080,10 @@ def _apply_warehouse_transfer_change(store, payload, server_id=None, product_res
     items = payload.get("items", [])
     if not isinstance(items, list):
         items = []
-    existing_items_by_id = {
-        item.id: item
-        for item in obj.items.select_related("product")
-    }
-    kept_item_ids = set()
+    obj.items.all().delete()
     for item_payload in items:
         if not isinstance(item_payload, dict):
             continue
-        server_item_id = _to_int(item_payload.get("server_item_id"))
         product = None
         if product_resolver:
             product = product_resolver(
@@ -1107,25 +1093,16 @@ def _apply_warehouse_transfer_change(store, payload, server_id=None, product_res
             )
         if not product:
             raise ValueError("Transfer item product is required")
-        transfer_item = None
-        if server_item_id is not None:
-            transfer_item = existing_items_by_id.get(server_item_id)
-        if transfer_item is None:
-            transfer_item = WarehouseTransferItem(transfer=obj, store=store)
-
-        transfer_item.product = product
-        transfer_item.quantity = Decimal(str(_to_float(item_payload.get("quantity"), 0.0)))
-        transfer_item.unit_name = _to_str(item_payload.get("unit_name")).strip()
-        transfer_item.unit_factor = Decimal(str(_to_float(item_payload.get("unit_factor"), 1.0) or 1.0))
-        transfer_item.notes = _to_str(item_payload.get("notes")).strip()
-        transfer_item.mobile_update_time = now_minute
-        transfer_item.save()
-        kept_item_ids.add(transfer_item.id)
-
-    stale_items_qs = obj.items.exclude(id__in=kept_item_ids)
-    for stale_item in stale_items_qs:
-        stale_item._skip_mobile_delete_sync = True
-        stale_item.delete()
+        WarehouseTransferItem.objects.create(
+            transfer=obj,
+            store=store,
+            product=product,
+            quantity=Decimal(str(_to_float(item_payload.get("quantity"), 0.0))),
+            unit_name=_to_str(item_payload.get("unit_name")).strip(),
+            unit_factor=Decimal(str(_to_float(item_payload.get("unit_factor"), 1.0) or 1.0)),
+            notes=_to_str(item_payload.get("notes")).strip(),
+            mobile_update_time=now_minute,
+        )
     return obj, action
 
 
@@ -1213,9 +1190,7 @@ def _apply_expense_type_change(store, payload, server_id=None):
     if not obj:
         obj = ExpenseType.objects.filter(store=store, name=name).first()
     if obj:
-        update_fields = {"name": name, "mobile_update_time": now_minute}
-        _mark_access_update_if_linked(obj, update_fields, now_minute)
-        ExpenseType.objects.filter(id=obj.id, store=store).update(**update_fields)
+        ExpenseType.objects.filter(id=obj.id, store=store).update(name=name, mobile_update_time=now_minute)
         obj.refresh_from_db()
         return obj, "updated"
     return ExpenseType.objects.create(store=store, name=name, mobile_update_time=now_minute), "created"
@@ -1230,9 +1205,7 @@ def _apply_expense_reason_change(store, payload, server_id=None):
     if not obj:
         obj = ExpenseReason.objects.filter(store=store, name=name).first()
     if obj:
-        update_fields = {"name": name, "mobile_update_time": now_minute}
-        _mark_access_update_if_linked(obj, update_fields, now_minute)
-        ExpenseReason.objects.filter(id=obj.id, store=store).update(**update_fields)
+        ExpenseReason.objects.filter(id=obj.id, store=store).update(name=name, mobile_update_time=now_minute)
         obj.refresh_from_db()
         return obj, "updated"
     return ExpenseReason.objects.create(store=store, name=name, mobile_update_time=now_minute), "created"
@@ -1272,7 +1245,6 @@ def _apply_expense_change(store, payload, server_id=None):
     }
     obj = Expense.objects.filter(id=server_id, store=store).first() if server_id else None
     if obj:
-        _mark_access_update_if_linked(obj, update_fields, now_minute)
         Expense.objects.filter(id=obj.id, store=store).update(**update_fields)
         obj.refresh_from_db()
         return obj, "updated"
@@ -2913,14 +2885,9 @@ def orders_push(request):
                 order._skip_update_time_touch = True
                 order.save()
 
-                existing_items_by_id = {
-                    item.id: item
-                    for item in order.items.select_related("product", "warehouse")
-                }
-                kept_item_ids = set()
+                order.items.all().delete()
                 created_items = []
                 for item_payload, product in prepared_items:
-                    server_item_id = _to_int(item_payload.get("server_item_id"))
                     quantity = _to_float(item_payload.get("quantity"), 1.0)
                     price = _to_float(item_payload.get("price"), 0.0)
                     direction = _to_int(item_payload.get("direction"), -1)
@@ -2931,34 +2898,25 @@ def orders_push(request):
                         buy_price = price
                     item_note = _to_str(item_payload.get("item_note"), "") or None
 
-                    order_item = None
-                    if server_item_id is not None:
-                        order_item = existing_items_by_id.get(server_item_id)
-                    if order_item is None:
-                        order_item = OrderItem(order=order, access_id=None)
-
-                    order_item.product = product
-                    order_item.quantity = Decimal(str(quantity))
-                    order_item.price = Decimal(str(price))
-                    order_item.direction = direction if direction is not None else -1
-                    order_item.buy_price = None if buy_price in (None, "") else Decimal(str(_to_float(buy_price)))
-                    order_item.warehouse = warehouse
-                    order_item.item_note = item_note
+                    order_item = OrderItem(
+                        order=order,
+                        product=product,
+                        quantity=Decimal(str(quantity)),
+                        price=Decimal(str(price)),
+                        direction=direction if direction is not None else -1,
+                        buy_price=None if buy_price in (None, "") else Decimal(str(_to_float(buy_price))),
+                        warehouse=warehouse,
+                        access_id=None,
+                    )
                     order_item.mobile_update_time = order.mobile_update_time
                     order_item._skip_update_time_touch = True
                     order_item.save()
-                    kept_item_ids.add(order_item.id)
 
                     created_items.append({
                         "local_item_id": _to_int(item_payload.get("local_item_id")),
                         "server_item_id": order_item.id,
                         "server_update_time": _mobile_time(order_item),
                     })
-
-                stale_items_qs = order.items.exclude(id__in=kept_item_ids)
-                for stale_item in stale_items_qs:
-                    stale_item._skip_mobile_delete_sync = True
-                    stale_item.delete()
 
                 cashback_entry = _sync_mobile_invoice_cashback(store, order, customer)
 

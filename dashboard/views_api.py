@@ -70,14 +70,12 @@ def merchant_expenses_confirm_api(request):
     try:
         data = json.loads(request.body)
         for item in data:
-            try:
-                expense_id = int(item["expense_id"])
-                access_id = int(item["access_id"])
-            except (KeyError, TypeError, ValueError):
-                continue
-            if expense_id <= 0 or access_id <= 0:
-                continue
-            Expense.objects.filter(id=expense_id).update(access_id=access_id, update_time=None)
+            Expense.objects.filter(
+                id=int(item["expense_id"])
+            ).update(
+                access_id=int(item["access_id"]),
+                update_time=None
+            )
 
         return JsonResponse({"status": "ok"})
     except Exception as e:
