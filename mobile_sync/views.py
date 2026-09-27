@@ -1080,10 +1080,15 @@ def _apply_warehouse_transfer_change(store, payload, server_id=None, product_res
     items = payload.get("items", [])
     if not isinstance(items, list):
         items = []
-    obj.items.all().delete()
+    existing_items_by_id = {
+        item.id: item
+        for item in obj.items.select_related("product")
+    }
+    kept_item_ids = set()
     for item_payload in items:
         if not isinstance(item_payload, dict):
             continue
+        server_item_id = _to_int(item_payload.get("server_item_id"))
         product = None
         if product_resolver:
             product = product_resolver(
@@ -1093,16 +1098,25 @@ def _apply_warehouse_transfer_change(store, payload, server_id=None, product_res
             )
         if not product:
             raise ValueError("Transfer item product is required")
-        WarehouseTransferItem.objects.create(
-            transfer=obj,
-            store=store,
-            product=product,
-            quantity=Decimal(str(_to_float(item_payload.get("quantity"), 0.0))),
-            unit_name=_to_str(item_payload.get("unit_name")).strip(),
-            unit_factor=Decimal(str(_to_float(item_payload.get("unit_factor"), 1.0) or 1.0)),
-            notes=_to_str(item_payload.get("notes")).strip(),
-            mobile_update_time=now_minute,
-        )
+        transfer_item = None
+        if server_item_id is not None:
+            transfer_item = existing_items_by_id.get(server_item_id)
+        if transfer_item is None:
+            transfer_item = WarehouseTransferItem(transfer=obj, store=store)
+
+        transfer_item.product = product
+        transfer_item.quantity = Decimal(str(_to_float(item_payload.get("quantity"), 0.0)))
+        transfer_item.unit_name = _to_str(item_payload.get("unit_name")).strip()
+        transfer_item.unit_factor = Decimal(str(_to_float(item_payload.get("unit_factor"), 1.0) or 1.0))
+        transfer_item.notes = _to_str(item_payload.get("notes")).strip()
+        transfer_item.mobile_update_time = now_minute
+        transfer_item.save()
+        kept_item_ids.add(transfer_item.id)
+
+    stale_items_qs = obj.items.exclude(id__in=kept_item_ids)
+    for stale_item in stale_items_qs:
+        stale_item._skip_mobile_delete_sync = True
+        stale_item.delete()
     return obj, action
 
 
@@ -2885,9 +2899,14 @@ def orders_push(request):
                 order._skip_update_time_touch = True
                 order.save()
 
-                order.items.all().delete()
+                existing_items_by_id = {
+                    item.id: item
+                    for item in order.items.select_related("product", "warehouse")
+                }
+                kept_item_ids = set()
                 created_items = []
                 for item_payload, product in prepared_items:
+                    server_item_id = _to_int(item_payload.get("server_item_id"))
                     quantity = _to_float(item_payload.get("quantity"), 1.0)
                     price = _to_float(item_payload.get("price"), 0.0)
                     direction = _to_int(item_payload.get("direction"), -1)
@@ -2898,25 +2917,34 @@ def orders_push(request):
                         buy_price = price
                     item_note = _to_str(item_payload.get("item_note"), "") or None
 
-                    order_item = OrderItem(
-                        order=order,
-                        product=product,
-                        quantity=Decimal(str(quantity)),
-                        price=Decimal(str(price)),
-                        direction=direction if direction is not None else -1,
-                        buy_price=None if buy_price in (None, "") else Decimal(str(_to_float(buy_price))),
-                        warehouse=warehouse,
-                        access_id=None,
-                    )
+                    order_item = None
+                    if server_item_id is not None:
+                        order_item = existing_items_by_id.get(server_item_id)
+                    if order_item is None:
+                        order_item = OrderItem(order=order, access_id=None)
+
+                    order_item.product = product
+                    order_item.quantity = Decimal(str(quantity))
+                    order_item.price = Decimal(str(price))
+                    order_item.direction = direction if direction is not None else -1
+                    order_item.buy_price = None if buy_price in (None, "") else Decimal(str(_to_float(buy_price)))
+                    order_item.warehouse = warehouse
+                    order_item.item_note = item_note
                     order_item.mobile_update_time = order.mobile_update_time
                     order_item._skip_update_time_touch = True
                     order_item.save()
+                    kept_item_ids.add(order_item.id)
 
                     created_items.append({
                         "local_item_id": _to_int(item_payload.get("local_item_id")),
                         "server_item_id": order_item.id,
                         "server_update_time": _mobile_time(order_item),
                     })
+
+                stale_items_qs = order.items.exclude(id__in=kept_item_ids)
+                for stale_item in stale_items_qs:
+                    stale_item._skip_mobile_delete_sync = True
+                    stale_item.delete()
 
                 cashback_entry = _sync_mobile_invoice_cashback(store, order, customer)
 
