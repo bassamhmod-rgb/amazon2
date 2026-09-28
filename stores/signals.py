@@ -36,5 +36,8 @@ def create_owner_store_user_for_store(sender, instance, created, **kwargs):
 
 @receiver(pre_delete, sender=Warehouse)
 def prevent_main_warehouse_delete(sender, instance, **kwargs):
-    if instance.is_main:
+    origin = kwargs.get("origin")
+    origin_model = getattr(origin, "model", None)
+    deleting_store = isinstance(origin, Store) or origin_model is Store
+    if instance.is_main and not deleting_store:
         raise ValidationError("لا يمكن حذف المستودع الرئيسي.")

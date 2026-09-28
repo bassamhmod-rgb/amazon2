@@ -31,6 +31,7 @@ from stores.models import Store
 from stores.models import TrialDevice
 from stores.models import (
     InventoryAdjustment,
+    StockMovement,
     Warehouse,
     WarehouseTransfer,
     WarehouseTransferItem,
@@ -401,6 +402,25 @@ def _serialize_inventory_adjustment(adjustment):
         "created_by_store_user_id": adjustment.created_by_store_user_id,
         "access_id": adjustment.access_id,
         "update_time": _mobile_time(adjustment),
+    }
+
+
+def _serialize_stock_movement(movement):
+    return {
+        "id": movement.id,
+        "store_id": movement.store_id,
+        "product_id": movement.product_id,
+        "warehouse_id": movement.warehouse_id,
+        "movement_type": movement.movement_type,
+        "quantity_change": float(movement.quantity_change or 0),
+        "unit_cost": float(movement.unit_cost or 0),
+        "reference_type": movement.reference_type or "",
+        "reference_id": movement.reference_id or "",
+        "notes": movement.notes or "",
+        "occurred_at": movement.occurred_at.isoformat() if movement.occurred_at else "",
+        "created_by_store_user_id": movement.created_by_store_user_id,
+        "access_id": movement.access_id,
+        "update_time": _mobile_time(movement),
     }
 
 
@@ -1178,6 +1198,88 @@ def _apply_inventory_adjustment_change(
         obj.refresh_from_db()
         return obj, "updated"
     obj = InventoryAdjustment.objects.create(store=store, **fields)
+    return obj, "created"
+
+
+def _apply_stock_movement_change(store, payload, server_id=None, product_resolver=None):
+    qty_quant = Decimal("0.001")
+    money_quant = Decimal("0.01")
+    product = None
+    if product_resolver:
+        product = product_resolver(
+            product_id=payload.get("product_id"),
+            product_server_id=payload.get("product_server_id"),
+            product_local_id=payload.get("product_local_id"),
+            product_access_id=payload.get("product_access_id"),
+        )
+    if not product:
+        product_id = _to_int(payload.get("product_id"))
+        product = Product.objects.filter(id=product_id, store=store).first() if product_id else None
+    if not product:
+        raise ValueError("Stock movement product is required")
+
+    warehouse = None
+    warehouse_id = _to_int(payload.get("warehouse_id"))
+    if warehouse_id:
+        warehouse = Warehouse.objects.filter(id=warehouse_id, store=store).first()
+
+    movement_type = _to_str(payload.get("movement_type")).strip() or "manual"
+    valid_types = {choice[0] for choice in StockMovement.MOVEMENT_TYPES}
+    if movement_type not in valid_types:
+        movement_type = "manual"
+
+    quantity_change = Decimal(str(_to_float(payload.get("quantity_change"), 0.0))).quantize(
+        qty_quant, rounding=ROUND_HALF_UP
+    )
+    if quantity_change == 0:
+        raise ValueError("Stock movement quantity_change must not be zero")
+
+    unit_cost = Decimal(str(_to_float(payload.get("unit_cost"), 0.0))).quantize(
+        money_quant, rounding=ROUND_HALF_UP
+    )
+    occurred_at = parse_datetime(str(payload.get("occurred_at") or ""))
+    if occurred_at is None:
+        occurred_at = timezone.now()
+
+    created_by_store_user = None
+    created_by_store_user_id = _to_int(payload.get("created_by_store_user_id"))
+    if created_by_store_user_id:
+        created_by_store_user = StoreUser.objects.filter(
+            id=created_by_store_user_id,
+            store=store,
+        ).first()
+
+    now_minute = _now_minute()
+    obj = StockMovement.objects.filter(id=server_id, store=store).first() if server_id else None
+    reference_type = _to_str(payload.get("reference_type")).strip()
+    reference_id = _to_str(payload.get("reference_id")).strip()
+    if not obj and reference_type and reference_id:
+        obj = StockMovement.objects.filter(
+            store=store,
+            reference_type=reference_type,
+            reference_id=reference_id,
+            product=product,
+            movement_type=movement_type,
+        ).first()
+
+    fields = {
+        "product": product,
+        "warehouse": warehouse,
+        "movement_type": movement_type,
+        "quantity_change": quantity_change,
+        "unit_cost": unit_cost,
+        "reference_type": reference_type,
+        "reference_id": reference_id,
+        "notes": _to_str(payload.get("notes")).strip(),
+        "occurred_at": occurred_at,
+        "created_by_store_user": created_by_store_user,
+        "mobile_update_time": now_minute,
+    }
+    if obj:
+        StockMovement.objects.filter(id=obj.id, store=store).update(**fields)
+        obj.refresh_from_db()
+        return obj, "updated"
+    obj = StockMovement.objects.create(store=store, **fields)
     return obj, "created"
 
 
@@ -1964,6 +2066,50 @@ def inventory_adjustments_pull(request):
     )
 
 
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def stock_movements_pull(request):
+    merchant_id = request.query_params.get("merchant_id")
+    since = request.query_params.get("since")
+
+    if not merchant_id:
+        return Response({"detail": "merchant_id is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        merchant_id_int = int(merchant_id)
+    except (TypeError, ValueError):
+        return Response({"detail": "merchant_id must be an integer"}, status=status.HTTP_400_BAD_REQUEST)
+
+    store = Store.objects.filter(id=merchant_id_int).first()
+    if not store:
+        return Response({"detail": "Store not found"}, status=status.HTTP_404_NOT_FOUND)
+    _, device_error = _ensure_store_user_sync_device(request, merchant_id_int)
+    if device_error:
+        return device_error
+
+    qs = (
+        StockMovement.objects.filter(store_id=merchant_id_int)
+        .select_related("product", "warehouse", "created_by_store_user")
+        .order_by("-occurred_at", "-id")
+    )
+    if since not in (None, "", "0"):
+        try:
+            since_int = int(since)
+        except (TypeError, ValueError):
+            return Response({"detail": "since must be an integer"}, status=status.HTTP_400_BAD_REQUEST)
+        qs = qs.filter(_mobile_since_q(since_int))
+
+    data = [_serialize_stock_movement(movement) for movement in qs]
+
+    return Response(
+        {
+            "merchant_id": merchant_id_int,
+            "items": data,
+            "max_update_time": max((x["update_time"] for x in data), default=0),
+        }
+    )
+
+
 @api_view(["POST"])
 @permission_classes([AllowAny])
 def store_user_login(request):
@@ -2254,6 +2400,7 @@ def sync_push(request):
             "fixed_asset": 2,
             "warehouse_transfer": 3,
             "inventory_adjustment": 4,
+            "stock_movement": 4,
         }.get(str(item.get("entity")), 99)
 
     upserts.sort(key=entity_priority)
@@ -2423,6 +2570,20 @@ def sync_push(request):
                         "server_id": obj.id,
                         "update_time": obj.update_time or 0,
                     })
+                elif entity == "stock_movement":
+                    obj, action = _apply_stock_movement_change(
+                        store,
+                        payload_item,
+                        server_id=_to_int(server_id),
+                        product_resolver=resolve_product,
+                    )
+                    applied.append({
+                        "entity": "stock_movement",
+                        "action": action,
+                        "local_id": local_id,
+                        "server_id": obj.id,
+                        "update_time": _mobile_time(obj),
+                    })
                 elif entity == "expense":
                     obj, action = _apply_expense_change(
                         store,
@@ -2566,6 +2727,17 @@ def sync_push(request):
                         obj.delete()
                         applied.append({
                             "entity": "inventory_adjustment",
+                            "action": "deleted",
+                            "local_id": local_id,
+                            "server_id": server_id,
+                        })
+                elif entity == "stock_movement":
+                    obj = StockMovement.objects.filter(id=server_id, store_id=merchant_id).first()
+                    if obj:
+                        obj._skip_mobile_delete_sync = True
+                        obj.delete()
+                        applied.append({
+                            "entity": "stock_movement",
                             "action": "deleted",
                             "local_id": local_id,
                             "server_id": server_id,

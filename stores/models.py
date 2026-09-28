@@ -429,6 +429,70 @@ class InventoryAdjustment(models.Model):
 
     def __str__(self):
         return f"{self.store} - {self.product} - {self.difference_quantity}"
+
+
+class StockMovement(models.Model):
+    MOVEMENT_TYPES = [
+        ("production_consumption", "Production consumption"),
+        ("production_output", "Production output"),
+        ("manual", "Manual"),
+    ]
+
+    store = models.ForeignKey(Store, on_delete=models.CASCADE, related_name="stock_movements")
+    update_time = models.BigIntegerField(blank=True, null=True)
+    mobile_update_time = models.BigIntegerField(blank=True, null=True)
+    access_id = models.BigIntegerField(blank=True, null=True)
+    product = models.ForeignKey("products.Product", on_delete=models.PROTECT, related_name="stock_movements")
+    warehouse = models.ForeignKey(
+        Warehouse,
+        on_delete=models.PROTECT,
+        related_name="stock_movements",
+        blank=True,
+        null=True,
+    )
+    movement_type = models.CharField(max_length=40, choices=MOVEMENT_TYPES)
+    quantity_change = models.DecimalField(max_digits=12, decimal_places=3)
+    unit_cost = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    reference_type = models.CharField(max_length=80, blank=True, default="")
+    reference_id = models.CharField(max_length=120, blank=True, default="")
+    notes = models.TextField(blank=True, null=True)
+    occurred_at = models.DateTimeField(default=timezone.now)
+    created_by_store_user = models.ForeignKey(
+        "accounts.StoreUser",
+        on_delete=models.SET_NULL,
+        related_name="stock_movements",
+        blank=True,
+        null=True,
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-occurred_at", "-id"]
+        indexes = [
+            models.Index(fields=["store", "product", "warehouse"]),
+            models.Index(fields=["reference_type", "reference_id"]),
+        ]
+
+    def clean(self):
+        if self.product_id and self.store_id and self.product.store_id != self.store_id:
+            raise ValidationError("المنتج يجب أن يتبع نفس المتجر.")
+        if self.warehouse_id and self.store_id and self.warehouse.store_id != self.store_id:
+            raise ValidationError("المستودع يجب أن يتبع نفس المتجر.")
+        if self.quantity_change == 0:
+            raise ValidationError({"quantity_change": "كمية الحركة يجب ألا تكون صفراً."})
+
+    def save(self, *args, **kwargs):
+        _touch_update_time(self, kwargs)
+        _touch_mobile_update_time(self, kwargs)
+        qty_quant = Decimal("0.001")
+        money_quant = Decimal("0.01")
+        self.quantity_change = Decimal(self.quantity_change).quantize(qty_quant, rounding=ROUND_HALF_UP)
+        self.unit_cost = Decimal(self.unit_cost or 0).quantize(money_quant, rounding=ROUND_HALF_UP)
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.store} - {self.product} - {self.quantity_change}"
 #طرق الدفع
 class StorePaymentMethod(models.Model):
     update_time = models.BigIntegerField(blank=True, null=True)

@@ -6,9 +6,9 @@ from django.db.models import Sum, F, Value, DecimalField, ExpressionWrapper, Cas
 from django.db.models.functions import Coalesce, Cast
 from accounts.models import PointsTransaction
 from products.models import Category
-from django.db.models import Q, Exists, OuterRef
+from django.db.models import Q, Exists, OuterRef, Subquery
 from django.contrib.auth.decorators import login_required
-from stores.models import Store, StorePaymentMethod
+from stores.models import Store, StorePaymentMethod, StockMovement
 from cart.models import Cart
 from django.http import JsonResponse
 from django.http import HttpResponse
@@ -71,6 +71,19 @@ def store_front(request, slug):
         cart_count = cart.items.count()
 
     # ============ 🔥 المنتجات ============
+    stock_movements_qs = (
+        StockMovement.objects
+        .filter(product=OuterRef("pk"), store=store)
+        .values("product")
+        .annotate(
+            total_quantity=Coalesce(
+                Sum("quantity_change"),
+                Value(0, output_field=DecimalField(max_digits=12, decimal_places=2)),
+                output_field=DecimalField(max_digits=12, decimal_places=2),
+            )
+        )
+        .values("total_quantity")[:1]
+    )
     movement_expr = ExpressionWrapper(
         F("order_items__quantity") * Cast(F("order_items__direction"), DecimalField(max_digits=12, decimal_places=2)),
         output_field=DecimalField(max_digits=12, decimal_places=2)
@@ -81,7 +94,13 @@ def store_front(request, slug):
         output_field=DecimalField(max_digits=12, decimal_places=2)
     )
     real_stock_calc = ExpressionWrapper(
-        Cast(F("stock"), DecimalField(max_digits=12, decimal_places=2)) + movements,
+        Cast(F("stock"), DecimalField(max_digits=12, decimal_places=2))
+        + movements
+        + Coalesce(
+            Subquery(stock_movements_qs, output_field=DecimalField(max_digits=12, decimal_places=2)),
+            Value(0, output_field=DecimalField(max_digits=12, decimal_places=2)),
+            output_field=DecimalField(max_digits=12, decimal_places=2),
+        ),
         output_field=DecimalField(max_digits=12, decimal_places=2)
     )
     sold_qty = Coalesce(

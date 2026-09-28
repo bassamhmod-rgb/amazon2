@@ -6,7 +6,7 @@ from accounts.models import Customer, StoreUser
 from dashboard.models import Expense, ExpenseReason, ExpenseType, FixedAsset
 from orders.models import Order
 from products.models import Category, Product, ProductBarcode
-from stores.models import InventoryAdjustment, Store
+from stores.models import InventoryAdjustment, StockMovement, Store
 
 
 def _resolve_merchant_id(instance):
@@ -76,6 +76,11 @@ def log_product_barcode_delete(sender, instance, **kwargs):
 @receiver(pre_delete, sender=InventoryAdjustment)
 def log_inventory_adjustment_delete(sender, instance, **kwargs):
     _log_mobile_delete(instance, instance.access_id, "inventory_adjustments")
+
+
+@receiver(pre_delete, sender=StockMovement)
+def log_stock_movement_delete(sender, instance, **kwargs):
+    _log_mobile_delete(instance, instance.access_id, "stock_movements")
 
 
 @receiver(pre_delete, sender=Expense)

@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Store, TrialDevice, Warehouse, WarehouseTransfer, WarehouseTransferItem
+from .models import Store, TrialDevice, Warehouse, WarehouseTransfer, WarehouseTransferItem, StockMovement
 
 @admin.register(Store)
 class StoreAdmin(admin.ModelAdmin):
@@ -100,4 +100,11 @@ class WarehouseTransferAdmin(admin.ModelAdmin):
 class TrialDeviceAdmin(admin.ModelAdmin):
     list_display = ("device_id", "created_at")
     search_fields = ("device_id",)
+
+
+@admin.register(StockMovement)
+class StockMovementAdmin(admin.ModelAdmin):
+    list_display = ("id", "store", "product", "warehouse", "movement_type", "quantity_change", "occurred_at")
+    list_filter = ("store", "movement_type", "warehouse")
+    search_fields = ("product__name", "reference_type", "reference_id", "notes")
 

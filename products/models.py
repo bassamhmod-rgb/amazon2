@@ -132,7 +132,10 @@ class Product(models.Model):
         movements = self.order_items.aggregate(
             total=Sum(F("quantity") * F("direction"))
         )["total"] or 0
-        return self.stock + movements
+        stock_movements = self.stock_movements.aggregate(
+            total=Sum("quantity_change")
+        )["total"] or 0
+        return self.stock + movements + stock_movements
 
     # ⭐ حساب متوسط سعر الشراء (آمن 100%)
     def get_avg_buy_price(self):

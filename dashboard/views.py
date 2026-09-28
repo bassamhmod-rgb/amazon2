@@ -23,7 +23,7 @@ from products.utils import fix_missing_buy_price_for_product, apply_purchase_pri
 # --- استيراد المودلز من التطبيقات المختلفة ---
 from products.models import Category, Product
 from products.forms import CategoryForm, ProductForm
-from stores.models import Store, StorePaymentMethod, Warehouse, WarehouseTransfer, WarehouseTransferItem, InventoryAdjustment
+from stores.models import Store, StorePaymentMethod, Warehouse, WarehouseTransfer, WarehouseTransferItem, InventoryAdjustment, StockMovement
 from stores.forms import WarehouseForm
 from orders.models import Order, OrderItem
 from accounts.models import PointsTransaction, AccountingClient, SystemNotification, DeleteSync, StoreUser
@@ -73,6 +73,7 @@ def _store_reset_delete_logging_disabled():
         (mobile_signals.log_order_delete, Order),
         (mobile_signals.log_product_barcode_delete, ProductBarcode),
         (mobile_signals.log_inventory_adjustment_delete, InventoryAdjustment),
+        (mobile_signals.log_stock_movement_delete, StockMovement),
         (mobile_signals.log_expense_delete, Expense),
         (mobile_signals.log_expense_type_delete, ExpenseType),
         (mobile_signals.log_expense_reason_delete, ExpenseReason),
@@ -104,6 +105,7 @@ def _delete_reset_sync_rows(store, main_warehouse_id):
         "stores.WarehouseTransfer": WarehouseTransfer.objects.filter(store=store).values("id"),
         "stores.WarehouseTransferItem": WarehouseTransferItem.objects.filter(store=store).values("id"),
         "stores.InventoryAdjustment": InventoryAdjustment.objects.filter(store=store).values("id"),
+        "stores.StockMovement": StockMovement.objects.filter(store=store).values("id"),
         "accounts.StoreUser": StoreUser.objects.filter(store=store).values("id"),
     }
 
@@ -536,6 +538,19 @@ def dashboard_home(request, store_slug):
 @login_required
 def products_list(request, store_slug):
     store = _get_store_for_dashboard(request, store_slug)
+    stock_movements_qs = (
+        StockMovement.objects
+        .filter(product=OuterRef("pk"), store=store)
+        .values("product")
+        .annotate(
+            total_quantity=Coalesce(
+                Sum("quantity_change"),
+                Value(0, output_field=DecimalField(max_digits=12, decimal_places=2)),
+                output_field=DecimalField(max_digits=12, decimal_places=2),
+            )
+        )
+        .values("total_quantity")[:1]
+    )
     movement_expr = ExpressionWrapper(
         F("order_items__quantity") * Cast(F("order_items__direction"), DecimalField(max_digits=12, decimal_places=2)),
         output_field=DecimalField(max_digits=12, decimal_places=2)
@@ -546,7 +561,13 @@ def products_list(request, store_slug):
         output_field=DecimalField(max_digits=12, decimal_places=2)
     )
     real_stock_calc = ExpressionWrapper(
-        Cast(F("stock"), DecimalField(max_digits=12, decimal_places=2)) + movements,
+        Cast(F("stock"), DecimalField(max_digits=12, decimal_places=2))
+        + movements
+        + Coalesce(
+            Subquery(stock_movements_qs, output_field=DecimalField(max_digits=12, decimal_places=2)),
+            Value(0, output_field=DecimalField(max_digits=12, decimal_places=2)),
+            output_field=DecimalField(max_digits=12, decimal_places=2),
+        ),
         output_field=DecimalField(max_digits=12, decimal_places=2)
     )
     sold_qty = Coalesce(
@@ -2709,6 +2730,7 @@ def reset_access_export_flags(request, store_slug):
         WarehouseTransfer.objects.filter(store=store),
         WarehouseTransferItem.objects.filter(store=store),
         InventoryAdjustment.objects.filter(store=store),
+        StockMovement.objects.filter(store=store),
         StorePaymentMethod.objects.filter(store=store),
         Cart.objects.filter(store=store),
         CartItem.objects.filter(cart__store=store),
@@ -2756,6 +2778,7 @@ def _perform_store_reset(request, store):
         _delete_reset_sync_rows(store, main_warehouse_id)
 
         with _store_reset_delete_logging_disabled():
+            StockMovement.objects.filter(store=store).delete()
             InventoryAdjustment.objects.filter(store=store).delete()
             WarehouseTransferItem.objects.filter(store=store).delete()
             WarehouseTransfer.objects.filter(store=store).delete()
@@ -2890,6 +2913,19 @@ def balances_report(request, store_slug):
 @login_required
 def profits_report(request, store_slug):
     store = _get_store_for_dashboard(request, store_slug)
+    stock_movements_qs = (
+        StockMovement.objects
+        .filter(product=OuterRef("pk"), store=store)
+        .values("product")
+        .annotate(
+            total_quantity=Coalesce(
+                Sum("quantity_change"),
+                Value(0, output_field=DecimalField(max_digits=14, decimal_places=2)),
+                output_field=DecimalField(max_digits=14, decimal_places=2),
+            )
+        )
+        .values("total_quantity")[:1]
+    )
 
     negative_stock_count = (
         Product.objects
@@ -2907,7 +2943,13 @@ def profits_report(request, store_slug):
         )
         .annotate(
             real_stock=ExpressionWrapper(
-                F("stock") + F("movements"),
+                F("stock")
+                + F("movements")
+                + Coalesce(
+                    Subquery(stock_movements_qs, output_field=DecimalField(max_digits=14, decimal_places=2)),
+                    Value(0, output_field=DecimalField(max_digits=14, decimal_places=2)),
+                    output_field=DecimalField(max_digits=14, decimal_places=2),
+                ),
                 output_field=DecimalField(max_digits=14, decimal_places=2),
             )
         )
@@ -3246,6 +3288,19 @@ def inventory_list(request, store_slug):
         )
         .values("total_difference")[:1]
     )
+    stock_movements_qs = (
+        StockMovement.objects
+        .filter(product=OuterRef("pk"), store=store)
+        .values("product")
+        .annotate(
+            total_quantity=Coalesce(
+                Sum("quantity_change"),
+                Value(0, output_field=DecimalField(max_digits=10, decimal_places=2)),
+                output_field=DecimalField(max_digits=10, decimal_places=2),
+            )
+        )
+        .values("total_quantity")[:1]
+    )
 
     base_qs = Product.objects.filter(store=store)
 
@@ -3295,6 +3350,14 @@ def inventory_list(request, store_slug):
             + Coalesce(
                 Subquery(
                     inventory_adjustments_qs,
+                    output_field=DecimalField(max_digits=10, decimal_places=2),
+                ),
+                Value(0, output_field=DecimalField(max_digits=10, decimal_places=2)),
+                output_field=DecimalField(max_digits=10, decimal_places=2),
+            )
+            + Coalesce(
+                Subquery(
+                    stock_movements_qs,
                     output_field=DecimalField(max_digits=10, decimal_places=2),
                 ),
                 Value(0, output_field=DecimalField(max_digits=10, decimal_places=2)),
