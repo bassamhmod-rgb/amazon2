@@ -2615,6 +2615,35 @@ def sync_push(request):
                 entity = str(item.get("entity", "")).lower()
                 server_id = _to_int(item.get("server_id"))
                 local_id = item.get("local_id")
+                payload_item = item.get("payload") or {}
+                if entity == "production_stock_movement_delete":
+                    reference_type = _to_str(payload_item.get("reference_type")).strip()
+                    reference_id = _to_str(payload_item.get("reference_id")).strip()
+                    if reference_type and reference_id:
+                        qs = StockMovement.objects.filter(
+                            store_id=merchant_id,
+                            reference_type=reference_type,
+                            reference_id=reference_id,
+                        )
+                        deleted_count = qs.count()
+                        for obj in qs:
+                            obj._skip_mobile_delete_sync = True
+                            obj.delete()
+                        applied.append({
+                            "entity": "production_stock_movement_delete",
+                            "action": "deleted_reference",
+                            "local_id": local_id,
+                            "server_id": None,
+                            "deleted_count": deleted_count,
+                        })
+                    elif local_id not in (None, ""):
+                        applied.append({
+                            "entity": "production_stock_movement_delete",
+                            "action": "skipped",
+                            "local_id": local_id,
+                            "server_id": None,
+                        })
+                    continue
                 if server_id is None:
                     if local_id not in (None, ""):
                         applied.append({
