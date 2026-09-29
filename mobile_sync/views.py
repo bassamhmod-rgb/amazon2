@@ -26,7 +26,7 @@ from products.models import Category
 from products.models import Product
 from products.models import ProductBarcode
 from orders.models import Order, OrderItem
-from dashboard.models import AppUpdate, Expense, ExpenseType, ExpenseReason, FixedAsset
+from dashboard.models import AppUpdate, ContactInfo, Expense, ExpenseType, ExpenseReason, FixedAsset
 from stores.models import Store
 from stores.models import TrialDevice
 from stores.models import (
@@ -470,6 +470,15 @@ def _serialize_fixed_asset(asset):
         "existed_before_program": asset.existed_before_program,
         "access_id": asset.access_id,
         "update_time": _mobile_time(asset),
+    }
+
+
+def _serialize_contact_info(info):
+    return {
+        "id": info.id,
+        "label": info.label,
+        "statement": info.statement or "",
+        "update_time": _mobile_time(info),
     }
 
 
@@ -1647,6 +1656,17 @@ def fixed_assets_pull(request):
             "update_time",
             "mobile_update_time",
         ],
+    )
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def contact_infos_pull(request):
+    return _pull_store_rows(
+        request,
+        ContactInfo,
+        _serialize_contact_info,
+        ["id", "label", "statement", "update_time", "mobile_update_time"],
     )
 
 

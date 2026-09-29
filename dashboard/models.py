@@ -120,6 +120,25 @@ class FixedAsset(models.Model):
         return super().save(*args, **kwargs)
 
 
+class ContactInfo(models.Model):
+    update_time = models.BigIntegerField(blank=True, null=True)
+    mobile_update_time = models.BigIntegerField(blank=True, null=True)
+    store = models.ForeignKey(Store, on_delete=models.CASCADE, related_name="contact_infos")
+    label = models.CharField(max_length=160)
+    statement = models.TextField(blank=True)
+    created_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ["label", "id"]
+
+    def __str__(self):
+        return f"{self.store} - {self.label}"
+
+    def save(self, *args, **kwargs):
+        _touch_mobile_update_time(self, kwargs)
+        return super().save(*args, **kwargs)
+
+
 class AppUpdate(models.Model):
     PLATFORM_ANDROID = "android"
     PLATFORM_WINDOWS = "windows"
