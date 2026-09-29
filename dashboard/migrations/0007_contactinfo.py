@@ -6,8 +6,7 @@ import django.utils.timezone
 class Migration(migrations.Migration):
 
     dependencies = [
-        ("dashboard", "0006_fixedasset"),
-        ("dashboard", "0006_expense_currency_fields"),
+        ("dashboard", "0008_merge_20260922_1633"),
         ("stores", "0022_mobile_update_time"),
     ]
 
