@@ -28,10 +28,9 @@ admin.site.register(Expense)
 
 @admin.register(ContactInfo)
 class ContactInfoAdmin(admin.ModelAdmin):
-    list_display = ("store", "label", "statement_preview", "mobile_update_time")
-    list_filter = ("store",)
-    search_fields = ("store__name", "label", "statement")
-    ordering = ("store", "label", "id")
+    list_display = ("label", "statement_preview", "mobile_update_time")
+    search_fields = ("label", "statement")
+    ordering = ("label", "id")
 
     def statement_preview(self, obj):
         text = (obj.statement or "").strip()

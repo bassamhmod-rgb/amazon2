@@ -1662,12 +1662,41 @@ def fixed_assets_pull(request):
 @api_view(["GET"])
 @permission_classes([AllowAny])
 def contact_infos_pull(request):
-    return _pull_store_rows(
-        request,
-        ContactInfo,
-        _serialize_contact_info,
-        ["id", "label", "statement", "update_time", "mobile_update_time"],
-    )
+    merchant_id = request.query_params.get("merchant_id")
+    since = request.query_params.get("since")
+
+    if not merchant_id:
+        return Response({"detail": "merchant_id is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        merchant_id_int = int(merchant_id)
+    except (TypeError, ValueError):
+        return Response({"detail": "merchant_id must be an integer"}, status=status.HTTP_400_BAD_REQUEST)
+
+    store = Store.objects.filter(id=merchant_id_int).first()
+    if not store:
+        return Response({"detail": "Store not found"}, status=status.HTTP_404_NOT_FOUND)
+    _, device_error = _ensure_store_user_sync_device(request, merchant_id_int)
+    if device_error:
+        return device_error
+
+    qs = ContactInfo.objects.all().order_by("id")
+    if since not in (None, "", "0"):
+        try:
+            since_int = int(since)
+        except (TypeError, ValueError):
+            return Response({"detail": "since must be an integer"}, status=status.HTTP_400_BAD_REQUEST)
+        qs = qs.filter(_mobile_since_q(since_int))
+
+    data = [
+        _serialize_contact_info(row)
+        for row in qs.only("id", "label", "statement", "update_time", "mobile_update_time")
+    ]
+    return Response({
+        "merchant_id": merchant_id_int,
+        "items": data,
+        "max_update_time": max((x["update_time"] for x in data), default=0),
+    })
 
 
 @api_view(["GET"])

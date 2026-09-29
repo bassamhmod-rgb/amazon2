@@ -105,4 +105,18 @@ def log_fixed_asset_delete(sender, instance, **kwargs):
 
 @receiver(pre_delete, sender=ContactInfo)
 def log_contact_info_delete(sender, instance, **kwargs):
-    _log_mobile_delete(instance, instance.id, "contact_infos")
+    if getattr(instance, "_skip_mobile_delete_sync", False):
+        return
+
+    rows = [
+        MobileDeleteSync(
+            merchant_id=merchant_id,
+            store_record_id=instance.id,
+            store_model_name=f"{instance._meta.app_label}.{instance.__class__.__name__}",
+            access_record_id=instance.id,
+            access_table_name="contact_infos",
+        )
+        for merchant_id in Store.objects.values_list("id", flat=True)
+    ]
+    if rows:
+        MobileDeleteSync.objects.bulk_create(rows)
