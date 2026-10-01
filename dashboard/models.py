@@ -68,6 +68,7 @@ class Expense(models.Model):
     update_time = models.BigIntegerField(blank=True, null=True)
     mobile_update_time = models.BigIntegerField(blank=True, null=True)
     access_id = models.BigIntegerField(blank=True, null=True)
+    mobile_sync_key = models.CharField(max_length=160, blank=True, null=True)
     store = models.ForeignKey(Store, on_delete=models.CASCADE, related_name="expenses")
     amount = models.DecimalField(max_digits=14, decimal_places=2, default=Decimal("0.00"))
     date = models.DateField(default=timezone.now)
@@ -89,6 +90,13 @@ class Expense(models.Model):
 
     class Meta:
         ordering = ["-date", "-id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["store", "mobile_sync_key"],
+                condition=models.Q(mobile_sync_key__isnull=False),
+                name="unique_expense_mobile_sync_key_per_store",
+            ),
+        ]
 
     def __str__(self):
         return f"{self.store} - {self.amount}"

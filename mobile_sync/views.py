@@ -168,6 +168,14 @@ def _to_str(value, default=""):
     return str(value)
 
 
+def _mobile_sync_key(device_id, entity, local_id):
+    device_id = _to_str(device_id).strip()
+    entity = _to_str(entity).strip()
+    if not device_id or not entity or local_id in (None, ""):
+        return None
+    return f"{device_id}:{entity}:{local_id}"[:160]
+
+
 def _all_mobile_permissions():
     return {key: True for key in MOBILE_PERMISSION_KEYS}
 
@@ -1322,7 +1330,7 @@ def _apply_expense_reason_change(store, payload, server_id=None):
     return ExpenseReason.objects.create(store=store, name=name, mobile_update_time=now_minute), "created"
 
 
-def _apply_expense_change(store, payload, server_id=None):
+def _apply_expense_change(store, payload, server_id=None, mobile_sync_key=None):
     expense_type = None
     expense_reason = None
     type_id = _to_int(payload.get("expense_type_server_id"))
@@ -1355,11 +1363,25 @@ def _apply_expense_change(store, payload, server_id=None):
         "mobile_update_time": now_minute,
     }
     obj = Expense.objects.filter(id=server_id, store=store).first() if server_id else None
+    if not obj and mobile_sync_key:
+        obj = Expense.objects.filter(store=store, mobile_sync_key=mobile_sync_key).first()
+    if mobile_sync_key:
+        update_fields["mobile_sync_key"] = mobile_sync_key
     if obj:
         Expense.objects.filter(id=obj.id, store=store).update(**update_fields)
         obj.refresh_from_db()
         return obj, "updated"
-    obj = Expense.objects.create(store=store, **update_fields)
+    try:
+        obj = Expense.objects.create(store=store, **update_fields)
+    except IntegrityError:
+        if not mobile_sync_key:
+            raise
+        obj = Expense.objects.filter(store=store, mobile_sync_key=mobile_sync_key).first()
+        if obj is None:
+            raise
+        Expense.objects.filter(id=obj.id, store=store).update(**update_fields)
+        obj.refresh_from_db()
+        return obj, "updated"
     return obj, "created"
 
 
@@ -2362,6 +2384,7 @@ def sync_push(request):
         return Response({"detail": "Invalid JSON payload"}, status=status.HTTP_400_BAD_REQUEST)
 
     merchant_id = _to_int(payload.get("merchant_id"))
+    device_id = _to_str(payload.get("device_id")).strip()
     changes = payload.get("changes", [])
     if merchant_id is None:
         return Response({"detail": "merchant_id is required"}, status=status.HTTP_400_BAD_REQUEST)
@@ -2638,13 +2661,14 @@ def sync_push(request):
                         store,
                         payload_item,
                         server_id=_to_int(server_id),
+                        mobile_sync_key=_mobile_sync_key(device_id, "expense", local_id),
                     )
                     applied.append({
                         "entity": "expense",
                         "action": action,
                         "local_id": local_id,
                         "server_id": obj.id,
-                        "update_time": obj.update_time or 0,
+                        "update_time": _mobile_time(obj),
                     })
                 elif entity == "fixed_asset":
                     obj, action = _apply_fixed_asset_change(
