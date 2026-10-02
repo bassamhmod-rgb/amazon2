@@ -27,6 +27,9 @@
     {% if net_amount is not None %}
     <div class="alert alert-info" style="max-width:980px;">الصافي الحالي: <strong>{{ net_amount|floatformat:2 }}</strong> | باقي السلفة: <strong>{{ advance_remaining|floatformat:2 }}</strong></div>
     {% endif %}
+    <div class="alert alert-secondary" style="max-width:980px;">
+        باقي السلفة السابق للموظف المحدد: <strong id="advanceRemainingPreview">0.00</strong>
+    </div>
     <div class="card shadow-sm" style="max-width: 980px;">
         <div class="card-body">
             <form method="post" novalidate>
@@ -51,6 +54,26 @@
         </div>
     </div>
 </div>
-<script>const sidebar=document.getElementById("sidebar");const arrow=document.getElementById("sidebarArrow");arrow.onclick=()=>{sidebar.classList.toggle("active");arrow.textContent=sidebar.classList.contains("active")?"❮":"❯";};</script>
+{{ employee_advance_remaining|json_script:"employeeAdvanceRemainingData" }}
+<script>
+    const sidebar=document.getElementById("sidebar");
+    const arrow=document.getElementById("sidebarArrow");
+    arrow.onclick=()=>{sidebar.classList.toggle("active");arrow.textContent=sidebar.classList.contains("active")?"❮":"❯";};
+
+    const advanceData = JSON.parse(document.getElementById("employeeAdvanceRemainingData").textContent || "{}");
+    const employeeSelect = document.getElementById("id_employee");
+    const advanceRemainingPreview = document.getElementById("advanceRemainingPreview");
+
+    function updateAdvanceRemainingPreview() {
+        const employeeId = employeeSelect ? employeeSelect.value : "";
+        const value = Number(advanceData[employeeId] || 0);
+        advanceRemainingPreview.textContent = value.toFixed(2);
+    }
+
+    if (employeeSelect) {
+        employeeSelect.addEventListener("change", updateAdvanceRemainingPreview);
+        updateAdvanceRemainingPreview();
+    }
+</script>
 </body>
 </html>

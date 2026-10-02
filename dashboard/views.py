@@ -642,6 +642,9 @@ def salary_payments_list(request, store_slug):
     voucher_id = request.GET.get("voucher")
     if voucher_id:
         payments = payments.filter(voucher_id=voucher_id)
+    employee_q = (request.GET.get("employee_q") or "").strip()
+    if employee_q:
+        payments = payments.filter(employee__name__icontains=employee_q)
     return render(
         request,
         "dashboard/employees/salary_payments_list.html",
@@ -649,6 +652,7 @@ def salary_payments_list(request, store_slug):
             "store": store,
             "payments": payments,
             "selected_voucher_id": voucher_id,
+            "employee_q": employee_q,
             "vouchers": SalaryPaymentVoucher.objects.filter(store=store).order_by("-date", "-id"),
         },
     )
@@ -674,7 +678,12 @@ def salary_payment_create(request, store_slug):
     return render(
         request,
         "dashboard/employees/salary_payment_form.html",
-        {"store": store, "form": form, "title": "إضافة تقبيض راتب"},
+        {
+            "store": store,
+            "form": form,
+            "title": "إضافة تقبيض راتب",
+            "employee_advance_remaining": _employee_advance_remaining_map(store),
+        },
     )
 
 
@@ -700,8 +709,30 @@ def salary_payment_update(request, store_slug, payment_id):
             "title": "تعديل تقبيض راتب",
             "net_amount": payment.net_amount,
             "advance_remaining": payment.advance_remaining,
+            "employee_advance_remaining": _employee_advance_remaining_map(store, exclude_payment_id=payment.id),
         },
     )
+
+
+def _employee_advance_remaining_map(store, exclude_payment_id=None):
+    payments = SalaryPayment.objects.filter(store=store)
+    if exclude_payment_id:
+        payments = payments.exclude(pk=exclude_payment_id)
+    rows = payments.values("employee_id").annotate(
+        total_advances=Coalesce(
+            Sum("advance_amount"),
+            Value(0, output_field=DecimalField(max_digits=14, decimal_places=2)),
+        ),
+        total_installments=Coalesce(
+            Sum("advance_installment_deduction"),
+            Value(0, output_field=DecimalField(max_digits=14, decimal_places=2)),
+        ),
+    )
+    return {
+        str(row["employee_id"]): row["total_advances"] - row["total_installments"]
+        for row in rows
+        if row["employee_id"]
+    }
 
 
 def _is_store_access_linked(store):

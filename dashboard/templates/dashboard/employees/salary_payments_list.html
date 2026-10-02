@@ -24,7 +24,7 @@
         <h3 class="mb-0">تقبيض الرواتب</h3>
         <div class="d-flex gap-2 flex-wrap">
             <a href="{% url 'dashboard:employees_list' store.slug %}" class="btn btn-outline-secondary">رجوع للموظفين</a>
-            <a href="{% url 'dashboard:salary_payment_create' store.slug %}" class="btn btn-primary">+ إضافة تقبيض</a>
+            <a href="{% url 'dashboard:salary_payment_create' store.slug %}{% if selected_voucher_id %}?voucher={{ selected_voucher_id }}{% endif %}" class="btn btn-primary">+ إضافة تقبيض</a>
         </div>
     </div>
     {% if messages %}{% for message in messages %}<div class="alert alert-{{ message.tags|default:'info' }}">{{ message }}</div>{% endfor %}{% endif %}
@@ -38,6 +38,10 @@
                     <option value="{{ voucher.id }}" {% if selected_voucher_id == voucher.id|stringformat:"s" %}selected{% endif %}>{{ voucher.description }} - {{ voucher.date|date:"Y-m-d" }}</option>
                     {% endfor %}
                 </select>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">اسم الموظف</label>
+                <input type="text" name="employee_q" class="form-control" value="{{ employee_q }}" placeholder="بحث باسم الموظف">
             </div>
             <div class="col-auto"><button class="btn btn-primary">عرض</button></div>
             <div class="col-auto"><a class="btn btn-outline-secondary" href="{% url 'dashboard:salary_payments_list' store.slug %}">مسح</a></div>
