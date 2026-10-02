@@ -173,5 +173,45 @@ path(
     views_api.create_expense_from_access,
     name="create_expense_from_access"
 ),
+path(
+    "api/merchant-employees/<int:merchant_id>/",
+    views_api.merchant_employees_export_api,
+    name="merchant_employees_export_api",
+),
+path(
+    "api/merchant-employees-confirm/",
+    views_api.merchant_employees_confirm_api,
+    name="merchant_employees_confirm_api",
+),
+path(
+    "api/create-employee-department-from-access/<int:merchant_id>/",
+    views_api.create_employee_department_from_access,
+    name="create_employee_department_from_access",
+),
+path(
+    "api/create-employee-job-title-from-access/<int:merchant_id>/",
+    views_api.create_employee_job_title_from_access,
+    name="create_employee_job_title_from_access",
+),
+path(
+    "api/create-employee-pay-period-from-access/<int:merchant_id>/",
+    views_api.create_employee_pay_period_from_access,
+    name="create_employee_pay_period_from_access",
+),
+path(
+    "api/create-employee-from-access/<int:merchant_id>/",
+    views_api.create_employee_from_access,
+    name="create_employee_from_access",
+),
+path(
+    "api/create-salary-voucher-from-access/<int:merchant_id>/",
+    views_api.create_salary_voucher_from_access,
+    name="create_salary_voucher_from_access",
+),
+path(
+    "api/create-salary-payment-from-access/<int:merchant_id>/",
+    views_api.create_salary_payment_from_access,
+    name="create_salary_payment_from_access",
+),
 ]
 

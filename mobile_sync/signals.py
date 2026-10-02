@@ -4,6 +4,14 @@ from django.dispatch import receiver
 from mobile_sync.models import MobileDeleteSync
 from accounts.models import Customer, StoreUser
 from dashboard.models import ContactInfo, Expense, ExpenseReason, ExpenseType, FixedAsset
+from employees.models import (
+    Employee,
+    EmployeeDepartment,
+    EmployeeJobTitle,
+    EmployeePayPeriod,
+    SalaryPayment,
+    SalaryPaymentVoucher,
+)
 from orders.models import Order
 from products.models import Category, Product, ProductBarcode
 from stores.models import InventoryAdjustment, StockMovement, Store
@@ -101,6 +109,36 @@ def log_expense_reason_delete(sender, instance, **kwargs):
 @receiver(pre_delete, sender=FixedAsset)
 def log_fixed_asset_delete(sender, instance, **kwargs):
     _log_mobile_delete(instance, instance.access_id, "fixed_assets")
+
+
+@receiver(pre_delete, sender=EmployeeDepartment)
+def log_employee_department_delete(sender, instance, **kwargs):
+    _log_mobile_delete(instance, instance.access_id, "employee_departments")
+
+
+@receiver(pre_delete, sender=EmployeeJobTitle)
+def log_employee_job_title_delete(sender, instance, **kwargs):
+    _log_mobile_delete(instance, instance.access_id, "employee_job_titles")
+
+
+@receiver(pre_delete, sender=EmployeePayPeriod)
+def log_employee_pay_period_delete(sender, instance, **kwargs):
+    _log_mobile_delete(instance, instance.access_id, "employee_pay_periods")
+
+
+@receiver(pre_delete, sender=Employee)
+def log_employee_delete(sender, instance, **kwargs):
+    _log_mobile_delete(instance, instance.access_id, "employees")
+
+
+@receiver(pre_delete, sender=SalaryPaymentVoucher)
+def log_salary_payment_voucher_delete(sender, instance, **kwargs):
+    _log_mobile_delete(instance, instance.access_id, "salary_payment_vouchers")
+
+
+@receiver(pre_delete, sender=SalaryPayment)
+def log_salary_payment_delete(sender, instance, **kwargs):
+    _log_mobile_delete(instance, instance.access_id, "salary_payments")
 
 
 @receiver(pre_delete, sender=ContactInfo)

@@ -27,6 +27,14 @@ from products.models import Product
 from products.models import ProductBarcode
 from orders.models import Order, OrderItem
 from dashboard.models import AppUpdate, ContactInfo, Expense, ExpenseType, ExpenseReason, FixedAsset
+from employees.models import (
+    Employee,
+    EmployeeDepartment,
+    EmployeeJobTitle,
+    EmployeePayPeriod,
+    SalaryPayment,
+    SalaryPaymentVoucher,
+)
 from stores.models import Store
 from stores.models import TrialDevice
 from stores.models import (
@@ -1032,6 +1040,130 @@ def _apply_supplier_change(store, payload, server_id=None):
     return obj, "created"
 
 
+def _apply_employee_lookup_change(store, payload, model, server_id=None):
+    name = _to_str(payload.get("name")).strip()
+    if not name:
+        raise ValueError("Name is required")
+    now_minute = _now_minute()
+    obj = model.objects.filter(id=server_id, store=store).first() if server_id else None
+    if not obj:
+        obj = model.objects.filter(store=store, name=name).first()
+    fields = {
+        "name": name,
+        "notes": _to_str(payload.get("notes")).strip(),
+        "mobile_update_time": now_minute,
+    }
+    if obj:
+        model.objects.filter(id=obj.id, store=store).update(**fields)
+        obj.refresh_from_db()
+        return obj, "updated"
+    return model.objects.create(store=store, **fields), "created"
+
+
+def _apply_employee_change(store, payload, server_id=None):
+    name = _to_str(payload.get("name")).strip()
+    if not name:
+        raise ValueError("Employee name is required")
+    now_minute = _now_minute()
+    obj = Employee.objects.filter(id=server_id, store=store).first() if server_id else None
+    if not obj:
+        national_id = _to_str(payload.get("national_id")).strip()
+        if national_id:
+            obj = Employee.objects.filter(store=store, national_id=national_id).first()
+    department = None
+    department_id = _to_int(payload.get("department_id"))
+    if department_id:
+        department = EmployeeDepartment.objects.filter(id=department_id, store=store).first()
+    job_title = None
+    job_title_id = _to_int(payload.get("job_title_id"))
+    if job_title_id:
+        job_title = EmployeeJobTitle.objects.filter(id=job_title_id, store=store).first()
+    pay_period = None
+    pay_period_id = _to_int(payload.get("pay_period_id"))
+    if pay_period_id:
+        pay_period = EmployeePayPeriod.objects.filter(id=pay_period_id, store=store).first()
+    fields = {
+        "name": name,
+        "national_id": _to_str(payload.get("national_id")).strip(),
+        "mobile": _to_str(payload.get("mobile")).strip(),
+        "address": _to_str(payload.get("address")).strip(),
+        "department": department,
+        "job_title": job_title,
+        "pay_period": pay_period,
+        "salary": Decimal(str(_to_float(payload.get("salary"), 0.0))),
+        "work_hours": _to_str(payload.get("work_hours")).strip(),
+        "notes": _to_str(payload.get("notes")).strip(),
+        "is_active": _to_bool(payload.get("is_active"), True),
+        "mobile_update_time": now_minute,
+    }
+    if obj:
+        Employee.objects.filter(id=obj.id, store=store).update(**fields)
+        obj.refresh_from_db()
+        return obj, "updated"
+    return Employee.objects.create(store=store, **fields), "created"
+
+
+def _apply_salary_voucher_change(store, payload, server_id=None):
+    description = _to_str(payload.get("description")).strip()
+    if not description:
+        raise ValueError("Salary voucher description is required")
+    date_value = parse_datetime(str(payload.get("date") or ""))
+    if date_value is None:
+        from django.utils.dateparse import parse_date
+        date_value = parse_date(str(payload.get("date") or "")) or timezone.localdate()
+    else:
+        date_value = date_value.date()
+    now_minute = _now_minute()
+    obj = SalaryPaymentVoucher.objects.filter(id=server_id, store=store).first() if server_id else None
+    fields = {
+        "description": description,
+        "date": date_value,
+        "decision_number": _to_str(payload.get("decision_number")).strip(),
+        "notes": _to_str(payload.get("notes")).strip(),
+        "mobile_update_time": now_minute,
+    }
+    if obj:
+        SalaryPaymentVoucher.objects.filter(id=obj.id, store=store).update(**fields)
+        obj.refresh_from_db()
+        return obj, "updated"
+    return SalaryPaymentVoucher.objects.create(store=store, **fields), "created"
+
+
+def _apply_salary_payment_change(store, payload, server_id=None):
+    voucher_id = _to_int(payload.get("voucher_id"))
+    employee_id = _to_int(payload.get("employee_id"))
+    voucher = SalaryPaymentVoucher.objects.filter(id=voucher_id, store=store).first() if voucher_id else None
+    employee = Employee.objects.filter(id=employee_id, store=store).first() if employee_id else None
+    if not voucher or not employee:
+        raise ValueError("Salary payment voucher and employee are required")
+    date_value = parse_datetime(str(payload.get("date") or ""))
+    if date_value is None:
+        from django.utils.dateparse import parse_date
+        date_value = parse_date(str(payload.get("date") or "")) or timezone.localdate()
+    else:
+        date_value = date_value.date()
+    now_minute = _now_minute()
+    obj = SalaryPayment.objects.filter(id=server_id, store=store).first() if server_id else None
+    fields = {
+        "voucher": voucher,
+        "employee": employee,
+        "salary": Decimal(str(_to_float(payload.get("salary"), 0.0))),
+        "extra_amount": Decimal(str(_to_float(payload.get("extra_amount"), 0.0))),
+        "discount_amount": Decimal(str(_to_float(payload.get("discount_amount"), 0.0))),
+        "advance_amount": Decimal(str(_to_float(payload.get("advance_amount"), 0.0))),
+        "advance_installment_deduction": Decimal(str(_to_float(payload.get("advance_installment_deduction"), 0.0))),
+        "notes": _to_str(payload.get("notes")).strip(),
+        "date": date_value,
+        "is_received": _to_bool(payload.get("is_received"), False),
+        "mobile_update_time": now_minute,
+    }
+    if obj:
+        SalaryPayment.objects.filter(id=obj.id, store=store).update(**fields)
+        obj.refresh_from_db()
+        return obj, "updated"
+    return SalaryPayment.objects.create(store=store, **fields), "created"
+
+
 def _apply_warehouse_change(store, payload, server_id=None):
     identifier = _to_str(payload.get("identifier")).strip()
     name = _to_str(payload.get("name")).strip()
@@ -1719,6 +1851,162 @@ def contact_infos_pull(request):
         "items": data,
         "max_update_time": max((x["update_time"] for x in data), default=0),
     })
+
+
+def _serialize_employee_lookup(row):
+    return {
+        "id": row.id,
+        "name": row.name,
+        "notes": row.notes or "",
+        "access_id": row.access_id,
+        "update_time": _mobile_time(row),
+    }
+
+
+def _serialize_employee(row):
+    return {
+        "id": row.id,
+        "name": row.name,
+        "national_id": row.national_id or "",
+        "mobile": row.mobile or "",
+        "address": row.address or "",
+        "department_id": row.department_id,
+        "job_title_id": row.job_title_id,
+        "pay_period_id": row.pay_period_id,
+        "salary": _to_float(row.salary),
+        "work_hours": row.work_hours or "",
+        "notes": row.notes or "",
+        "is_active": row.is_active,
+        "access_id": row.access_id,
+        "update_time": _mobile_time(row),
+    }
+
+
+def _serialize_salary_voucher(row):
+    return {
+        "id": row.id,
+        "description": row.description,
+        "date": row.date.isoformat() if row.date else "",
+        "decision_number": row.decision_number or "",
+        "notes": row.notes or "",
+        "access_id": row.access_id,
+        "update_time": _mobile_time(row),
+    }
+
+
+def _serialize_salary_payment(row):
+    return {
+        "id": row.id,
+        "voucher_id": row.voucher_id,
+        "employee_id": row.employee_id,
+        "salary": _to_float(row.salary),
+        "extra_amount": _to_float(row.extra_amount),
+        "discount_amount": _to_float(row.discount_amount),
+        "advance_amount": _to_float(row.advance_amount),
+        "advance_installment_deduction": _to_float(row.advance_installment_deduction),
+        "notes": row.notes or "",
+        "date": row.date.isoformat() if row.date else "",
+        "is_received": row.is_received,
+        "access_id": row.access_id,
+        "update_time": _mobile_time(row),
+    }
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def employee_departments_pull(request):
+    return _pull_store_rows(
+        request,
+        EmployeeDepartment,
+        _serialize_employee_lookup,
+        ["id", "name", "notes", "access_id", "update_time", "mobile_update_time"],
+    )
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def employee_job_titles_pull(request):
+    return _pull_store_rows(
+        request,
+        EmployeeJobTitle,
+        _serialize_employee_lookup,
+        ["id", "name", "notes", "access_id", "update_time", "mobile_update_time"],
+    )
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def employee_pay_periods_pull(request):
+    return _pull_store_rows(
+        request,
+        EmployeePayPeriod,
+        _serialize_employee_lookup,
+        ["id", "name", "notes", "access_id", "update_time", "mobile_update_time"],
+    )
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def employees_pull(request):
+    return _pull_store_rows(
+        request,
+        Employee,
+        _serialize_employee,
+        [
+            "id",
+            "name",
+            "national_id",
+            "mobile",
+            "address",
+            "department_id",
+            "job_title_id",
+            "pay_period_id",
+            "salary",
+            "work_hours",
+            "notes",
+            "is_active",
+            "access_id",
+            "update_time",
+            "mobile_update_time",
+        ],
+    )
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def salary_vouchers_pull(request):
+    return _pull_store_rows(
+        request,
+        SalaryPaymentVoucher,
+        _serialize_salary_voucher,
+        ["id", "description", "date", "decision_number", "notes", "access_id", "update_time", "mobile_update_time"],
+    )
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def salary_payments_pull(request):
+    return _pull_store_rows(
+        request,
+        SalaryPayment,
+        _serialize_salary_payment,
+        [
+            "id",
+            "voucher_id",
+            "employee_id",
+            "salary",
+            "extra_amount",
+            "discount_amount",
+            "advance_amount",
+            "advance_installment_deduction",
+            "notes",
+            "date",
+            "is_received",
+            "access_id",
+            "update_time",
+            "mobile_update_time",
+        ],
+    )
 
 
 @api_view(["GET"])
@@ -2466,7 +2754,13 @@ def sync_push(request):
             "warehouse": 0,
             "expense_type": 0,
             "expense_reason": 0,
+            "employee_department": 0,
+            "employee_job_title": 0,
+            "employee_pay_period": 0,
             "product": 1,
+            "employee": 1,
+            "salary_voucher": 2,
+            "salary_payment": 3,
             "barcode": 2,
             "expense": 2,
             "fixed_asset": 2,
@@ -2611,6 +2905,87 @@ def sync_push(request):
                         "local_id": local_id,
                         "server_id": obj.id,
                         "update_time": obj.update_time or 0,
+                    })
+                elif entity == "employee_department":
+                    obj, action = _apply_employee_lookup_change(
+                        store,
+                        payload_item,
+                        EmployeeDepartment,
+                        server_id=_to_int(server_id),
+                    )
+                    applied.append({
+                        "entity": "employee_department",
+                        "action": action,
+                        "local_id": local_id,
+                        "server_id": obj.id,
+                        "update_time": _mobile_time(obj),
+                    })
+                elif entity == "employee_job_title":
+                    obj, action = _apply_employee_lookup_change(
+                        store,
+                        payload_item,
+                        EmployeeJobTitle,
+                        server_id=_to_int(server_id),
+                    )
+                    applied.append({
+                        "entity": "employee_job_title",
+                        "action": action,
+                        "local_id": local_id,
+                        "server_id": obj.id,
+                        "update_time": _mobile_time(obj),
+                    })
+                elif entity == "employee_pay_period":
+                    obj, action = _apply_employee_lookup_change(
+                        store,
+                        payload_item,
+                        EmployeePayPeriod,
+                        server_id=_to_int(server_id),
+                    )
+                    applied.append({
+                        "entity": "employee_pay_period",
+                        "action": action,
+                        "local_id": local_id,
+                        "server_id": obj.id,
+                        "update_time": _mobile_time(obj),
+                    })
+                elif entity == "employee":
+                    obj, action = _apply_employee_change(
+                        store,
+                        payload_item,
+                        server_id=_to_int(server_id),
+                    )
+                    applied.append({
+                        "entity": "employee",
+                        "action": action,
+                        "local_id": local_id,
+                        "server_id": obj.id,
+                        "update_time": _mobile_time(obj),
+                    })
+                elif entity == "salary_voucher":
+                    obj, action = _apply_salary_voucher_change(
+                        store,
+                        payload_item,
+                        server_id=_to_int(server_id),
+                    )
+                    applied.append({
+                        "entity": "salary_voucher",
+                        "action": action,
+                        "local_id": local_id,
+                        "server_id": obj.id,
+                        "update_time": _mobile_time(obj),
+                    })
+                elif entity == "salary_payment":
+                    obj, action = _apply_salary_payment_change(
+                        store,
+                        payload_item,
+                        server_id=_to_int(server_id),
+                    )
+                    applied.append({
+                        "entity": "salary_payment",
+                        "action": action,
+                        "local_id": local_id,
+                        "server_id": obj.id,
+                        "update_time": _mobile_time(obj),
                     })
                 elif entity == "warehouse_transfer":
                     obj, action = _apply_warehouse_transfer_change(
@@ -2884,6 +3259,72 @@ def sync_push(request):
                         obj.delete()
                         applied.append({
                             "entity": "expense_reason",
+                            "action": "deleted",
+                            "local_id": local_id,
+                            "server_id": server_id,
+                        })
+                elif entity == "employee_department":
+                    obj = EmployeeDepartment.objects.filter(id=server_id, store_id=merchant_id).first()
+                    if obj:
+                        obj._skip_mobile_delete_sync = True
+                        obj.delete()
+                        applied.append({
+                            "entity": "employee_department",
+                            "action": "deleted",
+                            "local_id": local_id,
+                            "server_id": server_id,
+                        })
+                elif entity == "employee_job_title":
+                    obj = EmployeeJobTitle.objects.filter(id=server_id, store_id=merchant_id).first()
+                    if obj:
+                        obj._skip_mobile_delete_sync = True
+                        obj.delete()
+                        applied.append({
+                            "entity": "employee_job_title",
+                            "action": "deleted",
+                            "local_id": local_id,
+                            "server_id": server_id,
+                        })
+                elif entity == "employee_pay_period":
+                    obj = EmployeePayPeriod.objects.filter(id=server_id, store_id=merchant_id).first()
+                    if obj:
+                        obj._skip_mobile_delete_sync = True
+                        obj.delete()
+                        applied.append({
+                            "entity": "employee_pay_period",
+                            "action": "deleted",
+                            "local_id": local_id,
+                            "server_id": server_id,
+                        })
+                elif entity == "employee":
+                    obj = Employee.objects.filter(id=server_id, store_id=merchant_id).first()
+                    if obj:
+                        obj._skip_mobile_delete_sync = True
+                        obj.delete()
+                        applied.append({
+                            "entity": "employee",
+                            "action": "deleted",
+                            "local_id": local_id,
+                            "server_id": server_id,
+                        })
+                elif entity == "salary_voucher":
+                    obj = SalaryPaymentVoucher.objects.filter(id=server_id, store_id=merchant_id).first()
+                    if obj:
+                        obj._skip_mobile_delete_sync = True
+                        obj.delete()
+                        applied.append({
+                            "entity": "salary_voucher",
+                            "action": "deleted",
+                            "local_id": local_id,
+                            "server_id": server_id,
+                        })
+                elif entity == "salary_payment":
+                    obj = SalaryPayment.objects.filter(id=server_id, store_id=merchant_id).first()
+                    if obj:
+                        obj._skip_mobile_delete_sync = True
+                        obj.delete()
+                        applied.append({
+                            "entity": "salary_payment",
                             "action": "deleted",
                             "local_id": local_id,
                             "server_id": server_id,
