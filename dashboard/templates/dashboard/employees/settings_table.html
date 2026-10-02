@@ -1,0 +1,51 @@
+<div class="col-lg-4">
+    <div class="card p-3 shadow-sm h-100">
+        <h5 class="mb-3">{{ title }}</h5>
+        <form method="post" class="mb-3">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="add_{{ key }}">
+            <input type="text" name="name" class="form-control mb-2" placeholder="{{ placeholder }}">
+            <textarea name="notes" class="form-control mb-2" rows="2" placeholder="ملاحظات"></textarea>
+            <button class="btn btn-success w-100">إضافة</button>
+        </form>
+
+        <div class="table-responsive">
+            <table class="table table-striped align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th>الاسم</th>
+                        <th class="text-center" style="width:90px;">حذف</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in items %}
+                    <tr>
+                        <td>
+                            <form method="post">
+                                {% csrf_token %}
+                                <input type="hidden" name="action" value="update_{{ key }}">
+                                <input type="hidden" name="id" value="{{ item.id }}">
+                                <input type="text" name="name" class="form-control mb-2" value="{{ item.name }}">
+                                <textarea name="notes" class="form-control mb-2" rows="2">{{ item.notes }}</textarea>
+                                <button class="btn btn-sm btn-outline-primary">حفظ</button>
+                            </form>
+                        </td>
+                        <td class="text-center">
+                            <form method="post" onsubmit="return confirm('هل أنت متأكد من الحذف؟');">
+                                {% csrf_token %}
+                                <input type="hidden" name="action" value="delete_{{ key }}">
+                                <input type="hidden" name="id" value="{{ item.id }}">
+                                <button class="btn btn-sm btn-danger">حذف</button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="2" class="text-center text-muted">لا توجد بيانات</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>

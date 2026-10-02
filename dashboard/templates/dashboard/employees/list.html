@@ -104,6 +104,12 @@
 <div class="content">
     <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
         <h3 class="mb-0">الموظفين</h3>
+        <div class="d-flex gap-2 flex-wrap">
+            <a href="{% url 'dashboard:employee_settings' store.slug %}" class="btn btn-outline-secondary">إدارة الأقسام والوظائف</a>
+            <a href="{% url 'dashboard:salary_vouchers_list' store.slug %}" class="btn btn-outline-primary">سندات صرف الرواتب</a>
+            <a href="{% url 'dashboard:salary_payments_list' store.slug %}" class="btn btn-outline-primary">تقبيض الرواتب</a>
+            <a href="{% url 'dashboard:employee_create' store.slug %}" class="btn btn-primary">+ إضافة موظف</a>
+        </div>
     </div>
 
     {% if messages %}
@@ -137,6 +143,7 @@
                         <th>الراتب</th>
                         <th>أوقات الدوام</th>
                         <th>الحالة</th>
+                        <th class="text-center">خيارات</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -157,10 +164,13 @@
                                 <span class="badge bg-secondary">متوقف</span>
                             {% endif %}
                         </td>
+                        <td class="text-center">
+                            <a href="{% url 'dashboard:employee_update' store.slug employee.id %}" class="btn btn-warning btn-sm">تعديل</a>
+                        </td>
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="9" class="text-center text-muted py-4">لا يوجد موظفين بعد</td>
+                        <td colspan="10" class="text-center text-muted py-4">لا يوجد موظفين بعد</td>
                     </tr>
                     {% endfor %}
                 </tbody>

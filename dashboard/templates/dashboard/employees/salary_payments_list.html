@@ -1,0 +1,75 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <title>تقبيض الرواتب - {{ store.name }}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+    <style>
+        body{ background:#f7f9fc; font-family:"Cairo",sans-serif; overflow-x:hidden; }
+        .sidebar{ width:230px; background:#fff; height:100vh; position:fixed; top:0; right:0; padding:20px 15px; border-left:1px solid #e0e0e0; transition:.3s; z-index:1000; }
+        .sidebar a{ display:block; padding:10px 12px; margin-bottom:8px; color:#333; border-radius:8px; text-decoration:none; }
+        .sidebar a:hover{ background:#e9f2ff; color:#0d6efd; }
+        .content{ margin-right:240px; padding:20px; transition:.3s; }
+        #sidebarArrow{ display:none; }
+        @media (max-width:768px){ .sidebar{ right:-260px; } .sidebar.active{ right:0; } .content{ margin-right:0; padding:15px; } table{ min-width:950px; } #sidebarArrow{ display:flex; position:fixed; top:50%; right:0; transform:translateY(-50%); width:26px; height:48px; background:#1A2A4A; color:#fff; border-radius:10px 0 0 10px; align-items:center; justify-content:center; font-size:18px; cursor:pointer; z-index:1001; box-shadow:-3px 0 10px rgba(0,0,0,.15); user-select:none; } }
+    </style>
+</head>
+<body>
+<div id="sidebarArrow">❯</div>
+{% include "dashboard/sidebar.html" %}
+<div class="content">
+    <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+        <h3 class="mb-0">تقبيض الرواتب</h3>
+        <div class="d-flex gap-2 flex-wrap">
+            <a href="{% url 'dashboard:employees_list' store.slug %}" class="btn btn-outline-secondary">رجوع للموظفين</a>
+            <a href="{% url 'dashboard:salary_payment_create' store.slug %}" class="btn btn-primary">+ إضافة تقبيض</a>
+        </div>
+    </div>
+    {% if messages %}{% for message in messages %}<div class="alert alert-{{ message.tags|default:'info' }}">{{ message }}</div>{% endfor %}{% endif %}
+    <div class="card p-3 shadow-sm mb-3">
+        <form method="get" class="row g-2 align-items-end">
+            <div class="col-md-5">
+                <label class="form-label">السند</label>
+                <select name="voucher" class="form-select">
+                    <option value="">الكل</option>
+                    {% for voucher in vouchers %}
+                    <option value="{{ voucher.id }}" {% if selected_voucher_id == voucher.id|stringformat:"s" %}selected{% endif %}>{{ voucher.description }} - {{ voucher.date|date:"Y-m-d" }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-auto"><button class="btn btn-primary">عرض</button></div>
+            <div class="col-auto"><a class="btn btn-outline-secondary" href="{% url 'dashboard:salary_payments_list' store.slug %}">مسح</a></div>
+        </form>
+    </div>
+    <div class="card p-3 shadow-sm">
+        <div class="table-responsive">
+            <table class="table table-striped align-middle mb-0">
+                <thead><tr><th>الموظف</th><th>السند</th><th>التاريخ</th><th>الراتب</th><th>إضافي</th><th>حسم</th><th>سلفة</th><th>قسط سلفة</th><th>الصافي</th><th>تم القبض</th><th class="text-center">خيارات</th></tr></thead>
+                <tbody>
+                    {% for payment in payments %}
+                    <tr>
+                        <td>{{ payment.employee }}</td>
+                        <td>{{ payment.voucher.description }}</td>
+                        <td>{{ payment.date|date:"Y-m-d" }}</td>
+                        <td>{{ payment.salary|floatformat:2 }}</td>
+                        <td>{{ payment.extra_amount|floatformat:2 }}</td>
+                        <td>{{ payment.discount_amount|floatformat:2 }}</td>
+                        <td>{{ payment.advance_amount|floatformat:2 }}</td>
+                        <td>{{ payment.advance_installment_deduction|floatformat:2 }}</td>
+                        <td>{{ payment.net_amount|floatformat:2 }}</td>
+                        <td>{% if payment.is_received %}<span class="badge bg-success">نعم</span>{% else %}<span class="badge bg-secondary">لا</span>{% endif %}</td>
+                        <td class="text-center"><a class="btn btn-sm btn-warning" href="{% url 'dashboard:salary_payment_update' store.slug payment.id %}">تعديل</a></td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="11" class="text-center text-muted">لا توجد عمليات تقبيض بعد</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+<script>const sidebar=document.getElementById("sidebar");const arrow=document.getElementById("sidebarArrow");arrow.onclick=()=>{sidebar.classList.toggle("active");arrow.textContent=sidebar.classList.contains("active")?"❮":"❯";};</script>
+</body>
+</html>

@@ -31,7 +31,15 @@ from accounts.store_user_forms import StoreUserForm
 from cart.models import Cart, CartItem
 from loyalty.models import LoyaltyPoints
 from mobile_sync.models import MobileDeleteSync
-from employees.models import Employee
+from employees.forms import EmployeeForm, SalaryPaymentForm, SalaryPaymentVoucherForm
+from employees.models import (
+    Employee,
+    EmployeeDepartment,
+    EmployeeJobTitle,
+    EmployeePayPeriod,
+    SalaryPayment,
+    SalaryPaymentVoucher,
+)
 
 # 1. الزبون موجود بـ accounts (حسب كلامك)
 from accounts.models import Customer
@@ -488,6 +496,210 @@ def employees_list(request, store_slug):
             "store": store,
             "page_obj": page_obj,
             "q": q,
+        },
+    )
+
+
+@login_required
+def employee_create(request, store_slug):
+    store = _get_store_for_dashboard(request, store_slug)
+    if request.method == "POST":
+        form = EmployeeForm(request.POST, store=store)
+        if form.is_valid():
+            employee = form.save(commit=False)
+            employee.store = store
+            employee.save()
+            messages.success(request, "تم إضافة الموظف.")
+            return redirect("dashboard:employees_list", store_slug=store.slug)
+    else:
+        form = EmployeeForm(store=store)
+    return render(
+        request,
+        "dashboard/employees/form.html",
+        {"store": store, "form": form, "title": "إضافة موظف"},
+    )
+
+
+@login_required
+def employee_update(request, store_slug, employee_id):
+    store = _get_store_for_dashboard(request, store_slug)
+    employee = get_object_or_404(Employee, pk=employee_id, store=store)
+    if request.method == "POST":
+        form = EmployeeForm(request.POST, instance=employee, store=store)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "تم تعديل بيانات الموظف.")
+            return redirect("dashboard:employees_list", store_slug=store.slug)
+    else:
+        form = EmployeeForm(instance=employee, store=store)
+    return render(
+        request,
+        "dashboard/employees/form.html",
+        {"store": store, "form": form, "employee": employee, "title": "تعديل موظف"},
+    )
+
+
+@login_required
+def employee_settings(request, store_slug):
+    store = _get_store_for_dashboard(request, store_slug)
+    model_map = {
+        "department": EmployeeDepartment,
+        "job_title": EmployeeJobTitle,
+        "pay_period": EmployeePayPeriod,
+    }
+    action = request.POST.get("action", "")
+    if request.method == "POST":
+        action_parts = action.split("_", 1)
+        if len(action_parts) == 2 and action_parts[1] in model_map:
+            verb, key = action_parts
+            model = model_map[key]
+            obj_id = request.POST.get("id")
+            name = (request.POST.get("name") or "").strip()
+            notes = (request.POST.get("notes") or "").strip()
+
+            if verb == "add" and name:
+                model.objects.get_or_create(store=store, name=name, defaults={"notes": notes})
+                messages.success(request, "تمت الإضافة.")
+            elif verb == "update" and obj_id and name:
+                model.objects.filter(pk=obj_id, store=store).update(name=name, notes=notes)
+                messages.success(request, "تم الحفظ.")
+            elif verb == "delete" and obj_id:
+                model.objects.filter(pk=obj_id, store=store).delete()
+                messages.success(request, "تم الحذف.")
+        return redirect("dashboard:employee_settings", store_slug=store.slug)
+
+    return render(
+        request,
+        "dashboard/employees/settings.html",
+        {
+            "store": store,
+            "departments": EmployeeDepartment.objects.filter(store=store),
+            "job_titles": EmployeeJobTitle.objects.filter(store=store),
+            "pay_periods": EmployeePayPeriod.objects.filter(store=store),
+        },
+    )
+
+
+@login_required
+def salary_vouchers_list(request, store_slug):
+    store = _get_store_for_dashboard(request, store_slug)
+    vouchers = SalaryPaymentVoucher.objects.filter(store=store).order_by("-date", "-id")
+    return render(
+        request,
+        "dashboard/employees/salary_vouchers_list.html",
+        {"store": store, "vouchers": vouchers},
+    )
+
+
+@login_required
+def salary_voucher_create(request, store_slug):
+    store = _get_store_for_dashboard(request, store_slug)
+    if request.method == "POST":
+        form = SalaryPaymentVoucherForm(request.POST)
+        if form.is_valid():
+            voucher = form.save(commit=False)
+            voucher.store = store
+            voucher.save()
+            messages.success(request, "تم إنشاء سند صرف الراتب.")
+            return redirect("dashboard:salary_vouchers_list", store_slug=store.slug)
+    else:
+        form = SalaryPaymentVoucherForm()
+    return render(
+        request,
+        "dashboard/employees/salary_voucher_form.html",
+        {"store": store, "form": form, "title": "إضافة سند صرف راتب"},
+    )
+
+
+@login_required
+def salary_voucher_update(request, store_slug, voucher_id):
+    store = _get_store_for_dashboard(request, store_slug)
+    voucher = get_object_or_404(SalaryPaymentVoucher, pk=voucher_id, store=store)
+    if request.method == "POST":
+        form = SalaryPaymentVoucherForm(request.POST, instance=voucher)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "تم تعديل سند صرف الراتب.")
+            return redirect("dashboard:salary_vouchers_list", store_slug=store.slug)
+    else:
+        form = SalaryPaymentVoucherForm(instance=voucher)
+    return render(
+        request,
+        "dashboard/employees/salary_voucher_form.html",
+        {"store": store, "form": form, "voucher": voucher, "title": "تعديل سند صرف راتب"},
+    )
+
+
+@login_required
+def salary_payments_list(request, store_slug):
+    store = _get_store_for_dashboard(request, store_slug)
+    payments = (
+        SalaryPayment.objects
+        .filter(store=store)
+        .select_related("employee", "voucher")
+        .order_by("-date", "-id")
+    )
+    voucher_id = request.GET.get("voucher")
+    if voucher_id:
+        payments = payments.filter(voucher_id=voucher_id)
+    return render(
+        request,
+        "dashboard/employees/salary_payments_list.html",
+        {
+            "store": store,
+            "payments": payments,
+            "selected_voucher_id": voucher_id,
+            "vouchers": SalaryPaymentVoucher.objects.filter(store=store).order_by("-date", "-id"),
+        },
+    )
+
+
+@login_required
+def salary_payment_create(request, store_slug):
+    store = _get_store_for_dashboard(request, store_slug)
+    initial = {}
+    voucher_id = request.GET.get("voucher")
+    if voucher_id:
+        initial["voucher"] = voucher_id
+    if request.method == "POST":
+        form = SalaryPaymentForm(request.POST, store=store)
+        if form.is_valid():
+            payment = form.save(commit=False)
+            payment.store = store
+            payment.save()
+            messages.success(request, "تم إضافة تقبيض الراتب.")
+            return redirect("dashboard:salary_payments_list", store_slug=store.slug)
+    else:
+        form = SalaryPaymentForm(store=store, initial=initial)
+    return render(
+        request,
+        "dashboard/employees/salary_payment_form.html",
+        {"store": store, "form": form, "title": "إضافة تقبيض راتب"},
+    )
+
+
+@login_required
+def salary_payment_update(request, store_slug, payment_id):
+    store = _get_store_for_dashboard(request, store_slug)
+    payment = get_object_or_404(SalaryPayment, pk=payment_id, store=store)
+    if request.method == "POST":
+        form = SalaryPaymentForm(request.POST, instance=payment, store=store)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "تم تعديل تقبيض الراتب.")
+            return redirect("dashboard:salary_payments_list", store_slug=store.slug)
+    else:
+        form = SalaryPaymentForm(instance=payment, store=store)
+    return render(
+        request,
+        "dashboard/employees/salary_payment_form.html",
+        {
+            "store": store,
+            "form": form,
+            "payment": payment,
+            "title": "تعديل تقبيض راتب",
+            "net_amount": payment.net_amount,
+            "advance_remaining": payment.advance_remaining,
         },
     )
 
@@ -3135,7 +3347,22 @@ def profits_report(request, store_slug):
         ))
     )["total"]
 
-    actual_profit = general_profit - work_expenses
+    salary_payments = SalaryPayment.objects.filter(store=store, is_received=True)
+    if date_from:
+        salary_payments = salary_payments.filter(date__gte=date_from)
+    if date_to:
+        salary_payments = salary_payments.filter(date__lte=date_to)
+
+    salary_expr = ExpressionWrapper(
+        F("salary") + F("extra_amount") - F("discount_amount") - F("advance_amount") - F("advance_installment_deduction"),
+        output_field=DecimalField(max_digits=14, decimal_places=2),
+    )
+    salaries_total = salary_payments.aggregate(total=Coalesce(
+        Sum(salary_expr),
+        Value(0, output_field=DecimalField(max_digits=14, decimal_places=2))
+    ))["total"]
+
+    actual_profit = general_profit - work_expenses - salaries_total
     net_profit = actual_profit - general_expenses + inventory_adjustments_total
 
     return render(request, "dashboard/profits_report.html", {
@@ -3147,6 +3374,7 @@ def profits_report(request, store_slug):
         "discount_total": discount_total,
         "general_profit": general_profit,
         "work_expenses": work_expenses,
+        "salaries_total": salaries_total,
         "actual_profit": actual_profit,
         "general_expenses": general_expenses,
         "inventory_adjustments_total": inventory_adjustments_total,

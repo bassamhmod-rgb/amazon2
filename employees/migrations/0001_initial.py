@@ -143,10 +143,10 @@ class Migration(migrations.Migration):
         ),
         migrations.AddIndex(
             model_name="salarypayment",
-            index=models.Index(fields=["store", "employee", "date"], name="employees_s_store_i_986f5a_idx"),
+            index=models.Index(fields=["store", "employee", "date"], name="employees_s_store_i_e2322c_idx"),
         ),
         migrations.AddIndex(
             model_name="salarypayment",
-            index=models.Index(fields=["store", "voucher"], name="employees_s_store_i_bbe3ff_idx"),
+            index=models.Index(fields=["store", "voucher"], name="employees_s_store_i_65805b_idx"),
         ),
     ]
