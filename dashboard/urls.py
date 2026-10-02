@@ -100,6 +100,11 @@ path(
     views.reset_access_export_flags,
     name="reset_access_export_flags",
 ),
+path(
+    "<slug:store_slug>/settings/allow-mobile-resend/",
+    views.allow_mobile_resend,
+    name="allow_mobile_resend",
+),
 #ط§ظ„ط¬ط±ط¯
 path(
     "<slug:store_slug>/inventory/",

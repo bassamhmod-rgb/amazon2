@@ -41,7 +41,7 @@ from django.db.models import Q
 from accounts.models import Supplier
 from django.http import JsonResponse
 # Expenses
-from .models import Expense, ExpenseType, ExpenseReason, FixedAsset
+from .models import Expense, ExpenseType, ExpenseReason, FixedAsset, ContactInfo
 
 FIXED_EXPENSE_TYPES = ["صرفيات عمل", "صرفيات عامة"]
 # أما إذا كنت ناقله كمان لـ accounts، الغي السطر اللي فوق واستخدم هاد:
@@ -2755,6 +2755,55 @@ def reset_access_export_flags(request, store_slug):
     messages.success(
         request,
         f"تم السماح بإعادة إرسال بيانات المتجر إلى أكسس. عدد السجلات التي تم تجهيزها: {reset_count}.",
+    )
+    return redirect(f"/dashboard/{store.slug}/settings/")
+
+
+@login_required
+@require_POST
+def allow_mobile_resend(request, store_slug):
+    store = _get_store_for_dashboard(request, store_slug)
+
+    if request.user != store.owner:
+        messages.error(request, "غير مسموح لك بتعديل إعدادات هذا المتجر.")
+        return redirect(f"/dashboard/{store.slug}/settings/")
+
+    password = (request.POST.get("mobile_resend_password") or "").strip()
+    if not password or not check_password(password, request.user.password):
+        messages.error(request, "كلمة المرور غير صحيحة.")
+        return redirect(f"/dashboard/{store.slug}/settings/")
+
+    now_minute = int(time.time() // 60)
+    resend_count = 0
+    mobile_models = [
+        Store.objects.filter(id=store.id),
+        Warehouse.objects.filter(store=store),
+        Customer.objects.filter(store=store),
+        Supplier.objects.filter(store=store),
+        Category.objects.filter(store=store),
+        Product.objects.filter(store=store),
+        ProductBarcode.objects.filter(product__store=store),
+        Order.objects.filter(store=store),
+        OrderItem.objects.filter(order__store=store),
+        ExpenseType.objects.filter(store=store),
+        ExpenseReason.objects.filter(store=store),
+        Expense.objects.filter(store=store),
+        FixedAsset.objects.filter(store=store),
+        ContactInfo.objects.all(),
+        WarehouseTransfer.objects.filter(store=store),
+        WarehouseTransferItem.objects.filter(transfer__store=store),
+        InventoryAdjustment.objects.filter(store=store),
+        StockMovement.objects.filter(store=store),
+        StorePaymentMethod.objects.filter(store=store),
+    ]
+
+    with transaction.atomic():
+        for queryset in mobile_models:
+            resend_count += queryset.update(mobile_update_time=now_minute)
+
+    messages.success(
+        request,
+        f"تم السماح بإعادة إرسال بيانات المتجر إلى التطبيق. عدد السجلات التي تم تجهيزها: {resend_count}.",
     )
     return redirect(f"/dashboard/{store.slug}/settings/")
 

@@ -339,6 +339,18 @@
                     <button type="submit" class="btn btn-warning" form="access-reset-form">السماح بإعادة الإرسال الآن</button>
                 </div>
 
+                <div class="settings-card border border-info">
+                    <h4 class="mb-3 text-info">إعادة إرسال البيانات إلى التطبيق</h4>
+                    <p class="text-muted mb-2">
+                        هذا الإجراء لا يحذف أي بيانات، لكنه يحدّث علامات المزامنة حتى يعيد التطبيق سحب بيانات المتجر مرة أخرى.
+                    </p>
+                    <div class="mb-2">
+                        <label class="form-label">تأكيد كلمة المرور</label>
+                        <input type="password" class="form-control" name="mobile_resend_password" form="mobile-resend-form" placeholder="كلمة مرور التاجر">
+                    </div>
+                    <button type="submit" class="btn btn-info text-white" form="mobile-resend-form">السماح بإعادة الإرسال إلى التطبيق</button>
+                </div>
+
                 <div class="settings-card border border-danger">
                     <h4 class="mb-3 text-danger">تفريغ بيانات المتجر</h4>
                     <p class="text-muted mb-2">
@@ -364,6 +376,9 @@
         {% csrf_token %}
     </form>
     <form id="access-reset-form" method="post" action="{% url 'dashboard:reset_access_export_flags' store.slug %}">
+        {% csrf_token %}
+    </form>
+    <form id="mobile-resend-form" method="post" action="{% url 'dashboard:allow_mobile_resend' store.slug %}">
         {% csrf_token %}
     </form>
 </div>
