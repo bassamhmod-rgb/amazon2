@@ -2888,6 +2888,7 @@ def balances_report(request, store_slug):
         else:
             supplier.calc_balance_label = "متوازن"
 
+    customer_count = len(customers)
     customers = [customer for customer in customers if customer.calc_balance != 0]
     suppliers = [supplier for supplier in suppliers if supplier.calc_balance != 0]
 
@@ -2906,6 +2907,7 @@ def balances_report(request, store_slug):
         "supplier_total_abs": supplier_total_abs,
         "customer_total_label": customer_total_label,
         "supplier_total_label": supplier_total_label,
+        "customer_count": customer_count,
         "currency_symbol": "$" if store.pricing_currency == "USD" else "ل.س",
     })
 

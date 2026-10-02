@@ -162,7 +162,10 @@
     <div class="row g-3 mb-4">
         <div class="col-md-6">
             <div class="summary-card">
-                <div class="label">إجمالي أرصدة العملاء</div>
+                <div class="label d-flex justify-content-between align-items-center gap-2">
+                    <span>إجمالي أرصدة العملاء</span>
+                    <span>عدد العملاء: {{ customer_count }}</span>
+                </div>
                 <div class="value">
                     {{ customer_total_abs }} {{ currency_symbol }}
                     (
