@@ -71,6 +71,7 @@ path("<slug:store_slug>/suppliers/", views.suppliers_list, name="suppliers_list"
 path("<slug:store_slug>/suppliers/create/", views.supplier_create, name="supplier_create"),
 path("<slug:store_slug>/suppliers/<int:supplier_id>/edit/", views.supplier_update, name="supplier_update"),
 path("<slug:store_slug>/suppliers/<int:supplier_id>/delete/", views.delete_supplier, name="delete_supplier"),
+path("<slug:store_slug>/employees/", views.employees_list, name="employees_list"),
 path("<slug:store_slug>/balances/", views.balances_report, name="balances_report"),
 path("<slug:store_slug>/profits/", views.profits_report, name="profits_report"),
 path("<slug:store_slug>/fixed-assets/", views.fixed_assets_list, name="fixed_assets_list"),

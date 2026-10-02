@@ -88,6 +88,7 @@ INSTALLED_APPS = [
     "orders",
     "loyalty",
     "dashboard",
+    "employees.apps.EmployeesConfig",
     'rest_framework',
     "mobile_sync.apps.MobileSyncConfig",
 

@@ -125,18 +125,13 @@
                 </a>
 
                 <details class="sidebar-group">
-                    <summary class="sidebar-summary">👥 العملاء</summary>
+                    <summary class="sidebar-summary">👥 العلاقات التجارية</summary>
                     <div class="sidebar-submenu">
                         <a href="{% url 'dashboard:customers_list' store.slug %}">قائمة العملاء</a>
                         <a href="{% url 'dashboard:customer_create' store.slug %}">إضافة عميل</a>
-                    </div>
-                </details>
-
-                <details class="sidebar-group">
-                    <summary class="sidebar-summary">🏭 الموردين</summary>
-                    <div class="sidebar-submenu">
                         <a href="{% url 'dashboard:suppliers_list' store.slug %}">قائمة الموردين</a>
                         <a href="{% url 'dashboard:supplier_create' store.slug %}">إضافة مورد</a>
+                        <a href="{% url 'dashboard:employees_list' store.slug %}">الموظفين</a>
                     </div>
                 </details>
 

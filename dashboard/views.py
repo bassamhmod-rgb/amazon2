@@ -31,6 +31,7 @@ from accounts.store_user_forms import StoreUserForm
 from cart.models import Cart, CartItem
 from loyalty.models import LoyaltyPoints
 from mobile_sync.models import MobileDeleteSync
+from employees.models import Employee
 
 # 1. الزبون موجود بـ accounts (حسب كلامك)
 from accounts.models import Customer
@@ -459,6 +460,36 @@ def store_user_delete(request, store_slug, user_id):
     obj.delete()
     messages.success(request, "تم حذف المستخدم.")
     return redirect("dashboard:store_users_list", store_slug=store.slug)
+
+
+@login_required
+def employees_list(request, store_slug):
+    store = _get_store_for_dashboard(request, store_slug)
+    q = (request.GET.get("q") or "").strip()
+    employees = (
+        Employee.objects
+        .filter(store=store)
+        .select_related("department", "job_title", "pay_period")
+        .order_by("name", "id")
+    )
+    if q:
+        employees = employees.filter(
+            Q(name__icontains=q)
+            | Q(national_id__icontains=q)
+            | Q(mobile__icontains=q)
+        )
+
+    paginator = Paginator(employees, 20)
+    page_obj = paginator.get_page(request.GET.get("page"))
+    return render(
+        request,
+        "dashboard/employees/list.html",
+        {
+            "store": store,
+            "page_obj": page_obj,
+            "q": q,
+        },
+    )
 
 
 def _is_store_access_linked(store):
