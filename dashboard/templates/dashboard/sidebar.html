@@ -74,6 +74,15 @@
 
     <hr class="my-3">
 
+    {% if low_stock_alert_count > 0 %}
+        <div class="alert alert-warning py-2 px-2 mb-3 small">
+            <div class="fw-bold mb-1">تنبيه كميات ({{ low_stock_alert_count }})</div>
+            {% for product in low_stock_alert_products %}
+                <div>{{ product.name }}: {{ product.real_stock }} / {{ product.stock_alert_threshold }}</div>
+            {% endfor %}
+        </div>
+    {% endif %}
+
     <!-- روابط القائمة -->
     <nav class="sidebar-links">
 
