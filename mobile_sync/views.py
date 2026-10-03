@@ -514,7 +514,6 @@ def activate_permanent_license(request):
     store = Store.objects.filter(
         mobile=mobile,
         activation_code=activation_code,
-        is_active=True,
     ).first()
     if not store:
         return Response(
@@ -594,12 +593,29 @@ def check_permanent_license(request):
             status=status.HTTP_400_BAD_REQUEST,
         )
 
-    store = Store.objects.filter(
-        activation_code=activation_code,
-        licensed_device_id=device_id,
-        is_active=True,
-    ).first()
+    store = Store.objects.filter(activation_code=activation_code).first()
     if not store:
+        return Response(
+            {
+                "valid": False,
+                "detail": "رقم الجهاز غير مطابق للنسخة الدائمة.",
+                "contact_numbers": ["+963000000000"],
+            },
+            status=status.HTTP_403_FORBIDDEN,
+        )
+
+    registered_device_id = _to_str(store.licensed_device_id).strip()
+    if not registered_device_id:
+        return Response(
+            {
+                "valid": False,
+                "needs_activation": True,
+                "detail": "Permanent license needs activation.",
+            },
+            status=status.HTTP_409_CONFLICT,
+        )
+
+    if registered_device_id != device_id:
         return Response(
             {
                 "valid": False,
