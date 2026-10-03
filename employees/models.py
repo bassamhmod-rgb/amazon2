@@ -226,7 +226,7 @@ class SalaryPayment(models.Model):
             Decimal(self.salary or 0)
             + Decimal(self.extra_amount or 0)
             - Decimal(self.discount_amount or 0)
-            - Decimal(self.advance_amount or 0)
+            + Decimal(self.advance_amount or 0)
             - Decimal(self.advance_installment_deduction or 0)
         )
 
