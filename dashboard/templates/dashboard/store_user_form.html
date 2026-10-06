@@ -138,7 +138,13 @@
                     <div class="col-12">
                         <div class="card border-0 bg-light">
                             <div class="card-body">
-                                <div class="fw-bold mb-2">الصلاحيات</div>
+                                <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
+                                    <div class="fw-bold">الصلاحيات</div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="permissionsToggleAll">
+                                        <label class="form-check-label" for="permissionsToggleAll">تحديد الكل</label>
+                                    </div>
+                                </div>
                                 <div class="row g-2">
                                     {% for field in form.permission_fields %}
                                         <div class="col-md-4">
@@ -179,6 +185,25 @@
             arrow.textContent = sidebar.classList.contains("active") ? "❮" : "❯";
         };
     }
+
+    const permissionsToggleAll = document.getElementById("permissionsToggleAll");
+    const permissionCheckboxes = Array.from(document.querySelectorAll(".permission-checkbox"));
+    const syncPermissionsToggle = () => {
+        if (!permissionsToggleAll) return;
+        const checkedCount = permissionCheckboxes.filter((checkbox) => checkbox.checked).length;
+        permissionsToggleAll.checked = permissionCheckboxes.length > 0 && checkedCount === permissionCheckboxes.length;
+        permissionsToggleAll.indeterminate = checkedCount > 0 && checkedCount < permissionCheckboxes.length;
+    };
+    if (permissionsToggleAll) {
+        permissionsToggleAll.addEventListener("change", () => {
+            permissionCheckboxes.forEach((checkbox) => {
+                checkbox.checked = permissionsToggleAll.checked;
+            });
+            syncPermissionsToggle();
+        });
+    }
+    permissionCheckboxes.forEach((checkbox) => checkbox.addEventListener("change", syncPermissionsToggle));
+    syncPermissionsToggle();
 </script>
 
 </body>

@@ -28,6 +28,10 @@ PERMISSION_FIELDS = [
     ("suppliers.edit", "تعديل الموردين"),
     ("suppliers.delete", "حذف الموردين"),
     ("suppliers.balances", "أرصدة الموردين"),
+    ("employees.view", "عرض الموظفين"),
+    ("employees.manage", "إدارة الموظفين والرواتب"),
+    ("partners.view", "عرض الشركاء"),
+    ("partners.manage", "إدارة الشركاء"),
     ("warehouses.view", "عرض المستودعات"),
     ("warehouses.create", "إضافة مستودعات"),
     ("warehouses.edit", "تعديل المستودعات"),
@@ -36,11 +40,17 @@ PERMISSION_FIELDS = [
     ("stock.view", "عرض حركة المخزون"),
     ("stock.adjust", "تسوية المخزون"),
     ("stock.movement", "حركة مادة"),
+    ("production.view", "عرض التصنيع"),
+    ("production.manage", "إدارة التصنيع"),
     ("expenses.view", "عرض الصرفيات"),
     ("expenses.create", "إضافة صرفيات"),
     ("expenses.edit", "تعديل الصرفيات"),
     ("expenses.delete", "حذف الصرفيات"),
     ("expenses.settings", "إعدادات الصرفيات"),
+    ("fixed_assets.view", "عرض الأصول الثابتة"),
+    ("fixed_assets.manage", "إدارة الأصول الثابتة"),
+    ("installments.view", "عرض الأقساط"),
+    ("installments.manage", "إدارة الأقساط"),
     ("notices.receipt.create", "إضافة إشعار قبض"),
     ("notices.receipt.edit", "تعديل إشعار قبض"),
     ("notices.receipt.delete", "حذف إشعار قبض"),
@@ -117,6 +127,7 @@ class StoreUserForm(forms.ModelForm):
         for key, label in PERMISSION_FIELDS:
             field_name = permission_field_name(key)
             self.fields[field_name] = forms.BooleanField(required=False, label=label)
+            self.fields[field_name].widget.attrs["class"] = "form-check-input permission-checkbox"
             self.permission_field_names.append(field_name)
 
         if self.instance and self.instance.pk:
