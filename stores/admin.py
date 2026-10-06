@@ -98,8 +98,8 @@ class WarehouseTransferAdmin(admin.ModelAdmin):
 
 @admin.register(TrialDevice)
 class TrialDeviceAdmin(admin.ModelAdmin):
-    list_display = ("device_id", "created_at")
-    search_fields = ("device_id",)
+    list_display = ("owner_name", "device_id", "created_at")
+    search_fields = ("owner_name", "device_id")
 
 
 @admin.register(StockMovement)

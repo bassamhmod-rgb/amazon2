@@ -196,13 +196,14 @@ class Store(models.Model):
 
 class TrialDevice(models.Model):
     device_id = models.CharField(max_length=128, unique=True)
+    owner_name = models.CharField(max_length=150, blank=True, default="")
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         ordering = ["-created_at"]
 
     def __str__(self):
-        return self.device_id
+        return self.owner_name or self.device_id
 
 # المستودعات
 class Warehouse(models.Model):

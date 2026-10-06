@@ -563,13 +563,23 @@ def activate_permanent_license(request):
 @permission_classes([AllowAny])
 def register_trial_license(request):
     device_id = _to_str(request.data.get("device_id")).strip()
+    owner_name = _to_str(request.data.get("owner_name")).strip()
     if not device_id:
         return Response(
             {"detail": "رقم الجهاز مطلوب."},
             status=status.HTTP_400_BAD_REQUEST,
         )
+    if not owner_name:
+        return Response(
+            {"detail": "اسم صاحب النسخة مطلوب."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
 
-    if TrialDevice.objects.filter(device_id=device_id).exists():
+    existing = TrialDevice.objects.filter(device_id=device_id).first()
+    if existing:
+        if existing.owner_name != owner_name:
+            existing.owner_name = owner_name
+            existing.save(update_fields=["owner_name"])
         return Response(
             {
                 "detail": "انتهت الفترة التجريبية لهذا الجهاز. تواصل مع المسؤول للحصول على نسخة دائمة.",
@@ -578,7 +588,7 @@ def register_trial_license(request):
             status=status.HTTP_409_CONFLICT,
         )
 
-    TrialDevice.objects.create(device_id=device_id)
+    TrialDevice.objects.create(device_id=device_id, owner_name=owner_name)
     return Response({"license_type": 2})
 
 
