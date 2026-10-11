@@ -150,7 +150,7 @@ from django.db.models import (
     Sum, F, DecimalField, ExpressionWrapper,
     OuterRef, Subquery, Value, Case, When
 )
-from django.db.models.functions import Coalesce, Cast
+from django.db.models.functions import Abs, Coalesce, Cast
 
 from stores.models import Store
 from products.models import Product, Category
@@ -3309,7 +3309,7 @@ def profits_report(request, store_slug):
 
     profit_expr = ExpressionWrapper(
         (F("price") - Coalesce(F("buy_price"), Value(0))) *
-        F("quantity") *
+        Abs(F("quantity")) *
         Case(
             When(order__transaction_type="sale_return", then=Value(-1)),
             default=Value(1),
@@ -3385,7 +3385,11 @@ def profits_report(request, store_slug):
         salary_payments = salary_payments.filter(date__lte=date_to)
 
     salary_expr = ExpressionWrapper(
-        F("salary") + F("extra_amount") - F("discount_amount"),
+        F("salary")
+        + F("extra_amount")
+        - F("discount_amount")
+        + F("advance_amount")
+        - F("advance_installment_deduction"),
         output_field=DecimalField(max_digits=14, decimal_places=2),
     )
     salaries_total = salary_payments.aggregate(total=Coalesce(
