@@ -3387,9 +3387,7 @@ def profits_report(request, store_slug):
     salary_expr = ExpressionWrapper(
         F("salary")
         + F("extra_amount")
-        - F("discount_amount")
-        + F("advance_amount")
-        - F("advance_installment_deduction"),
+        - F("discount_amount"),
         output_field=DecimalField(max_digits=14, decimal_places=2),
     )
     salaries_total = salary_payments.aggregate(total=Coalesce(
