@@ -3395,8 +3395,8 @@ def profits_report(request, store_slug):
         Value(0, output_field=DecimalField(max_digits=14, decimal_places=2))
     ))["total"]
 
-    actual_profit = general_profit - work_expenses - salaries_total
-    net_profit = actual_profit - general_expenses + inventory_adjustments_total
+    actual_profit = general_profit - work_expenses - salaries_total - inventory_adjustments_total
+    net_profit = actual_profit - general_expenses
 
     return render(request, "dashboard/profits_report.html", {
         "store": store,
