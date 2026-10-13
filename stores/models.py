@@ -44,6 +44,16 @@ class Store(models.Model):
     mobile = models.CharField(max_length=20, unique=True, blank=True, null=True)
     activation_code = models.CharField(max_length=32, unique=True, blank=True, null=True)
     licensed_device_id = models.CharField(max_length=128, blank=True, null=True)
+    update_file = models.FileField(
+        upload_to="merchant_updates/",
+        blank=True,
+        null=True,
+        help_text="ملف تحديث مخصص لهذا التاجر.",
+    )
+    update_file_active = models.BooleanField(
+        default=False,
+        help_text="عند التفعيل يظهر ملف التحديث للبرنامج عند تفقد التحديثات.",
+    )
     facebook_url = models.URLField(blank=True)
     instagram_url = models.URLField(blank=True)
     telegram_url = models.URLField(blank=True)
