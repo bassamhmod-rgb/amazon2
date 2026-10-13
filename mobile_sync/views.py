@@ -2078,6 +2078,34 @@ def app_update_check(request):
 
 @api_view(["GET"])
 @permission_classes([AllowAny])
+def merchant_update_check(request):
+    merchant_id = _to_int(request.query_params.get("merchant_id"))
+    if merchant_id is None:
+        return Response(
+            {"detail": "merchant_id is required"},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    store = Store.objects.filter(id=merchant_id).first()
+    if not store:
+        return Response({"detail": "Store not found"}, status=status.HTTP_404_NOT_FOUND)
+
+    if not store.update_file_active or not store.update_file:
+        return Response({"update_available": False})
+
+    return Response({
+        "update_available": True,
+        "platform": "merchant",
+        "version": "",
+        "build": None,
+        "required": False,
+        "notes": "تحديث خاص لهذا التاجر.",
+        "url": request.build_absolute_uri(store.update_file.url),
+    })
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
 def stores_pull(request):
     since = request.query_params.get("since")
 
