@@ -9,6 +9,7 @@ class StoreAdmin(admin.ModelAdmin):
         "mobile",
         "activation_code",
         "licensed_device_id",
+        "update_file_platform",
         "update_file_active",
         "max_store_users",
         "rkmdb",
@@ -17,7 +18,7 @@ class StoreAdmin(admin.ModelAdmin):
         "is_active",
     )
     search_fields = ("name", "owner__username", "mobile", "activation_code", "licensed_device_id")
-    list_filter = ("theme", "is_active", "update_file_active")
+    list_filter = ("theme", "is_active", "update_file_active", "update_file_platform")
     fields = (
         "owner",
         "name",
@@ -27,6 +28,7 @@ class StoreAdmin(admin.ModelAdmin):
         "activation_code",
         "licensed_device_id",
         "update_file",
+        "update_file_platform",
         "update_file_active",
         "rkmdb",
         "rkmtb",

@@ -50,6 +50,15 @@ class Store(models.Model):
         null=True,
         help_text="ملف تحديث مخصص لهذا التاجر.",
     )
+    update_file_platform = models.CharField(
+        max_length=20,
+        choices=[
+            ("windows", "Windows"),
+            ("android", "Android"),
+        ],
+        default="windows",
+        help_text="منصة ملف التحديث المخصص.",
+    )
     update_file_active = models.BooleanField(
         default=False,
         help_text="عند التفعيل يظهر ملف التحديث للبرنامج عند تفقد التحديثات.",

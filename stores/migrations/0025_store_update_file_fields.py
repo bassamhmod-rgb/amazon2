@@ -26,4 +26,17 @@ class Migration(migrations.Migration):
                 help_text="عند التفعيل يظهر ملف التحديث للبرنامج عند تفقد التحديثات.",
             ),
         ),
+        migrations.AddField(
+            model_name="store",
+            name="update_file_platform",
+            field=models.CharField(
+                choices=[
+                    ("windows", "Windows"),
+                    ("android", "Android"),
+                ],
+                default="windows",
+                help_text="منصة ملف التحديث المخصص.",
+                max_length=20,
+            ),
+        ),
     ]

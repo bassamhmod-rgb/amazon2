@@ -2080,9 +2080,15 @@ def app_update_check(request):
 @permission_classes([AllowAny])
 def merchant_update_check(request):
     merchant_id = _to_int(request.query_params.get("merchant_id"))
+    platform = _to_str(request.query_params.get("platform")).strip().lower()
     if merchant_id is None:
         return Response(
             {"detail": "merchant_id is required"},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    if platform not in ("android", "windows"):
+        return Response(
+            {"detail": "platform must be android or windows"},
             status=status.HTTP_400_BAD_REQUEST,
         )
 
@@ -2090,12 +2096,16 @@ def merchant_update_check(request):
     if not store:
         return Response({"detail": "Store not found"}, status=status.HTTP_404_NOT_FOUND)
 
-    if not store.update_file_active or not store.update_file:
+    if (
+        not store.update_file_active
+        or not store.update_file
+        or store.update_file_platform != platform
+    ):
         return Response({"update_available": False})
 
     return Response({
         "update_available": True,
-        "platform": "merchant",
+        "platform": store.update_file_platform,
         "version": "",
         "build": None,
         "required": False,
