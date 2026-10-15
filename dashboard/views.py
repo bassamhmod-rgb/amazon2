@@ -279,7 +279,7 @@ def _rebuild_missing_cashback(store):
             buy_price = item.buy_price
             if buy_price in (None, ""):
                 buy_price = item.product.get_avg_buy_price() if item.product_id else Decimal("0")
-            total_profit += (Decimal(item.price or 0) - Decimal(buy_price or 0)) * Decimal(abs(item.quantity or 0))
+            total_profit += Decimal(item.price or 0) * abs(Decimal(item.quantity or 0)) - Decimal(buy_price or 0) * item.stock_quantity
 
         if not has_items:
             skipped_empty += 1
@@ -826,7 +826,7 @@ def products_list(request, store_slug):
         .values("total_quantity")[:1]
     )
     movement_expr = ExpressionWrapper(
-        F("order_items__quantity") * Cast(F("order_items__direction"), DecimalField(max_digits=12, decimal_places=2)),
+        (F("order_items__quantity") + F("order_items__bonus_quantity")) * Cast(F("order_items__direction"), DecimalField(max_digits=12, decimal_places=2)),
         output_field=DecimalField(max_digits=12, decimal_places=2)
     )
     movements = Coalesce(
@@ -846,7 +846,7 @@ def products_list(request, store_slug):
     )
     sold_qty = Coalesce(
         Sum(Case(
-            When(order_items__direction=-1, then=F("order_items__quantity")),
+            When(order_items__direction=-1, then=F("order_items__quantity") + F("order_items__bonus_quantity")),
             default=Value(0),
             output_field=DecimalField(max_digits=12, decimal_places=2)
         )),
@@ -1283,7 +1283,7 @@ def order_detail_dashboard(request, store_slug, order_id):
     if order.transaction_type == "sale" and order.customer:
         for item in order.items.all():
             buy_price = item.buy_price or 0
-            total_profit += (item.price - buy_price) * item.quantity
+            total_profit += item.price * item.quantity - buy_price * item.stock_quantity
 
         percent = store.cashback_percentage or 0
         suggested_cashback = (total_profit * percent) / 100 if total_profit > 0 else 0
@@ -3259,7 +3259,7 @@ def profits_report(request, store_slug):
             movements=Coalesce(
                 Sum(
                     ExpressionWrapper(
-                        F("order_items__quantity") * F("order_items__direction"),
+                        (F("order_items__quantity") + F("order_items__bonus_quantity")) * F("order_items__direction"),
                         output_field=DecimalField(max_digits=14, decimal_places=2),
                     )
                 ),
@@ -3308,8 +3308,8 @@ def profits_report(request, store_slug):
             messages.error(request, "تاريخ النهاية غير صحيح.")
 
     profit_expr = ExpressionWrapper(
-        (F("price") - Coalesce(F("buy_price"), Value(0))) *
-        Abs(F("quantity")) *
+        (F("price") * Abs(F("quantity")) -
+         Coalesce(F("buy_price"), Value(0)) * (Abs(F("quantity")) + F("bonus_quantity"))) *
         Case(
             When(order__transaction_type="sale_return", then=Value(-1)),
             default=Value(1),
@@ -3679,7 +3679,7 @@ def inventory_list(request, store_slug):
             + Coalesce(
                 Sum(
                     ExpressionWrapper(
-                        F("order_items__quantity") * F("order_items__direction"),
+                        (F("order_items__quantity") + F("order_items__bonus_quantity")) * F("order_items__direction"),
                         output_field=DecimalField(max_digits=10, decimal_places=2)
                     ),
                     filter=Q(

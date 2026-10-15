@@ -85,7 +85,7 @@ def store_front(request, slug):
         .values("total_quantity")[:1]
     )
     movement_expr = ExpressionWrapper(
-        F("order_items__quantity") * Cast(F("order_items__direction"), DecimalField(max_digits=12, decimal_places=2)),
+        (F("order_items__quantity") + F("order_items__bonus_quantity")) * Cast(F("order_items__direction"), DecimalField(max_digits=12, decimal_places=2)),
         output_field=DecimalField(max_digits=12, decimal_places=2)
     )
     movements = Coalesce(
@@ -105,7 +105,7 @@ def store_front(request, slug):
     )
     sold_qty = Coalesce(
         Sum(Case(
-            When(order_items__direction=-1, then=F("order_items__quantity")),
+            When(order_items__direction=-1, then=F("order_items__quantity") + F("order_items__bonus_quantity")),
             default=Value(0),
             output_field=DecimalField(max_digits=12, decimal_places=2)
         )),

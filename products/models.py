@@ -131,7 +131,7 @@ class Product(models.Model):
     @property
     def real_stock(self):
         movements = self.order_items.aggregate(
-            total=Sum(F("quantity") * F("direction"))
+            total=Sum((F("quantity") + F("bonus_quantity")) * F("direction"))
         )["total"] or 0
         stock_movements = self.stock_movements.aggregate(
             total=Sum("quantity_change")
@@ -151,7 +151,7 @@ class Product(models.Model):
         )
 
         for item in items:
-            qty = Decimal(item.quantity or 0)
+            qty = Decimal(item.quantity or 0) + Decimal(item.bonus_quantity or 0)
             transaction_type = item.order.transaction_type if item.order_id else ""
             is_inbound_cost = transaction_type in ("purchase", "sale_return")
             is_outbound_cost = transaction_type in ("sale", "purchase_return")
@@ -163,7 +163,8 @@ class Product(models.Model):
             else:
                 buy_price = Decimal("0")
 
-            cost = buy_price * qty
+            cost = (Decimal(item.price or 0) * Decimal(item.quantity or 0)
+                    if transaction_type in ("purchase", "purchase_return") else buy_price * qty)
 
             if is_inbound_cost:
                 total_qty += qty

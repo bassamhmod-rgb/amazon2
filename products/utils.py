@@ -19,19 +19,22 @@ def fix_missing_buy_price_for_product(product, dry_run=False):
     )
 
     for item in items:
-        qty = Decimal(item.quantity or 0)
+        qty = Decimal(item.quantity or 0) + Decimal(item.bonus_quantity or 0)
         transaction_type = item.order.transaction_type if item.order_id else ""
         is_inbound_cost = transaction_type in ("purchase", "sale_return")
         is_outbound_cost = transaction_type in ("sale", "purchase_return")
 
         if is_inbound_cost:
             if item.buy_price is None and item.price is not None:
-                item.buy_price = item.price
+                item.buy_price = (item.price * Decimal(item.quantity or 0) / qty
+                                  if transaction_type == 'purchase' and qty > 0 else item.price)
                 updated_count += 1
                 if not dry_run:
                     item.save(update_fields=["buy_price"])
 
             buy_price = Decimal(item.buy_price or 0)
+            if transaction_type == 'purchase' and qty > 0:
+                buy_price = Decimal(item.price or 0) * Decimal(item.quantity or 0) / qty
             # If we had sales before purchases, backfill them now from this purchase price
             if pending_sales and buy_price > 0:
                 remaining = qty

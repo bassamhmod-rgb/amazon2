@@ -333,7 +333,7 @@ class OrderItem(models.Model):
     def profit(self):
         if self.direction == 1 or self.buy_price is None:
             return 0
-        return (self.price - self.buy_price) * abs(self.quantity)
+        return self.subtotal - self.buy_price * self.stock_quantity
 
     def save(self, *args, **kwargs):
         _touch_update_time(self, kwargs)
