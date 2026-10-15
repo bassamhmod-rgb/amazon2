@@ -3,7 +3,7 @@ from django.db import migrations, models
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("orders", "0012_orderitem_warehouse"),
+        ("orders", "0024_order_note"),
     ]
 
     operations = [
