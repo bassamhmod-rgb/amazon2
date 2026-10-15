@@ -102,6 +102,7 @@ def merchant_orders_api(request, merchant_id):
                     "order_item_id": item.id,
                     "product": item.product.name if item.product else "",
                     "quantity": float(item.quantity),
+                    "bonus_quantity": float(item.bonus_quantity or 0),
                     "price": float(item.price),
                     "buy_price": float(item.buy_price or 0),
                     "warehouse": (item.warehouse.access_id if item.warehouse else None),
@@ -179,6 +180,7 @@ def merchant_orders_updates_api(request, merchant_id):
                     "order_item_id": item.id,
                     "product": item.product.name if item.product else "",
                     "quantity": float(item.quantity),
+                    "bonus_quantity": float(item.bonus_quantity or 0),
                     "price": float(item.price),
                     "buy_price": float(item.buy_price or 0),
                     "warehouse": (item.warehouse.access_id if item.warehouse else None),
@@ -427,6 +429,7 @@ def create_order_item_from_access(request):
             return JsonResponse({"error": "product not found for store"})
 
         quantity = data.get("quantity", 1)
+        bonus_quantity = data.get("bonus_quantity", 0)
         direction = data.get("noaf")
         buy_price = data.get("buy_price", 0)
         price = data.get("price", 0)
@@ -448,6 +451,7 @@ def create_order_item_from_access(request):
             if existing_item:
                 existing_item.product = product
                 existing_item.quantity = quantity
+                existing_item.bonus_quantity = bonus_quantity
                 existing_item.direction = direction
                 existing_item.buy_price = buy_price
                 existing_item.price = price
@@ -472,6 +476,7 @@ def create_order_item_from_access(request):
                 order=order,
                 product=product,
                 quantity=quantity,
+                bonus_quantity=bonus_quantity,
                 price=price,
                 buy_price=buy_price,
                 direction=direction
@@ -488,6 +493,7 @@ def create_order_item_from_access(request):
             access_id=access_id,
             product=product,
             quantity=quantity,
+            bonus_quantity=bonus_quantity,
             direction=direction,
             buy_price=buy_price,
             price=price,
@@ -508,6 +514,7 @@ def create_order_item_from_access(request):
                     access_id=access_id,
                     product=product,
                     quantity=quantity,
+                    bonus_quantity=bonus_quantity,
                     direction=direction,
                     buy_price=buy_price,
                     price=price,

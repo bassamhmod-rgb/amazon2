@@ -290,6 +290,13 @@ class OrderItem(models.Model):
         decimal_places=2
     )
 
+    bonus_quantity = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=0,
+        help_text="كمية البونص المجانية من نفس الصنف",
+    )
+
     price = models.DecimalField(
         max_digits=10,
         decimal_places=2
@@ -317,6 +324,10 @@ class OrderItem(models.Model):
     @property
     def subtotal(self):
         return self.price * abs(self.quantity)
+
+    @property
+    def stock_quantity(self):
+        return abs(self.quantity) + abs(self.bonus_quantity or 0)
 
     @property
     def profit(self):
