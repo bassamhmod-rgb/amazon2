@@ -5,6 +5,8 @@ from . import views
 urlpatterns = [
     path("ping/", views.ping, name="ping"),
     path("app-update/", views.app_update_check, name="app_update_check"),
+    path("app-update/<int:update_id>/download/", views.app_update_download, name="app_update_download"),
+    path("merchant-update/<int:merchant_id>/download/", views.merchant_update_download, name="merchant_update_download"),
     path("merchant-update/", views.merchant_update_check, name="merchant_update_check"),
     path("stores/", views.stores_pull, name="stores_pull"),
     path("store-currency/", views.store_currency_settings, name="store_currency_settings"),

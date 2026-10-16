@@ -27,6 +27,7 @@ from products.models import Product
 from products.models import ProductBarcode
 from orders.models import Order, OrderItem
 from dashboard.models import AppUpdate, ContactInfo, Expense, ExpenseType, ExpenseReason, FixedAsset
+from mobile_sync.update_downloads import file_metadata, installer_response
 from employees.models import (
     Employee,
     EmployeeDepartment,
@@ -2064,7 +2065,9 @@ def app_update_check(request):
     if not update:
         return Response({"update_available": False})
 
-    file_url = request.build_absolute_uri(update.file.url) if update.file else ""
+    file_url = request.build_absolute_uri(
+        f"/api/mobile/v1/app-update/{update.id}/download/"
+    ) if update.file else ""
     return Response({
         "update_available": True,
         "platform": update.platform,
@@ -2073,6 +2076,7 @@ def app_update_check(request):
         "required": update.required,
         "notes": update.notes or "",
         "url": file_url,
+        **file_metadata(update.file, update.updated_at),
     })
 
 
@@ -2110,8 +2114,27 @@ def merchant_update_check(request):
         "build": None,
         "required": False,
         "notes": "تحديث خاص لهذا التاجر.",
-        "url": request.build_absolute_uri(store.update_file.url),
+        "url": request.build_absolute_uri(f"/api/mobile/v1/merchant-update/{store.id}/download/"),
+        **file_metadata(store.update_file),
     })
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def app_update_download(request, update_id):
+    update = AppUpdate.objects.filter(id=update_id, is_active=True).first()
+    if not update or not update.file:
+        return Response({"detail": "Update not found"}, status=404)
+    return installer_response(update.file, update.platform, update.build)
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def merchant_update_download(request, merchant_id):
+    store = Store.objects.filter(id=merchant_id, update_file_active=True).first()
+    if not store or not store.update_file:
+        return Response({"detail": "Update not found"}, status=404)
+    return installer_response(store.update_file, store.update_file_platform, f"merchant_{store.id}")
 
 
 @api_view(["GET"])
