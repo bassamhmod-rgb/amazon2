@@ -15,6 +15,7 @@ from io import BytesIO
 from contextlib import contextmanager
 from django.contrib.auth.models import User
 from django.db import IntegrityError, transaction
+from django.db.models.deletion import ProtectedError
 from django.db.models import Sum
 from django.utils import timezone
 from django.views.decorators.http import require_POST
@@ -1079,11 +1080,20 @@ def product_delete(request, store_slug, product_id):
         return redirect("dashboard:products_list", store_slug=store.slug)
 
     if request.method == "POST":
-        product_qs.delete()
-        messages.success(
-            request,
-            "تم حذف المنتج بنجاح"
-        )
+        try:
+            with transaction.atomic():
+                product_qs.delete()
+        except ProtectedError:
+            messages.error(
+                request,
+                "لا يمكن حذف هذه المادة لوجود حركات مخزون أو سجلات مرتبطة بها. "
+                "يمكنك إلغاء تفعيلها من تعديل المادة مع الاحتفاظ بسجل حركاتها."
+            )
+        else:
+            messages.success(
+                request,
+                "تم حذف المنتج بنجاح"
+            )
 
     return redirect("dashboard:products_list", store_slug=store.slug)
 
