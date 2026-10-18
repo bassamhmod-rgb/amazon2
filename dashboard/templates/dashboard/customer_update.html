@@ -80,6 +80,8 @@
                         <option value="1" {% if customer.preferred_price_level == 1 %}selected{% endif %}>سعر المفرق</option>
                         <option value="2" {% if customer.preferred_price_level == 2 %}selected{% endif %}>سعر نص جملة</option>
                         <option value="3" {% if customer.preferred_price_level == 3 %}selected{% endif %}>سعر جملة</option>
+                        <option value="4" {% if customer.preferred_price_level == 4 %}selected{% endif %}>آخر سعر بيع لهذا العميل</option>
+                        <option value="5" {% if customer.preferred_price_level == 5 %}selected{% endif %}>آخر سعر بيع للمادة عموماً</option>
                     </select>
                 </div>
 

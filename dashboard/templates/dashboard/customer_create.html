@@ -124,6 +124,8 @@
                 <option value="1" {% if form_data.preferred_price_level|default:'1' == '1' %}selected{% endif %}>سعر المفرق</option>
                 <option value="2" {% if form_data.preferred_price_level == '2' %}selected{% endif %}>سعر نص جملة</option>
                 <option value="3" {% if form_data.preferred_price_level == '3' %}selected{% endif %}>سعر جملة</option>
+                <option value="4" {% if form_data.preferred_price_level == '4' %}selected{% endif %}>آخر سعر بيع لهذا العميل</option>
+                <option value="5" {% if form_data.preferred_price_level == '5' %}selected{% endif %}>آخر سعر بيع للمادة عموماً</option>
             </select>
         </div>
 

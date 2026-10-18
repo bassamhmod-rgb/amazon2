@@ -106,6 +106,7 @@ def merchant_orders_api(request, merchant_id):
                     "price": float(item.price),
                     "buy_price": float(item.buy_price or 0),
                     "warehouse": (item.warehouse.access_id if item.warehouse else None),
+                    "line_note": item.line_note,
                     "direction": item.direction
                 }
                 for item in items
@@ -184,6 +185,7 @@ def merchant_orders_updates_api(request, merchant_id):
                     "price": float(item.price),
                     "buy_price": float(item.buy_price or 0),
                     "warehouse": (item.warehouse.access_id if item.warehouse else None),
+                    "line_note": item.line_note,
                     "direction": item.direction
                 }
                 for item in items
@@ -450,6 +452,8 @@ def create_order_item_from_access(request):
             )
             if existing_item:
                 existing_item.product = product
+                if "line_note" in data:
+                    existing_item.line_note = str(data.get("line_note") or "")
                 existing_item.quantity = quantity
                 existing_item.bonus_quantity = bonus_quantity
                 existing_item.direction = direction
@@ -490,6 +494,7 @@ def create_order_item_from_access(request):
 
         order_item = OrderItem(
             order=order,
+            line_note=str(data.get("line_note") or ""),
             access_id=access_id,
             product=product,
             quantity=quantity,

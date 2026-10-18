@@ -142,7 +142,7 @@ def _preferred_price_level_from_request(value):
         level = int(value)
     except (TypeError, ValueError):
         return 1
-    return level if level in (1, 2, 3) else 1
+    return level if level in (1, 2, 3, 4, 5) else 1
 from datetime import date as dt_date
 from django.db.models import Sum
 ###

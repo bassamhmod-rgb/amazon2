@@ -947,7 +947,7 @@ def _apply_customer_change(store, payload, server_id=None):
     note = _to_str(payload.get("note")).strip()
     access_id = _to_int(payload.get("access_id"))
     preferred_price_level = _to_int(payload.get("preferred_price_level"), 1)
-    if preferred_price_level not in (1, 2, 3):
+    if preferred_price_level not in (1, 2, 3, 4, 5):
         preferred_price_level = 1
     if not name and not phone:
         raise ValueError("Customer name or phone is required")
@@ -3692,6 +3692,7 @@ def orders_push(request):
                 order._skip_update_time_touch = True
                 order.save()
 
+                previous_line_notes = dict(order.items.values_list("id", "line_note"))
                 order.items.all().delete()
                 created_items = []
                 for item_payload, product in prepared_items:
@@ -3707,6 +3708,12 @@ def orders_push(request):
 
                     order_item = OrderItem(
                         order=order,
+                        item_note=item_note,
+                        line_note=(
+                            _to_str(item_payload.get("line_note"), "")
+                            if "line_note" in item_payload
+                            else previous_line_notes.get(_to_int(item_payload.get("server_item_id")), "")
+                        ),
                         product=product,
                         quantity=Decimal(str(quantity)),
                         bonus_quantity=Decimal(str(max(0, _to_float(item_payload.get("bonus_quantity"), 0)))),
@@ -3759,6 +3766,7 @@ def _serialize_order_item_for_mobile(item):
         "direction": getattr(item, "direction", -1),
         "buy_price": None if buy_price is None else _to_float(buy_price),
         "item_note": getattr(item, "item_note", "") or "",
+        "line_note": getattr(item, "line_note", "") or "",
         "update_time": _mobile_time(item),
     }
 

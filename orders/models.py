@@ -307,6 +307,7 @@ class OrderItem(models.Model):
         help_text="ط¨ظٹط¹ = -1 / ط´ط±ط§ط، = +1"
     )
 
+    line_note = models.TextField(blank=True, default="", verbose_name="ملاحظة البند")
     item_note = models.TextField(
         blank=True,
         null=True,
