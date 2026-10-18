@@ -1126,6 +1126,17 @@ def add_category(request, store_slug):
     if request.method == "POST":
         name = (request.POST.get("name") or "").strip()
         image = request.FILES.get("image")
+        try:
+            display_order = int(request.POST.get("display_order") or "0")
+            if not 0 <= display_order <= 2147483647:
+                raise ValueError
+        except (ValueError, TypeError):
+            return render(request, "dashboard/category_form.html", {
+                "store": store,
+                "category": None,
+                "is_edit": False,
+                "error": "ترتيب العرض يجب أن يكون رقماً صحيحاً بين 0 و2147483647",
+            })
 
         if not name:
             return render(request, "dashboard/category_form.html", {
@@ -1135,6 +1146,7 @@ def add_category(request, store_slug):
 
         # إنشاء الفئة وربطها تلقائياً بالمتجر
         Category.objects.create(
+            display_order=display_order,
             name=name,
             store=store,
             image=image,
@@ -1155,6 +1167,17 @@ def edit_category(request, store_slug, category_id):
     if request.method == "POST":
         name = (request.POST.get("name") or "").strip()
         image = request.FILES.get("image")
+        try:
+            display_order = int(request.POST.get("display_order") or "0")
+            if not 0 <= display_order <= 2147483647:
+                raise ValueError
+        except (ValueError, TypeError):
+            return render(request, "dashboard/category_form.html", {
+                "store": store,
+                "category": category,
+                "is_edit": True,
+                "error": "ترتيب العرض يجب أن يكون رقماً صحيحاً بين 0 و2147483647",
+            })
         clear_image = request.POST.get("clear_image") == "1"
 
         if not name:
@@ -1173,6 +1196,7 @@ def edit_category(request, store_slug, category_id):
                 "is_edit": True,
             })
 
+        category.display_order = display_order
         category.name = name
         if clear_image:
             category.image = None
@@ -2877,6 +2901,17 @@ def store_settings(request, store_slug):
             return _perform_store_reset(request, store)
 
         new_slug = request.POST.get("slug", "").strip()
+
+        product_layout = request.POST.get("product_layout", store.product_layout)
+        product_image_size = request.POST.get("product_image_size", store.product_image_size)
+        if product_layout not in dict(Store._meta.get_field("product_layout").choices):
+            messages.error(request, "طريقة عرض المنتجات غير صحيحة.")
+            return redirect(f"/dashboard/{store.slug}/settings/")
+        if product_image_size not in dict(Store._meta.get_field("product_image_size").choices):
+            messages.error(request, "حجم صور المنتجات غير صحيح.")
+            return redirect(f"/dashboard/{store.slug}/settings/")
+        store.product_layout = product_layout
+        store.product_image_size = product_image_size
 
         if new_slug != store.slug:
             if Store.objects.filter(slug=new_slug).exclude(id=store.id).exists():

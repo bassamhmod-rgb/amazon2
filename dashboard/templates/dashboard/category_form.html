@@ -87,6 +87,11 @@
         </div>
 
         <div class="mb-3">
+            <label for="display_order" class="form-label">ترتيب عرض الفئة (الأصغر أولاً)</label>
+            <input type="number" name="display_order" id="display_order" class="form-control" min="0" max="2147483647" step="1" value="{{ request.POST.display_order|default:category.display_order|default:0 }}" required>
+        </div>
+
+        <div class="mb-3">
             <label for="image" class="form-label">صورة الفئة</label>
             {% if category and category.image %}
                 <div class="mb-2 d-flex align-items-center gap-2">

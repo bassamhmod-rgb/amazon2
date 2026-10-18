@@ -226,6 +226,48 @@ button.btn-primary {
     display:block;
 }
 
+.products-grid { --product-image-size: 200px; }
+.products-grid.image-medium { --product-image-size: 120px; }
+.products-grid.image-small { --product-image-size: 72px; }
+.products-grid .product-image-square {
+    width: min(var(--product-image-size), 100%);
+}
+.products-grid .product-info { min-width: 0; }
+.products-grid.image-small .store-card { padding: .6rem .4rem; }
+.products-grid.image-medium .store-card { padding: .8rem .6rem; }
+.products-grid.image-small .product-name,
+.products-grid.image-small .product-price { font-size: .85rem; }
+.products-grid .qty-control { flex-wrap: wrap; }
+.products-grid.layout-horizontal .product-column { width: 100%; }
+.products-grid.layout-horizontal .store-card {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    text-align: start;
+}
+.products-grid.layout-horizontal .product-image-link {
+    flex: 0 0 min(var(--product-image-size), 38%);
+    min-width: 0;
+}
+.products-grid.layout-horizontal .product-image-square { margin-bottom: 0; }
+.products-grid.layout-horizontal .product-info { flex: 1; }
+.products-grid.layout-horizontal .qty-control { justify-content: flex-start; }
+@media (min-width: 768px) {
+    .products-grid.layout-horizontal .product-column { width: 50%; }
+}
+@media (max-width: 767.98px) {
+    .products-grid.layout-vertical.image-small .product-column { width: 33.333333%; }
+    .products-grid.layout-vertical.image-small { --bs-gutter-x: .5rem; --bs-gutter-y: .5rem; }
+    .products-grid.layout-vertical.image-small .qty-control { gap: .15rem; }
+    .products-grid.layout-vertical.image-small .qty-btn { width: 24px; height: 30px; }
+    .products-grid.layout-vertical.image-small .qty-input { width: 32px; padding: .2rem 0; }
+    .products-grid.layout-vertical.image-small .add-to-cart-form > button {
+        padding: .4rem .15rem;
+        font-size: .75rem;
+        white-space: normal;
+    }
+}
+
 .main-header {
     z-index: 2000;
 }
@@ -467,9 +509,9 @@ button.btn-primary {
         <h2 class="section-title">{{ store.description3 }}</h2>
         <p class="section-subtitle">{{ store.description4 }}</p>
 
-        <div class="row g-3 mt-3">
+        <div class="row g-3 mt-3 products-grid layout-{{ store.product_layout }} image-{{ store.product_image_size }}">
             {% for p in products %}
-            <div class="col-6 col-md-3">
+            <div class="col-6 col-md-3 product-column">
                 <div class="store-card">
                     <a href="{% url 'stores:product_public' store.slug p.id %}" class="product-image-link" aria-label="{{ p.name }}">
                         {% if p.main_image %}
@@ -483,6 +525,7 @@ button.btn-primary {
                         {% endif %}
                     </a>
 
+                    <div class="product-info">
                     <div class="product-name">{{ p.name }}</div>
                     {% if p.show_price %}
                       {% if store.pricing_currency == "USD" %}
@@ -504,6 +547,7 @@ button.btn-primary {
                         </div>
                         <button type="submit" class="btn btn-primary w-100 mt-2">أضف إلى السلة</button>
                     </form>
+                    </div>
                 </div>
             </div>
             {% empty %}

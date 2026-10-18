@@ -122,6 +122,16 @@ class Store(models.Model):
         ],
         default="contain"
     )
+    product_layout = models.CharField(
+        max_length=10,
+        choices=[("vertical", "عمودي"), ("horizontal", "أفقي")],
+        default="vertical",
+    )
+    product_image_size = models.CharField(
+        max_length=10,
+        choices=[("small", "صغير"), ("medium", "متوسط"), ("large", "كبير")],
+        default="large",
+    )
     
     
     def save(self, *args, **kwargs):

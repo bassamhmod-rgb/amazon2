@@ -227,6 +227,23 @@
                             </div>
                         </div>
 
+                        <div class="col-md-6">
+                            <label for="product_layout" class="form-label">طريقة عرض المنتجات</label>
+                            <select id="product_layout" class="form-select" name="product_layout">
+                                <option value="vertical" {% if store.product_layout == "vertical" %}selected{% endif %}>عمودي — الصورة فوق التفاصيل</option>
+                                <option value="horizontal" {% if store.product_layout == "horizontal" %}selected{% endif %}>أفقي — الصورة بجانب التفاصيل</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="product_image_size" class="form-label">حجم صور المنتجات</label>
+                            <select id="product_image_size" class="form-select" name="product_image_size">
+                                <option value="small" {% if store.product_image_size == "small" %}selected{% endif %}>صغير</option>
+                                <option value="medium" {% if store.product_image_size == "medium" %}selected{% endif %}>متوسط</option>
+                                <option value="large" {% if store.product_image_size == "large" %}selected{% endif %}>كبير (الحالي)</option>
+                            </select>
+                            <div class="text-muted mt-1" style="font-size:13px;">الحجم الصغير يقلل مساحة البطاقة، ويعرض 3 منتجات بكل صف على الموبايل في العرض العمودي. العرض الأفقي يعرض منتجاً بكل صف.</div>
+                        </div>
+
                         {% if store.accounting_clients.exists %}
                             <div class="alert alert-warning py-2" style="font-size:13px;">
                                 ملاحظة: المتجر مرتبط ببرنامج الأمان للمحاسبة، وطريقة التسعير تُحدد من البرنامج.

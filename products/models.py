@@ -27,6 +27,7 @@ def _touch_mobile_update_time(instance, kwargs):
 
 
 class Category(models.Model):
+    display_order = models.PositiveIntegerField(default=0, verbose_name="ترتيب العرض")
     update_time = models.BigIntegerField(blank=True, null=True)
     mobile_update_time = models.BigIntegerField(blank=True, null=True)
     access_id = models.BigIntegerField(blank=True, null=True)
@@ -54,6 +55,7 @@ class Category(models.Model):
 
 
 class Product(models.Model):
+    display_order = models.PositiveIntegerField(default=0, verbose_name="ترتيب العرض")
     update_time = models.BigIntegerField(blank=True, null=True)
     mobile_update_time = models.BigIntegerField(blank=True, null=True)
     access_id = models.BigIntegerField(blank=True, null=True)

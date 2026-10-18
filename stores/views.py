@@ -117,7 +117,7 @@ def store_front(request, slug):
         .filter(store=store, active=True)
         .annotate(real_stock_calc=real_stock_calc, sold_qty=sold_qty)
         .filter(Q(real_stock_calc__gt=0) | Q(allow_negative_stock_sale=True))
-        .order_by("-sold_qty", "-id")
+        .order_by(F("category__display_order").asc(nulls_last=True), "category_id", "display_order", "-sold_qty", "-id")
     )
 
     # ============ 🔎 البحث ============
@@ -126,7 +126,7 @@ def store_front(request, slug):
         products = products.filter(name__icontains=q)
 
     # ============ 🟦 جلب الفئات ============
-    categories = Category.objects.filter(store=store)
+    categories = Category.objects.filter(store=store).order_by("display_order", "id")
 
     # ============ 🟨 التصفية بالحقل category ============
     category_id = request.GET.get("category")
