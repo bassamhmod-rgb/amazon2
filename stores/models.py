@@ -122,6 +122,11 @@ class Store(models.Model):
         ],
         default="contain"
     )
+    display_currency = models.CharField(
+        max_length=4,
+        choices=[("USD", "دولار"), ("SYP", "ليرة سورية"), ("BOTH", "العملتان معاً")],
+        default="BOTH",
+    )
     product_layout = models.CharField(
         max_length=10,
         choices=[("vertical", "عمودي"), ("horizontal", "أفقي")],

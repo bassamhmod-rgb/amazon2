@@ -1,3 +1,4 @@
+from .pricing import set_display_prices
 from django.shortcuts import render, get_object_or_404, redirect
 from .models import Store
 from products.models import Product
@@ -143,13 +144,8 @@ def store_front(request, slug):
         category2_id = ""
 
     products = list(products)
-    exchange_rate = store.exchange_rate or 0
-    if store.pricing_currency == "USD" and exchange_rate > 0:
-        for p in products:
-            p.price_syp = p.price * exchange_rate
-    else:
-        for p in products:
-            p.price_syp = p.price
+    for p in products:
+        set_display_prices(p, store)
 
     return render(request, "stores/store_front.html", {
         "store": store,
@@ -246,11 +242,7 @@ def store_app_icon(request, slug, size):
 def product_public(request, store_slug, product_id):
     store = get_object_or_404(Store, slug=store_slug)
     product = get_object_or_404(Product, id=product_id, store=store)
-    exchange_rate = store.exchange_rate or 0
-    if store.pricing_currency == "USD" and exchange_rate > 0:
-        product.price_syp = product.price * exchange_rate
-    else:
-        product.price_syp = product.price
+    set_display_prices(product, store)
     return render(request, "stores/product_public.html", {
     "store": store,
     "product": product,

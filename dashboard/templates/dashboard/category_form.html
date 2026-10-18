@@ -88,7 +88,7 @@
 
         <div class="mb-3">
             <label for="display_order" class="form-label">ترتيب عرض الفئة (الأصغر أولاً)</label>
-            <input type="number" name="display_order" id="display_order" class="form-control" min="0" max="2147483647" step="1" value="{{ request.POST.display_order|default:category.display_order|default:0 }}" required>
+            <input type="number" name="display_order" id="display_order" class="form-control" min="0" max="2147483647" step="1" value="{% if request.method == 'POST' %}{{ request.POST.display_order|default:'0' }}{% elif category %}{{ category.display_order }}{% else %}0{% endif %}" required>
         </div>
 
         <div class="mb-3">

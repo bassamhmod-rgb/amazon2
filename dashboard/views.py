@@ -2912,6 +2912,11 @@ def store_settings(request, store_slug):
             return redirect(f"/dashboard/{store.slug}/settings/")
         store.product_layout = product_layout
         store.product_image_size = product_image_size
+        display_currency = request.POST.get("display_currency", store.display_currency)
+        if display_currency not in dict(Store._meta.get_field("display_currency").choices):
+            messages.error(request, "عملة العرض غير صحيحة.")
+            return redirect(f"/dashboard/{store.slug}/settings/")
+        store.display_currency = display_currency
 
         if new_slug != store.slug:
             if Store.objects.filter(slug=new_slug).exclude(id=store.id).exists():
@@ -2995,6 +3000,10 @@ def store_settings(request, store_slug):
             if store.pricing_currency == "USD":
                 messages.error(request, "سعر الصرف مطلوب عند اختيار التسعير بالدولار.")
                 return redirect(f"/dashboard/{store.slug}/settings/")
+
+        if (store.pricing_currency == "USD" or store.display_currency in ("USD", "BOTH")) and store.exchange_rate <= 0:
+            messages.error(request, "سعر الصرف يجب أن يكون أكبر من صفر لعرض الأسعار بالعملة الأخرى.")
+            return redirect(f"/dashboard/{store.slug}/settings/")
 
         store.save()
 

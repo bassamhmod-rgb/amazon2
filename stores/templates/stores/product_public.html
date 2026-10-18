@@ -175,15 +175,15 @@
                 <h1 class="product-title">{{ product.name }}</h1>
 
                 {% if product.show_price %}
-                {% if store.pricing_currency == "USD" %}
-                    <div class="product-price">{{ product.price|floatformat:2 }} $</div>
-                    <div class="text-muted" style="font-size:1rem;">
-                        {{ product.price_syp|floatformat:0 }} ل.س
-                    </div>
-                {% else %}
-                    <div class="product-price">{{ product.price_syp|floatformat:0 }} ل.س</div>
-                {% endif %}
-                {% endif %}
+    <div class="product-prices">
+    {% if store.display_currency == "USD" or store.display_currency == "BOTH" %}
+        {% if product.price_usd != None %}<div class="product-price">{{ product.price_usd|floatformat:2 }} $</div>{% endif %}
+    {% endif %}
+    {% if store.display_currency == "SYP" or store.display_currency == "BOTH" %}
+        {% if product.price_syp != None %}<div class="product-price">{{ product.price_syp|floatformat:0 }} ل.س</div>{% endif %}
+    {% endif %}
+    </div>
+{% endif %}
 
                 <p><strong>الكمية المتوفرة:</strong> {{ product.real_stock }}</p>
                 <p><strong>الفئة:</strong>

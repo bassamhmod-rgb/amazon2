@@ -223,10 +223,18 @@
                             <label class="form-label">سعر الصرف (1 دولار = ؟ ل.س)</label>
                             <input type="number" name="exchange_rate" value="{{ store.exchange_rate }}" min="0" step="0.01" class="form-control">
                             <div class="text-muted mt-1" style="font-size:13px;">
-                                عند اختيار الدولار سيتم عرض السعر بالدولار وبالليرة السورية حسب هذا السعر.
+                                يُستخدم للتحويل بين الدولار والليرة السورية حسب عملة التسعير وعملة العرض.
                             </div>
                         </div>
 
+                        <div class="col-md-12">
+                            <label for="display_currency" class="form-label">العملة الظاهرة للزبون</label>
+                            <select id="display_currency" name="display_currency" class="form-select">
+                                <option value="USD" {% if store.display_currency == "USD" %}selected{% endif %}>دولار فقط</option>
+                                <option value="SYP" {% if store.display_currency == "SYP" %}selected{% endif %}>ليرة سورية فقط</option>
+                                <option value="BOTH" {% if store.display_currency == "BOTH" %}selected{% endif %}>الدولار والليرة معاً</option>
+                            </select>
+                        </div>
                         <div class="col-md-6">
                             <label for="product_layout" class="form-label">طريقة عرض المنتجات</label>
                             <select id="product_layout" class="form-select" name="product_layout">

@@ -251,7 +251,39 @@ button.btn-primary {
 }
 .products-grid.layout-horizontal .product-image-square { margin-bottom: 0; }
 .products-grid.layout-horizontal .product-info { flex: 1; }
-.products-grid.layout-horizontal .qty-control { justify-content: flex-start; }
+.products-grid .product-add-btn {
+    width: auto;
+    padding: .25rem .65rem;
+    font-size: .8rem;
+    margin-top: .4rem;
+    white-space: nowrap;
+}
+.products-grid.layout-horizontal .product-heading {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: .5rem;
+}
+.products-grid.layout-horizontal .product-heading .product-name { flex: 1; min-width: 0; }
+.products-grid.layout-horizontal .product-prices {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: .15rem .5rem;
+    max-width: 60%;
+}
+.products-grid.layout-horizontal .product-price { margin-bottom: .3rem; }
+.products-grid.layout-horizontal .add-to-cart-form {
+    display: flex;
+    align-items: center;
+    gap: .4rem;
+    margin-top: .4rem;
+}
+.products-grid.layout-horizontal .product-add-btn { margin-top: 0; flex-shrink: 0; }
+.products-grid.layout-horizontal .qty-control { justify-content: flex-start; flex-wrap: nowrap; gap: .2rem; }
+.products-grid.layout-horizontal .qty-btn { width: 28px; height: 30px; }
+.products-grid.layout-horizontal .qty-input { width: 38px; padding: .2rem 0; }
 @media (min-width: 768px) {
     .products-grid.layout-horizontal .product-column { width: 50%; }
 }
@@ -262,7 +294,7 @@ button.btn-primary {
     .products-grid.layout-vertical.image-small .qty-btn { width: 24px; height: 30px; }
     .products-grid.layout-vertical.image-small .qty-input { width: 32px; padding: .2rem 0; }
     .products-grid.layout-vertical.image-small .add-to-cart-form > button {
-        padding: .4rem .15rem;
+        padding: .25rem .5rem;
         font-size: .75rem;
         white-space: normal;
     }
@@ -526,18 +558,19 @@ button.btn-primary {
                     </a>
 
                     <div class="product-info">
+                    <div class="product-heading">
                     <div class="product-name">{{ p.name }}</div>
-                    {% if p.show_price %}
-                      {% if store.pricing_currency == "USD" %}
-                          <div class="product-price">{{ p.price|floatformat:2 }} $</div>
-                          <div class="product-price text-muted" style="font-size:0.85rem;">
-                              {{ p.price_syp|floatformat:0 }} ل.س
-                          </div>
-                      {% else %}
-                          <div class="product-price">{{ p.price_syp|floatformat:0 }} ل.س</div>
-                      {% endif %}
-                    {% endif %}
-
+{% if p.show_price %}
+    <div class="product-prices">
+    {% if store.display_currency == "USD" or store.display_currency == "BOTH" %}
+        {% if p.price_usd != None %}<div class="product-price">{{ p.price_usd|floatformat:2 }} $</div>{% endif %}
+    {% endif %}
+    {% if store.display_currency == "SYP" or store.display_currency == "BOTH" %}
+        {% if p.price_syp != None %}<div class="product-price">{{ p.price_syp|floatformat:0 }} ل.س</div>{% endif %}
+    {% endif %}
+    </div>
+{% endif %}
+                    </div>
                     <form method="POST" action="{% url 'cart:add_to_cart' store.slug p.id %}" class="add-to-cart-form">
                         {% csrf_token %}
                         <div class="qty-control" data-qty>
@@ -545,7 +578,7 @@ button.btn-primary {
                             <input type="number" name="quantity" value="1" min="1" class="qty-input" inputmode="numeric">
                             <button type="button" class="qty-btn" data-qty-inc aria-label="زيادة الكمية">+</button>
                         </div>
-                        <button type="submit" class="btn btn-primary w-100 mt-2">أضف إلى السلة</button>
+                        <button type="submit" class="btn btn-primary product-add-btn">أضف</button>
                     </form>
                     </div>
                 </div>
