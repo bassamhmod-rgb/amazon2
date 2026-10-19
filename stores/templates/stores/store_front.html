@@ -265,12 +265,17 @@ button.btn-primary {
     gap: .5rem;
 }
 .products-grid.layout-horizontal .product-heading .product-name { flex: 1; min-width: 0; }
+.product-prices {
+    display: flex;
+    flex-direction: column;
+    gap: .15rem;
+}
 .products-grid.layout-horizontal .product-prices {
     display: flex;
-    align-items: baseline;
-    flex-wrap: wrap;
-    justify-content: flex-end;
-    gap: .15rem .5rem;
+    flex-direction: column;
+    align-items: flex-end;
+    flex-wrap: nowrap;
+    gap: .15rem;
     max-width: 60%;
 }
 .products-grid.layout-horizontal .product-price { margin-bottom: .3rem; }
