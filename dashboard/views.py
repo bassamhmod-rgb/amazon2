@@ -141,8 +141,8 @@ def _preferred_price_level_from_request(value):
     try:
         level = int(value)
     except (TypeError, ValueError):
-        return 1
-    return level if level in (1, 2, 3, 4, 5) else 1
+        return 0
+    return level if level in (0, 1, 2, 3, 4, 5) else 0
 from datetime import date as dt_date
 from django.db.models import Sum
 ###
@@ -1836,7 +1836,7 @@ def search_customers(request, store_slug):
             "id": c.id,
             "name": c.name,
             "phone": c.phone,
-            "preferred_price_level": getattr(c, "preferred_price_level", 1) or 1,
+            "preferred_price_level": getattr(c, "preferred_price_level", 0) or 0,
         }
         for c in customers
     ]

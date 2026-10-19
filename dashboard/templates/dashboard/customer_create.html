@@ -121,7 +121,8 @@
         <div class="mb-3">
             <label class="form-label">السعر الخاص للعميل</label>
             <select name="preferred_price_level" class="form-select">
-                <option value="1" {% if form_data.preferred_price_level|default:'1' == '1' %}selected{% endif %}>سعر المفرق</option>
+                <option value="0" {% if form_data.preferred_price_level|default:'0' == '0' %}selected{% endif %}>اتباع النظام</option>
+                <option value="1" {% if form_data.preferred_price_level == '1' %}selected{% endif %}>سعر المفرق</option>
                 <option value="2" {% if form_data.preferred_price_level == '2' %}selected{% endif %}>سعر نص جملة</option>
                 <option value="3" {% if form_data.preferred_price_level == '3' %}selected{% endif %}>سعر جملة</option>
                 <option value="4" {% if form_data.preferred_price_level == '4' %}selected{% endif %}>آخر سعر بيع لهذا العميل</option>
