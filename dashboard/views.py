@@ -2900,6 +2900,18 @@ def store_settings(request, store_slug):
         if request.POST.get("reset_action") == "1":
             return _perform_store_reset(request, store)
 
+        selected_ids = None
+        if request.POST.get("storefront_warehouses_present") == "1":
+            raw_ids = request.POST.getlist("storefront_warehouses")
+            if any(not value.isdigit() for value in raw_ids):
+                messages.error(request, "Invalid warehouse selection.")
+                return redirect("dashboard:store_settings", store_slug=store.slug)
+            selected_ids = {int(value) for value in raw_ids}
+            valid_ids = set(store.warehouses.filter(pk__in=selected_ids, is_active=True).values_list("pk", flat=True))
+            if selected_ids != valid_ids:
+                messages.error(request, "Invalid warehouse selection.")
+                return redirect("dashboard:store_settings", store_slug=store.slug)
+
         new_slug = request.POST.get("slug", "").strip()
 
         product_layout = request.POST.get("product_layout", store.product_layout)
@@ -3006,12 +3018,16 @@ def store_settings(request, store_slug):
             return redirect(f"/dashboard/{store.slug}/settings/")
 
         store.save()
+        if selected_ids is not None:
+            store.storefront_warehouses.set(selected_ids)
 
         messages.success(request, "تم حفظ إعدادات المتجر بنجاح.")
         return redirect(f"/dashboard/{store.slug}/settings/")
 
     products_count = Product.objects.filter(store=store).count()
-    return render(request, "dashboard/store_settings.html", {"store": store, "products_count": products_count})
+    return render(request, "dashboard/store_settings.html", {"store": store, "products_count": products_count,
+        "storefront_warehouses": store.warehouses.filter(is_active=True).order_by("name"),
+        "selected_storefront_warehouse_ids": set(store.storefront_warehouses.values_list("pk", flat=True))})
 
 
 @login_required

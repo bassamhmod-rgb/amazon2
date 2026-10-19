@@ -37,6 +37,9 @@ class Store(models.Model):
     access_id = models.BigIntegerField(blank=True, null=True)
     owner = models.ForeignKey(User, on_delete=models.CASCADE, related_name="stores")
     name = models.CharField(max_length=200)
+    storefront_warehouses = models.ManyToManyField(
+        "Warehouse", blank=True, related_name="storefront_stores",
+    )
     rkmdb = models.CharField(max_length=100, blank=True, null=True)
     rkmtb = models.CharField(max_length=100, blank=True, null=True)
     slug = models.SlugField(unique=True)

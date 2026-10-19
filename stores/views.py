@@ -1,3 +1,4 @@
+from .storefront_stock import with_storefront_stock, available_quantity
 from .pricing import set_display_prices
 from django.shortcuts import render, get_object_or_404, redirect
 from .models import Store
@@ -72,38 +73,6 @@ def store_front(request, slug):
         cart_count = cart.items.count()
 
     # ============ 🔥 المنتجات ============
-    stock_movements_qs = (
-        StockMovement.objects
-        .filter(product=OuterRef("pk"), store=store)
-        .values("product")
-        .annotate(
-            total_quantity=Coalesce(
-                Sum("quantity_change"),
-                Value(0, output_field=DecimalField(max_digits=12, decimal_places=2)),
-                output_field=DecimalField(max_digits=12, decimal_places=2),
-            )
-        )
-        .values("total_quantity")[:1]
-    )
-    movement_expr = ExpressionWrapper(
-        (F("order_items__quantity") + F("order_items__bonus_quantity")) * Cast(F("order_items__direction"), DecimalField(max_digits=12, decimal_places=2)),
-        output_field=DecimalField(max_digits=12, decimal_places=2)
-    )
-    movements = Coalesce(
-        Sum(movement_expr),
-        Value(0),
-        output_field=DecimalField(max_digits=12, decimal_places=2)
-    )
-    real_stock_calc = ExpressionWrapper(
-        Cast(F("stock"), DecimalField(max_digits=12, decimal_places=2))
-        + movements
-        + Coalesce(
-            Subquery(stock_movements_qs, output_field=DecimalField(max_digits=12, decimal_places=2)),
-            Value(0, output_field=DecimalField(max_digits=12, decimal_places=2)),
-            output_field=DecimalField(max_digits=12, decimal_places=2),
-        ),
-        output_field=DecimalField(max_digits=12, decimal_places=2)
-    )
     sold_qty = Coalesce(
         Sum(Case(
             When(order_items__direction=-1, then=F("order_items__quantity") + F("order_items__bonus_quantity")),
@@ -114,9 +83,8 @@ def store_front(request, slug):
         output_field=DecimalField(max_digits=12, decimal_places=2)
     )
     products = (
-        Product.objects
-        .filter(store=store, active=True)
-        .annotate(real_stock_calc=real_stock_calc, sold_qty=sold_qty)
+        with_storefront_stock(Product.objects.filter(store=store, active=True), store)
+        .annotate(sold_qty=sold_qty)
         .filter(Q(real_stock_calc__gt=0) | Q(allow_negative_stock_sale=True))
         .order_by(F("category__display_order").asc(nulls_last=True), "category_id", "display_order", "-sold_qty", "-id")
     )
@@ -241,7 +209,7 @@ def store_app_icon(request, slug, size):
 # تفاصيل المنتج للزبون
 def product_public(request, store_slug, product_id):
     store = get_object_or_404(Store, slug=store_slug)
-    product = get_object_or_404(Product, id=product_id, store=store)
+    product = get_object_or_404(with_storefront_stock(Product.objects.filter(active=True), store), id=product_id, store=store)
     set_display_prices(product, store)
     return render(request, "stores/product_public.html", {
     "store": store,

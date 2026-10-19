@@ -236,6 +236,17 @@
                             </select>
                         </div>
                         <div class="col-md-6">
+                            <input type="hidden" name="storefront_warehouses_present" value="1">
+                            <fieldset class="mb-4">
+                                <legend class="h6">مستودعات العرض بالمتجر الإلكتروني</legend>
+                                <p class="text-muted small">اختَر المستودعات التي يُحسب منها توفر المواد للعرض والطلب. ترك الجميع بدون اختيار يعني جميع المستودعات. المواد المسموح بيعها بدون مخزون تبقى متاحة.</p>
+                                {% for warehouse in storefront_warehouses %}
+                                <label class="d-block mb-2">
+                                    <input type="checkbox" name="storefront_warehouses" value="{{ warehouse.pk }}" {% if warehouse.pk in selected_storefront_warehouse_ids %}checked{% endif %}>
+                                    {{ warehouse.name }}
+                                </label>
+                                {% empty %}<p class="text-muted">لا توجد مستودعات فعالة.</p>{% endfor %}
+                            </fieldset>
                             <label for="product_layout" class="form-label">طريقة عرض المنتجات</label>
                             <select id="product_layout" class="form-select" name="product_layout">
                                 <option value="vertical" {% if store.product_layout == "vertical" %}selected{% endif %}>عمودي — الصورة فوق التفاصيل</option>

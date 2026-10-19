@@ -1,3 +1,5 @@
+from stores.storefront_stock import allocate_cart_items
+from django.contrib import messages
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.db import transaction
@@ -246,6 +248,7 @@ def review_order(request, store_slug):
 import os
 from django.core.files import File
 
+@transaction.atomic
 def confirm_order(request, store_slug):
     store = get_object_or_404(Store, slug=store_slug)
 
@@ -267,6 +270,17 @@ def confirm_order(request, store_slug):
 
     proof_image_path = data.get("payment_proof_image_path")
     transaction_id = data.get("payment_transaction_id")
+
+    items = list(cart.items.select_related("product").all())
+    if not items:
+        return redirect("cart:cart_detail", store_slug=store.slug)
+    list(Product.objects.select_for_update().filter(
+        pk__in=[item.product_id for item in items]).order_by("pk"))
+    try:
+        allocations = allocate_cart_items(store, items)
+    except ValueError as error:
+        messages.error(request, str(error))
+        return redirect("cart:cart_detail", store_slug=store.slug)
 
     # ✅ التعديل الوحيد هنا (إزالة total)
     order = Order.objects.create(
@@ -293,12 +307,13 @@ def confirm_order(request, store_slug):
         order.payment_transaction_id = transaction_id
         order.save()
 
-    for item in cart.items.all():
+    for item, warehouse, allocated_quantity in allocations:
         buy_price = item.product.get_avg_buy_price()
         OrderItem.objects.create(
             order=order,
             product=item.product,
-            quantity=item.quantity,
+            quantity=allocated_quantity,
+            warehouse=warehouse,
             price=item.product.price,
             direction=-1,
             buy_price=buy_price,

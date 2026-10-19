@@ -1,3 +1,4 @@
+from stores.storefront_stock import available_quantity
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.db.models import Sum
@@ -68,10 +69,20 @@ def add_to_cart(request, store_slug, product_id):
 
     cart = get_cart(request, store)
 
-    item, created = CartItem.objects.get_or_create(cart=cart, product=product)
-
     if request.method == "POST":
-        quantity = int(request.POST.get("quantity", 1))
+        try:
+            quantity = int(request.POST.get("quantity", 1))
+        except (TypeError, ValueError):
+            quantity = 0
+        existing = CartItem.objects.filter(cart=cart, product=product).first()
+        requested = quantity + (existing.quantity if existing else 0)
+        if quantity <= 0 or (not product.allow_negative_stock_sale and requested > available_quantity(product, store)):
+            error = "الكمية المطلوبة غير متوفرة."
+            if request.headers.get("x-requested-with") == "XMLHttpRequest":
+                return JsonResponse({"error": error}, status=400)
+            messages.error(request, error)
+            return redirect("cart:cart_detail", store_slug=store.slug)
+        item, created = CartItem.objects.get_or_create(cart=cart, product=product)
         note = request.POST.get("item_note", "")
 
         if created:
@@ -167,6 +178,10 @@ def update_cart_item_quantity(request, store_slug, item_id, action):
     item = get_object_or_404(CartItem, id=item_id, cart=cart)
 
     if action == "inc":
+        if (not item.product.active or not item.product.show_price or
+                (not item.product.allow_negative_stock_sale and item.quantity + 1 > available_quantity(item.product, store))):
+            messages.error(request, "الكمية المطلوبة غير متوفرة.")
+            return redirect("cart:cart_detail", store_slug=store.slug)
         item.quantity += 1
         item.save()
     elif action == "dec":
