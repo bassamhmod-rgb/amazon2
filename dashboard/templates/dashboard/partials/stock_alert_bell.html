@@ -1,8 +1,7 @@
 <style>
     .stock-alert-bell {
-        position: fixed;
-        bottom: 20px;
-        left: 20px;
+        position: relative;
+        flex-shrink: 0;
         z-index: 1020;
         direction: rtl;
     }
@@ -41,7 +40,7 @@
     }
     .stock-alert-panel {
         position: absolute;
-        bottom: 56px;
+        top: 56px;
         left: 0;
         width: min(340px, calc(100vw - 40px));
         max-height: min(420px, 65vh);
