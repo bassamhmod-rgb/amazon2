@@ -12,9 +12,14 @@ class SignUpForm(UserCreationForm):
         fields = ("username", "email", "password1", "password2")
 
 
+class StoreLoginChoiceField(forms.ModelChoiceField):
+    def label_from_instance(self, store):
+        return store.slug
+
+
 class StoreAwareLoginForm(forms.Form):
-    store = forms.ModelChoiceField(
-        queryset=Store.objects.filter(is_active=True).order_by("name"),
+    store = StoreLoginChoiceField(
+        queryset=Store.objects.filter(is_active=True).order_by("slug"),
         label="المتجر",
         empty_label="اختر المتجر",
     )
