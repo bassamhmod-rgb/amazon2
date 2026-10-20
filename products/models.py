@@ -144,6 +144,7 @@ class Product(models.Model):
     def get_avg_buy_price(self):
         total_qty = Decimal(self.stock or 0)
         total_cost = total_qty * Decimal(self.buy_price or 0)
+        purchase_subtotals = {}
 
         items = (
             OrderItem.objects
@@ -167,6 +168,18 @@ class Product(models.Model):
 
             cost = (Decimal(item.price or 0) * Decimal(item.quantity or 0)
                     if transaction_type in ("purchase", "purchase_return") else buy_price * qty)
+            if transaction_type == "purchase":
+                if item.order_id not in purchase_subtotals:
+                    purchase_subtotals[item.order_id] = item.order.items.aggregate(
+                        total=Sum(F("price") * F("quantity"))
+                    )["total"] or Decimal("0")
+                subtotal = purchase_subtotals[item.order_id]
+                landed_total = max(
+                    Decimal("0"),
+                    subtotal - Decimal(item.order.discount or 0)
+                    + Decimal(item.order.shipping_cost or 0),
+                )
+                cost = cost * landed_total / subtotal if subtotal > 0 else Decimal("0")
 
             if is_inbound_cost:
                 total_qty += qty

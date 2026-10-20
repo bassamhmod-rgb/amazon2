@@ -135,6 +135,12 @@ class Order(models.Model):
         decimal_places=2,
         default=0
     )
+    shipping_cost = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=0,
+        verbose_name="أجور الشحن للتكلفة",
+    )
 
     payment = models.DecimalField(
         max_digits=10,

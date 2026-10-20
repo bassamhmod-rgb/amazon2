@@ -3,6 +3,7 @@ import time
 import json
 import time
 import uuid
+import math
 from urllib.parse import quote
 from decimal import Decimal, ROUND_HALF_UP
 
@@ -265,7 +266,7 @@ def _ensure_mobile_default_records(store):
             "note": "",
             "balance": Decimal("0"),
             "opening_balance": Decimal("0"),
-            "preferred_price_level": 1,
+            "preferred_price_level": 0,
             "is_subscription_active": True,
             "mobile_update_time": now_minute,
         },
@@ -337,7 +338,7 @@ def _serialize_customer(customer):
         "note": customer.note or "",
         "balance": float(customer.balance),
         "opening_balance": float(customer.opening_balance),
-        "preferred_price_level": getattr(customer, "preferred_price_level", 1) or 1,
+        "preferred_price_level": getattr(customer, "preferred_price_level", 0) or 0,
         "is_subscription_active": customer.is_subscription_active,
         "access_id": customer.access_id,
         "update_time": _mobile_time(customer),
@@ -946,9 +947,9 @@ def _apply_customer_change(store, payload, server_id=None):
     address = _to_str(payload.get("address")).strip()
     note = _to_str(payload.get("note")).strip()
     access_id = _to_int(payload.get("access_id"))
-    preferred_price_level = _to_int(payload.get("preferred_price_level"), 1)
-    if preferred_price_level not in (1, 2, 3, 4, 5):
-        preferred_price_level = 1
+    preferred_price_level = _to_int(payload.get("preferred_price_level"), 0)
+    if preferred_price_level not in (0, 1, 2, 3, 4, 5):
+        preferred_price_level = 0
     if not name and not phone:
         raise ValueError("Customer name or phone is required")
 
@@ -3590,6 +3591,10 @@ def orders_push(request):
                     created_at = timezone.now()
 
                 discount = _to_float(order_payload.get("discount"), 0.0)
+                shipping_cost = _to_float(order_payload.get("shipping_cost"), 0.0)
+                if not math.isfinite(shipping_cost) or shipping_cost < 0:
+                    errors.append({"detail": "Invalid shipping cost", "local_order_id": local_order_id})
+                    continue
                 payment = _to_float(order_payload.get("payment"), 0.0)
                 amount = _to_float(order_payload.get("amount"), 0.0)
                 note = _to_str(order_payload.get("note"), "").strip()
@@ -3677,6 +3682,11 @@ def orders_push(request):
                 order.document_kind = document_kind
                 order.status = status_value
                 order.discount = Decimal(str(discount))
+                if transaction_type == "purchase" and document_kind == 1:
+                    if "shipping_cost" in order_payload:
+                        order.shipping_cost = Decimal(str(shipping_cost))
+                else:
+                    order.shipping_cost = Decimal("0")
                 order.payment = Decimal(str(payment))
                 order.amount = Decimal(str(amount))
                 order.note = note
@@ -3695,6 +3705,11 @@ def orders_push(request):
                 previous_line_notes = dict(order.items.values_list("id", "line_note"))
                 order.items.all().delete()
                 created_items = []
+                purchase_subtotal = sum(
+                    Decimal(str(_to_float(payload.get("price"), 0.0)))
+                    * Decimal(str(_to_float(payload.get("quantity"), 1.0)))
+                    for payload, _ in prepared_items
+                )
                 for item_payload, product in prepared_items:
                     quantity = _to_float(item_payload.get("quantity"), 1.0)
                     price = _to_float(item_payload.get("price"), 0.0)
@@ -3702,8 +3717,14 @@ def orders_push(request):
                     buy_price = item_payload.get("buy_price")
                     if transaction_type in ("sale", "sale_return") and buy_price in (None, "", 0, "0", "0.0"):
                         buy_price = product.get_avg_buy_price()
-                    elif transaction_type == "purchase" and buy_price in (None, "", 0, "0", "0.0"):
-                        buy_price = price
+                    elif transaction_type == "purchase":
+                        received = Decimal(str(quantity)) + Decimal(str(max(0, _to_float(item_payload.get("bonus_quantity"), 0))))
+                        landed_total = max(Decimal("0"), purchase_subtotal - order.discount + order.shipping_cost)
+                        buy_price = (
+                            Decimal(str(price)) * Decimal(str(quantity))
+                            * landed_total / purchase_subtotal / received
+                            if purchase_subtotal > 0 and received > 0 else Decimal("0")
+                        )
                     item_note = _to_str(item_payload.get("item_note"), "") or None
 
                     order_item = OrderItem(
@@ -3795,6 +3816,7 @@ def _serialize_order_for_mobile(order):
         "transaction_type": getattr(order, "transaction_type", ""),
         "status": "completed" if getattr(order, "status", "") == "confirmed" else getattr(order, "status", ""),
         "discount": _to_float(getattr(order, "discount", 0)),
+        "shipping_cost": _to_float(getattr(order, "shipping_cost", 0)),
         "payment": _to_float(getattr(order, "payment", 0)),
         "amount": _to_float(sync_amount),
         "base_currency": getattr(order.store, "pricing_currency", "SYP") or "SYP",
