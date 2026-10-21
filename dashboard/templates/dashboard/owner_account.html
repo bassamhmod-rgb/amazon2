@@ -19,7 +19,6 @@
   <h1>{% if account_login %}تسجيل دخول مدير المتجر{% else %}تغيير اسم المستخدم وكلمة المرور{% endif %}</h1>
   <p>{{ store.name }}</p>
   {% if messages %}{% for message in messages %}<p class="message" role="status">{{ message }}</p>{% endfor %}{% endif %}
-  {% if not account_login %}<p>يمكنك تعديل بيانات حسابك حتى لو كان المتجر الإلكتروني غير مفعّل.</p>{% endif %}
   <form method="post">
     {% csrf_token %}
     {{ form.non_field_errors }}
