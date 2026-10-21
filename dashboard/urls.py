@@ -2,8 +2,10 @@
 from django.urls import path
 from . import views
 from . import views_api
+from .account_views import owner_account
 app_name = "dashboard"
 urlpatterns = [
+    path("<slug:store_slug>/account/", owner_account, name="owner_account"),
     path("<slug:store_slug>/", views.dashboard_home, name="home"),
     path("<slug:store_slug>/orders/", views.orders_list, name="orders_list"),
 

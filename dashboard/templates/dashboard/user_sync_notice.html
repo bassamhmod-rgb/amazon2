@@ -1,0 +1,23 @@
+{% for message in messages %}
+  {% if 'users-sync-required' in message.tags %}
+    <dialog id="userSyncNotice" aria-labelledby="userSyncNoticeTitle" aria-describedby="userSyncNoticeText" dir="rtl"
+            style="max-width:480px;width:calc(100% - 32px);padding:24px;border:1px solid #c9d3df;border-radius:14px;color:#172033;font-family:Tahoma,Arial,sans-serif;line-height:1.8;">
+      <h2 id="userSyncNoticeTitle" style="font-size:21px;color:#0b2b56;">تنبيه مهم: مزامنة المستخدمين قبل الدخول</h2>
+      <p id="userSyncNoticeText">{{ message }}</p>
+      <form method="dialog">
+        <button autofocus style="background:#0b2b56;color:white;border:0;border-radius:8px;padding:10px 22px;font:inherit;cursor:pointer;">فهمت</button>
+      </form>
+    </dialog>
+    <script>
+      (function () {
+        const notice = document.getElementById('userSyncNotice');
+        if (typeof notice.showModal === 'function') {
+          notice.showModal();
+        } else {
+          window.alert(document.getElementById('userSyncNoticeText').textContent.trim());
+          notice.remove();
+        }
+      })();
+    </script>
+  {% endif %}
+{% endfor %}

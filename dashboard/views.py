@@ -29,6 +29,10 @@ from stores.forms import WarehouseForm
 from orders.models import Order, OrderItem
 from accounts.models import PointsTransaction, AccountingClient, SystemNotification, DeleteSync, StoreUser
 from accounts.store_user_forms import StoreUserForm
+from .user_sync_notice import notify_user_sync_required
+from .account_views import OwnerAccountForm, save_owner_account
+from django.contrib.auth import update_session_auth_hash
+from django.views.decorators.debug import sensitive_post_parameters
 from cart.models import Cart, CartItem
 from loyalty.models import LoyaltyPoints
 from mobile_sync.models import MobileDeleteSync
@@ -46,7 +50,7 @@ from employees.models import (
 from accounts.models import Customer
 from django.contrib import messages
 ###
-from django.contrib.auth.hashers import make_password, check_password
+from django.contrib.auth.hashers import check_password
 from django.db.models import Q
 from accounts.models import Supplier
 from django.http import JsonResponse
@@ -431,6 +435,7 @@ def store_user_create(request, store_slug):
             obj.store = store
             obj.save()
             messages.success(request, "تم إضافة المستخدم.")
+            notify_user_sync_required(request)
             return redirect("dashboard:store_users_list", store_slug=store.slug)
     else:
         form = StoreUserForm(warehouses_qs=warehouses_qs)
@@ -451,6 +456,7 @@ def store_user_update(request, store_slug, user_id):
         if form.is_valid():
             form.save()
             messages.success(request, "تم تعديل المستخدم.")
+            notify_user_sync_required(request)
             return redirect("dashboard:store_users_list", store_slug=store.slug)
     else:
         form = StoreUserForm(instance=obj, warehouses_qs=warehouses_qs)
@@ -468,6 +474,7 @@ def store_user_delete(request, store_slug, user_id):
     obj = get_object_or_404(StoreUser, pk=user_id, store=store)
     obj.delete()
     messages.success(request, "تم حذف المستخدم.")
+    notify_user_sync_required(request)
     return redirect("dashboard:store_users_list", store_slug=store.slug)
 
 
@@ -2889,6 +2896,7 @@ def delete_points_transaction(request, store_slug, transaction_id):
 
 
 @login_required
+@sensitive_post_parameters("current_password", "new_password", "confirmation")
 def store_settings(request, store_slug):
     store = get_object_or_404(Store, slug=store_slug)
 
@@ -2955,12 +2963,6 @@ def store_settings(request, store_slug):
         if "logo" in request.FILES:
             store.logo = request.FILES["logo"]
 
-        new_password = request.POST.get("new_password", "").strip()
-        if new_password:
-            store.owner.password = make_password(new_password)
-            store.owner.save()
-            messages.success(request, "تم تغيير كلمة المرور بنجاح.")
-
         percent = request.POST.get("payment_required_percentage", "").strip()
         if percent.isdigit():
             store.payment_required_percentage = int(percent)
@@ -3017,9 +3019,35 @@ def store_settings(request, store_slug):
             messages.error(request, "سعر الصرف يجب أن يكون أكبر من صفر لعرض الأسعار بالعملة الأخرى.")
             return redirect(f"/dashboard/{store.slug}/settings/")
 
-        store.save()
-        if selected_ids is not None:
-            store.storefront_warehouses.set(selected_ids)
+        account_data = {
+            "username": request.POST.get("username", store.owner.username),
+            "current_password": request.POST.get("current_password", ""),
+            "new_password": request.POST.get("new_password", ""),
+            "confirmation": request.POST.get("confirmation", ""),
+        }
+        account_changed = (account_data["username"].strip() != store.owner.username or
+                           bool(account_data["new_password"] or account_data["confirmation"]))
+        try:
+            with transaction.atomic():
+                if account_changed:
+                    owner = User.objects.select_for_update().get(pk=store.owner_id)
+                    account_form = OwnerAccountForm(account_data, owner=owner)
+                    if not account_form.is_valid():
+                        for errors in account_form.errors.values():
+                            for error in errors:
+                                messages.error(request, error)
+                        return redirect("dashboard:store_settings", store_slug=store_slug)
+                    save_owner_account(store, owner, account_form.cleaned_data)
+                store.save()
+                if selected_ids is not None:
+                    store.storefront_warehouses.set(selected_ids)
+        except IntegrityError:
+            messages.error(request, "تعذر حفظ التغييرات؛ اسم المستخدم أو اسم المتجر مستخدم مسبقاً.")
+            return redirect("dashboard:store_settings", store_slug=store_slug)
+
+        if account_changed:
+            update_session_auth_hash(request, owner)
+            notify_user_sync_required(request)
 
         messages.success(request, "تم حفظ إعدادات المتجر بنجاح.")
         return redirect(f"/dashboard/{store.slug}/settings/")
