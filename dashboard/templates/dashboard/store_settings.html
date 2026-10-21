@@ -361,13 +361,14 @@
                     <h4 class="mb-3">🔒 الإعدادات الأمنية</h4>
                     <label for="owner_username" class="form-label">اسم المستخدم</label>
                     <input id="owner_username" type="text" class="form-control mb-3" name="username" value="{{ store.owner.username }}" maxlength="50" autocomplete="username">
-                    <label for="owner_current_password" class="form-label">كلمة المرور الحالية</label>
-                    <input id="owner_current_password" type="password" class="form-control mb-3" name="current_password" autocomplete="current-password">
-                    <p class="text-muted">مطلوبة عند تغيير اسم المستخدم أو كلمة المرور. لا تُطلب عند تعديل إعدادات المتجر الأخرى فقط.</p>
                     <label for="owner_new_password" class="form-label">كلمة مرور جديدة (اختياري)</label>
                     <input id="owner_new_password" type="password" class="form-control mb-3" name="new_password" autocomplete="new-password">
                     <label for="owner_confirmation" class="form-label">تأكيد كلمة المرور الجديدة</label>
-                    <input id="owner_confirmation" type="password" class="form-control" name="confirmation" autocomplete="new-password">
+                    <input id="owner_confirmation" type="password" class="form-control mb-3" name="confirmation" autocomplete="new-password">
+                    <label for="owner_current_password" class="form-label">كلمة المرور الحالية</label>
+                    <input id="owner_current_password" type="password" class="form-control mb-3" name="current_password" autocomplete="current-password">
+                    <p class="text-muted">مطلوبة عند تغيير اسم المستخدم أو كلمة المرور. لا تُطلب عند تعديل إعدادات المتجر الأخرى فقط.</p>
+                    <button type="submit" class="btn btn-primary px-4">💾 حفظ التغييرات</button>
                 </div>
 
                 <div class="settings-card border border-warning">
