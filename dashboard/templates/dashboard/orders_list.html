@@ -99,6 +99,22 @@
             min-height:38px;
         }
 
+        .filter-autocomplete{
+            position:relative;
+        }
+
+        .filter-autocomplete-results{
+            display:none;
+            position:absolute;
+            top:100%;
+            right:0;
+            left:0;
+            max-height:240px;
+            overflow-y:auto;
+            z-index:1050;
+            box-shadow:0 8px 20px rgba(0,0,0,.12);
+        }
+
         @media (max-width:768px){
             .content{
                 padding:10px;
@@ -242,6 +258,33 @@
                    value="{{ current_mobile_id }}" placeholder="رقم نقطة البيع">
         </div>
 
+        <div class="filter-autocomplete col-6 col-md-2">
+            <input type="hidden" name="store_user_id" id="storeUserId"
+                   value="{{ current_store_user_id }}">
+            <input type="text" id="storeUserSearch" class="form-control"
+                   value="{{ current_store_user_name }}" placeholder="اسم المستخدم"
+                   autocomplete="off">
+            <div id="storeUserResults" class="filter-autocomplete-results list-group">
+                {% for user in store_users %}
+                    <button type="button" class="list-group-item list-group-item-action"
+                            data-id="{{ user.id }}" data-name="{{ user.name }}">
+                        {{ user.name }}
+                    </button>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="filter-autocomplete col-6 col-md-2">
+            <input type="hidden" name="customer_id" id="customerId"
+                   value="{{ current_customer_id }}">
+            <input type="hidden" name="supplier_id" id="supplierId"
+                   value="{{ current_supplier_id }}">
+            <input type="text" id="partySearch" class="form-control"
+                   value="{% if current_transaction_type == 'purchase' %}{{ current_supplier_name }}{% else %}{{ current_customer_name }}{% endif %}"
+                   placeholder="اختر النوع أولاً" autocomplete="off">
+            <div id="partyResults" class="filter-autocomplete-results list-group"></div>
+        </div>
+
         <div class="col-12 col-md-2">
             <button class="btn btn-secondary w-100">فلترة</button>
         </div>
@@ -336,13 +379,13 @@
                 {% if orders.has_previous %}
                     <li class="page-item">
                         <a class="page-link"
-                           href="?page=1&status={{ current_status }}&order_id={{ current_id }}&mobile_order_id={{ current_mobile_id }}&transaction_type={{ current_transaction_type }}">
+                           href="?page=1&status={{ current_status }}&order_id={{ current_id }}&mobile_order_id={{ current_mobile_id }}&transaction_type={{ current_transaction_type }}&store_user_id={{ current_store_user_id }}&customer_id={{ current_customer_id }}&supplier_id={{ current_supplier_id }}">
                             الاولى
                         </a>
                     </li>
                     <li class="page-item">
                         <a class="page-link"
-                           href="?page={{ orders.previous_page_number }}&status={{ current_status }}&order_id={{ current_id }}&mobile_order_id={{ current_mobile_id }}&transaction_type={{ current_transaction_type }}">
+                           href="?page={{ orders.previous_page_number }}&status={{ current_status }}&order_id={{ current_id }}&mobile_order_id={{ current_mobile_id }}&transaction_type={{ current_transaction_type }}&store_user_id={{ current_store_user_id }}&customer_id={{ current_customer_id }}&supplier_id={{ current_supplier_id }}">
                             السابق
                         </a>
                     </li>
@@ -357,13 +400,13 @@
                 {% if orders.has_next %}
                     <li class="page-item">
                         <a class="page-link"
-                           href="?page={{ orders.next_page_number }}&status={{ current_status }}&order_id={{ current_id }}&mobile_order_id={{ current_mobile_id }}&transaction_type={{ current_transaction_type }}">
+                           href="?page={{ orders.next_page_number }}&status={{ current_status }}&order_id={{ current_id }}&mobile_order_id={{ current_mobile_id }}&transaction_type={{ current_transaction_type }}&store_user_id={{ current_store_user_id }}&customer_id={{ current_customer_id }}&supplier_id={{ current_supplier_id }}">
                             التالي
                         </a>
                     </li>
                     <li class="page-item">
                         <a class="page-link"
-                           href="?page={{ orders.paginator.num_pages }}&status={{ current_status }}&order_id={{ current_id }}&mobile_order_id={{ current_mobile_id }}&transaction_type={{ current_transaction_type }}">
+                           href="?page={{ orders.paginator.num_pages }}&status={{ current_status }}&order_id={{ current_id }}&mobile_order_id={{ current_mobile_id }}&transaction_type={{ current_transaction_type }}&store_user_id={{ current_store_user_id }}&customer_id={{ current_customer_id }}&supplier_id={{ current_supplier_id }}">
                             الاخيرة
                         </a>
                     </li>
@@ -382,6 +425,148 @@
         sidebar.classList.toggle("active");
         arrow.innerHTML = sidebar.classList.contains("active") ? "❯" : "❮";
     };
+</script>
+<script>
+    function setupLocalAutocomplete(input, hidden, results) {
+        const options = Array.from(results.querySelectorAll("button"));
+        let activeIndex = -1;
+
+        function filterOptions(clearSelection = true) {
+            const query = input.value.trim().toLocaleLowerCase("ar");
+            if (clearSelection) hidden.value = "";
+            const visible = options.filter(option => {
+                const matches = !query || option.dataset.name.toLocaleLowerCase("ar").includes(query);
+                option.hidden = !matches;
+                option.classList.remove("active");
+                return matches;
+            });
+            activeIndex = visible.length ? 0 : -1;
+            if (activeIndex === 0) visible[0].classList.add("active");
+            results.style.display = visible.length ? "block" : "none";
+        }
+
+        function selectOption(option) {
+            input.value = option.dataset.name;
+            hidden.value = option.dataset.id;
+            results.style.display = "none";
+        }
+
+        input.addEventListener("input", () => filterOptions(true));
+        input.addEventListener("focus", () => filterOptions(false));
+        options.forEach(option => option.addEventListener("click", () => selectOption(option)));
+        input.addEventListener("keydown", event => {
+            const visible = options.filter(option => !option.hidden);
+            if (!visible.length || !["ArrowDown", "ArrowUp", "Enter", "Escape"].includes(event.key)) return;
+            event.preventDefault();
+            if (event.key === "Escape") {
+                results.style.display = "none";
+                return;
+            }
+            if (event.key === "ArrowDown") activeIndex = (activeIndex + 1) % visible.length;
+            if (event.key === "ArrowUp") activeIndex = (activeIndex - 1 + visible.length) % visible.length;
+            if (event.key === "Enter") {
+                selectOption(visible[Math.max(activeIndex, 0)]);
+                return;
+            }
+            visible.forEach((option, index) => option.classList.toggle("active", index === activeIndex));
+            visible[activeIndex].scrollIntoView({block: "nearest"});
+        });
+    }
+
+    const storeUserSearch = document.getElementById("storeUserSearch");
+    const storeUserResults = document.getElementById("storeUserResults");
+    setupLocalAutocomplete(storeUserSearch, document.getElementById("storeUserId"), storeUserResults);
+
+    const transactionType = document.querySelector('[name="transaction_type"]');
+    const partySearch = document.getElementById("partySearch");
+    const partyResults = document.getElementById("partyResults");
+    const customerId = document.getElementById("customerId");
+    const supplierId = document.getElementById("supplierId");
+    let partyIndex = -1;
+    let partyRequest = 0;
+
+    function partyKind() {
+        return transactionType.value === "sale" ? "customer" :
+               transactionType.value === "purchase" ? "supplier" : "";
+    }
+
+    function configurePartySearch(clearValue) {
+        const kind = partyKind();
+        partySearch.disabled = !kind;
+        partySearch.placeholder = kind === "customer" ? "اسم العميل" :
+                                  kind === "supplier" ? "اسم المورد" : "اختر النوع أولاً";
+        partyResults.style.display = "none";
+        if (clearValue) {
+            partySearch.value = "";
+            customerId.value = "";
+            supplierId.value = "";
+        }
+    }
+
+    transactionType.addEventListener("change", () => configurePartySearch(true));
+    configurePartySearch(false);
+
+    partySearch.addEventListener("input", function () {
+        const kind = partyKind();
+        const query = this.value.trim();
+        customerId.value = "";
+        supplierId.value = "";
+        partyResults.innerHTML = "";
+        partyIndex = -1;
+        if (!kind || !query) {
+            partyResults.style.display = "none";
+            return;
+        }
+
+        const requestNumber = ++partyRequest;
+        const path = kind === "customer" ? "search-customers" : "search-suppliers";
+        fetch(`/dashboard/{{ store.slug }}/${path}/?q=${encodeURIComponent(query)}`)
+            .then(response => response.json())
+            .then(data => {
+                if (requestNumber !== partyRequest) return;
+                partyResults.innerHTML = "";
+                data.results.forEach(item => {
+                    const option = document.createElement("button");
+                    option.type = "button";
+                    option.className = "list-group-item list-group-item-action";
+                    option.textContent = item.phone ? `${item.name} – ${item.phone}` : item.name;
+                    option.addEventListener("click", () => {
+                        partySearch.value = item.name;
+                        if (kind === "customer") customerId.value = item.id;
+                        else supplierId.value = item.id;
+                        partyResults.style.display = "none";
+                    });
+                    partyResults.appendChild(option);
+                });
+                const options = partyResults.querySelectorAll("button");
+                partyIndex = options.length ? 0 : -1;
+                if (options.length) options[0].classList.add("active");
+                partyResults.style.display = options.length ? "block" : "none";
+            });
+    });
+
+    partySearch.addEventListener("keydown", event => {
+        const options = Array.from(partyResults.querySelectorAll("button"));
+        if (!options.length || !["ArrowDown", "ArrowUp", "Enter", "Escape"].includes(event.key)) return;
+        event.preventDefault();
+        if (event.key === "Escape") {
+            partyResults.style.display = "none";
+            return;
+        }
+        if (event.key === "ArrowDown") partyIndex = (partyIndex + 1) % options.length;
+        if (event.key === "ArrowUp") partyIndex = (partyIndex - 1 + options.length) % options.length;
+        if (event.key === "Enter") {
+            options[Math.max(partyIndex, 0)].click();
+            return;
+        }
+        options.forEach((option, index) => option.classList.toggle("active", index === partyIndex));
+        options[partyIndex].scrollIntoView({block: "nearest"});
+    });
+
+    document.addEventListener("click", event => {
+        if (!storeUserSearch.parentElement.contains(event.target)) storeUserResults.style.display = "none";
+        if (!partySearch.parentElement.contains(event.target)) partyResults.style.display = "none";
+    });
 </script>
 <script src="{% static 'js/confirm_delete.js' %}"></script>
 </body>

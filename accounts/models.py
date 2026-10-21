@@ -72,6 +72,7 @@ def default_store_user_permissions():
         "warehouses.delete": False,
         "warehouses.transfer": False,
         "stock.view": False,
+        "stock_view": False,
         "stock.adjust": False,
         "stock.movement": False,
         "production.view": False,

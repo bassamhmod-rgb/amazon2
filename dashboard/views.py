@@ -1728,8 +1728,24 @@ def orders_list(request, store_slug):
     order_id = request.GET.get("order_id", "")
     mobile_order_id = request.GET.get("mobile_order_id", "")
     transaction_type = request.GET.get("transaction_type", "")
+    store_user_id = request.GET.get("store_user_id", "")
+    customer_id = request.GET.get("customer_id", "")
+    supplier_id = request.GET.get("supplier_id", "")
     order_load_errors = []
     orders = []
+
+    store_users = StoreUser.objects.filter(store=store).order_by("name", "id")
+    selected_store_user = store_users.filter(pk=store_user_id).first() if store_user_id.isdigit() else None
+    selected_customer = (
+        Customer.objects.filter(store=store, pk=customer_id).first()
+        if transaction_type == "sale" and customer_id.isdigit()
+        else None
+    )
+    selected_supplier = (
+        Supplier.objects.filter(store=store, pk=supplier_id).first()
+        if transaction_type == "purchase" and supplier_id.isdigit()
+        else None
+    )
 
     try:
         # كل طلبات المتجر (الطلبات فقط بدون إشعارات القبض/الصرف)
@@ -1740,6 +1756,7 @@ def orders_list(request, store_slug):
         orders_qs = (
             Order.objects
             .filter(store=store, document_kind=1)
+            .select_related("created_by_store_user", "customer", "supplier")
             .annotate(
                 display_items_total=Coalesce(
                     Sum(item_total),
@@ -1760,6 +1777,15 @@ def orders_list(request, store_slug):
         # فلترة حسب رقم الطلب في التطبيق
         if mobile_order_id:
             orders_qs = orders_qs.filter(mobile_local_order_id=mobile_order_id)
+
+        if selected_store_user:
+            orders_qs = orders_qs.filter(created_by_store_user=selected_store_user)
+
+        if selected_customer:
+            orders_qs = orders_qs.filter(customer=selected_customer)
+
+        if selected_supplier:
+            orders_qs = orders_qs.filter(supplier=selected_supplier)
 
         # فلترة حسب نوع المعاملة (بيع / شراء)
         if transaction_type:
@@ -1787,6 +1813,13 @@ def orders_list(request, store_slug):
         "current_id": order_id,
         "current_mobile_id": mobile_order_id,
         "current_transaction_type": transaction_type,
+        "current_store_user_id": selected_store_user.id if selected_store_user else "",
+        "current_store_user_name": selected_store_user.name if selected_store_user else "",
+        "current_customer_id": selected_customer.id if selected_customer else "",
+        "current_customer_name": selected_customer.name if selected_customer else "",
+        "current_supplier_id": selected_supplier.id if selected_supplier else "",
+        "current_supplier_name": selected_supplier.name if selected_supplier else "",
+        "store_users": store_users,
         "new_orders_count": new_orders_count,  # مهم للـ sidebar
         "orders_page_error": orders_page_error,
         "order_load_errors": order_load_errors,
@@ -1835,12 +1868,14 @@ def search_products_by_barcode(request, store_slug):
     return JsonResponse({"results": results})
 #البحث باسماء المستخدمين
 
+@login_required
 def search_customers(request, store_slug):
+    store = _get_store_for_dashboard(request, store_slug)
     q = request.GET.get("q", "")
     
     # جلب زبائن هذا المتجر فقط
-    customers = Customer.objects.filter(store__slug=store_slug, name__icontains=q) | Customer.objects.filter(
-        store__slug=store_slug,
+    customers = Customer.objects.filter(store=store, name__icontains=q) | Customer.objects.filter(
+        store=store,
         phone__icontains=q
     )
 
@@ -1858,12 +1893,14 @@ def search_customers(request, store_slug):
 # 🔍 بحث الموردين
 
 
+@login_required
 def search_suppliers(request, store_slug):
+    store = _get_store_for_dashboard(request, store_slug)
     q = request.GET.get("q", "").strip()
 
     # جلب الموردين حسب المتجر والكلمة المكتوبة
     suppliers = Supplier.objects.filter(
-        store__slug=store_slug
+        store=store
     ).filter(
         Q(name__icontains=q) | Q(phone__icontains=q)
     )
@@ -3713,6 +3750,9 @@ from django.db.models.functions import Coalesce, Cast
 @login_required
 def inventory_list(request, store_slug):
     store = _get_store_for_dashboard(request, store_slug)
+    if not _can_access_store_permission(request, store, "stock.view"):
+        messages.error(request, "لا تملك صلاحية عرض المخزون والجرد.")
+        return redirect("dashboard:home", store_slug=store.slug)
 
     # 🔹 آخر سعر شراء لكل منتج
     last_buy_price_qs = OrderItem.objects.filter(

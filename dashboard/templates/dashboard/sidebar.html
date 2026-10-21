@@ -162,14 +162,18 @@
 
                 {% else %}
 
-                {% if su.permissions.products %}
+                {% if su.permissions.products or su.permissions.stock_view %}
                     <details class="sidebar-group">
                         <summary class="sidebar-summary">🛍 المنتجات</summary>
                         <div class="sidebar-submenu">
+                            {% if su.permissions.products %}
                             <a href="{% url 'dashboard:products_list' store.slug %}">قائمة المنتجات</a>
                             <a href="{% url 'dashboard:product_create' store.slug %}">إضافة منتج</a>
                             <a href="{% url 'dashboard:categories_list' store.slug %}">الفئات</a>
+                            {% endif %}
+                            {% if su.permissions.stock_view %}
                             <a href="{% url 'dashboard:inventory_list' store.slug %}">جرد المنتجات</a>
+                            {% endif %}
                         </div>
                     </details>
                 {% endif %}

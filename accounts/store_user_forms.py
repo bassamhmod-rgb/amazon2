@@ -37,7 +37,7 @@ PERMISSION_FIELDS = [
     ("warehouses.edit", "تعديل المستودعات"),
     ("warehouses.delete", "حذف المستودعات"),
     ("warehouses.transfer", "حركة بين المستودعات"),
-    ("stock.view", "عرض حركة المخزون"),
+    ("stock.view", "عرض المخزون والجرد"),
     ("stock.adjust", "تسوية المخزون"),
     ("stock.movement", "حركة مادة"),
     ("production.view", "عرض التصنيع"),
@@ -156,6 +156,7 @@ class StoreUserForm(forms.ModelForm):
             "purchase_orders": obj.permissions["purchases.create"],
             "products": obj.permissions["products.view"] or obj.permissions["products.create"] or obj.permissions["products.edit"],
             "stock_movement": obj.permissions["stock.movement"],
+            "stock_view": obj.permissions["stock.view"],
             "customer_balances": obj.permissions["customers.balances"],
             "receipt_notices": obj.permissions["notices.receipt.create"] or obj.permissions["notices.disbursement.create"],
         })
