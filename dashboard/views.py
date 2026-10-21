@@ -421,6 +421,7 @@ def store_users_list(request, store_slug):
 def store_user_create(request, store_slug):
     store = _get_store_for_dashboard(request, store_slug)
     warehouses_qs = Warehouse.objects.filter(store=store).order_by("-is_main", "name", "id")
+    main_warehouse = warehouses_qs.filter(is_main=True).first()
     users_count = StoreUser.objects.filter(store=store).count()
     if users_count >= store.max_store_users:
         messages.error(
@@ -433,12 +434,17 @@ def store_user_create(request, store_slug):
         if form.is_valid():
             obj = form.save(commit=False)
             obj.store = store
+            if obj.warehouse_id is None:
+                obj.warehouse = main_warehouse
             obj.save()
             messages.success(request, "تم إضافة المستخدم.")
             notify_user_sync_required(request)
             return redirect("dashboard:store_users_list", store_slug=store.slug)
     else:
-        form = StoreUserForm(warehouses_qs=warehouses_qs)
+        form = StoreUserForm(
+            warehouses_qs=warehouses_qs,
+            initial={"warehouse": main_warehouse},
+        )
     return render(
         request,
         "dashboard/store_user_form.html",

@@ -92,6 +92,47 @@
             color:#2a9d8f;
             font-weight:700;
         }
+
+        .orders-filter .form-control,
+        .orders-filter .form-select,
+        .orders-filter .btn{
+            min-height:38px;
+        }
+
+        @media (max-width:768px){
+            .content{
+                padding:10px;
+            }
+
+            .orders-heading{
+                margin-bottom:8px !important;
+            }
+
+            .orders-user-summary{
+                margin-bottom:8px !important;
+                padding-top:6px !important;
+                padding-bottom:6px !important;
+                gap:6px 14px !important;
+                font-size:.9rem;
+            }
+
+            .orders-filter{
+                margin-bottom:8px !important;
+            }
+
+            .orders-filter .form-control,
+            .orders-filter .form-select,
+            .orders-filter .btn{
+                min-height:34px;
+                padding-top:4px;
+                padding-bottom:4px;
+                font-size:.88rem;
+            }
+
+            .orders-card{
+                padding:8px !important;
+            }
+        }
     </style>
 </head>
 
@@ -106,7 +147,7 @@
 <!-- المحتوى -->
 <div class="content">
 
-    <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+    <div class="orders-heading d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
         <h3 class="mb-0">📦 الطلبات</h3>
 
         <a href="{% url 'dashboard:order_create' store.slug %}" class="btn btn-primary">
@@ -114,7 +155,7 @@
         </a>
     </div>
 
-    <div class="alert alert-light border py-2 px-3 mb-3 d-flex flex-wrap gap-3 align-items-center">
+    <div class="orders-user-summary alert alert-light border py-2 px-3 mb-3 d-flex flex-wrap gap-3 align-items-center">
         <div>
             <strong>المستخدم:</strong>
             {% if current_store_user %}{{ current_store_user.name }}{% else %}{{ request.user.username }}{% endif %}
@@ -166,18 +207,13 @@
     {% endif %}
 
     <!-- فلترة -->
-    <form method="get" class="row g-2 mb-3">
-        <div class="col-12 col-md-2">
+    <form method="get" class="orders-filter row g-2 mb-3">
+        <div class="col-6 col-md-2">
             <input type="number" name="order_id" class="form-control"
                    value="{{ current_id }}" placeholder="رقم الطلب بالمتجر">
         </div>
 
-        <div class="col-12 col-md-2">
-            <input type="number" name="mobile_order_id" class="form-control"
-                   value="{{ current_mobile_id }}" placeholder="رقم الطلب بالتطبيق">
-        </div>
-
-        <div class="col-12 col-md-2">
+        <div class="col-6 col-md-2">
             <select name="status" class="form-select">
                 <option value="">كل الحالات</option>
                 <option value="pending" {% if current_status == 'pending' %}selected{% endif %}>
@@ -189,7 +225,7 @@
             </select>
         </div>
 
-        <div class="col-12 col-md-2">
+        <div class="col-6 col-md-2">
             <select name="transaction_type" class="form-select">
                 <option value="">كل المعاملات</option>
                 <option value="sale" {% if current_transaction_type == 'sale' %}selected{% endif %}>
@@ -201,18 +237,24 @@
             </select>
         </div>
 
+        <div class="col-6 col-md-2">
+            <input type="number" name="mobile_order_id" class="form-control"
+                   value="{{ current_mobile_id }}" placeholder="رقم نقطة البيع">
+        </div>
+
         <div class="col-12 col-md-2">
             <button class="btn btn-secondary w-100">فلترة</button>
         </div>
     </form>
 
     <!-- جدول الطلبات -->
-    <div class="card p-3 shadow-sm">
+    <div class="orders-card card p-3 shadow-sm">
         <div class="table-responsive">
             <table class="table table-striped align-middle mb-0">
                 <thead>
                     <tr>
                         <th>رقم الطلب</th>
+                        <th>رقم نقطة البيع</th>
                         <th>المجموع</th>
                         <th>الحالة</th>
                         <th>التاريخ</th>
@@ -232,6 +274,8 @@
                                 <span class="badge bg-danger ms-2">جديد</span>
                             {% endif %}
                         </td>
+
+                        <td>{{ order.mobile_local_order_id|default:"-" }}</td>
 
                         <td>{{ order.display_items_total|floatformat:2 }} $</td>
 
@@ -276,7 +320,7 @@
                     </tr>
                 {% empty %}
                     <tr>
-                        <td colspan="8" class="text-center text-muted">
+                        <td colspan="9" class="text-center text-muted">
                             لا يوجد طلبات
                         </td>
                     </tr>

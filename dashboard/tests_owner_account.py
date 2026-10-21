@@ -142,6 +142,7 @@ class OwnerAccountTests(TestCase):
         self.assertRedirects(self.client.post(create_url, data), list_url, fetch_redirect_response=False)
         self.assertContains(self.client.get(list_url), '<dialog id="userSyncNotice"')
         employee = StoreUser.objects.get(store=self.store, identifier="employee")
+        self.assertEqual(employee.warehouse_id, self.store.warehouses.get(is_main=True).id)
         edit_url = reverse("dashboard:store_user_update", kwargs={"store_slug": self.store.slug, "user_id": employee.pk})
         data["name"] = "Employee edited"
         self.assertRedirects(self.client.post(edit_url, data), list_url, fetch_redirect_response=False)
