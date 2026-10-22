@@ -71,10 +71,10 @@ class StoreUserOwnerTests(TestCase):
 
     def test_owner_pages_show_full_permissions_without_permission_controls(self):
         response = self.client.get(self.url)
-        self.assertContains(response, "صلاحيات كاملة")
+        self.assertContains(response, "المدير صلاحيات كاملة")
         self.assertNotContains(response, 'id="permissionsToggleAll"')
         self.assertNotContains(response, 'name="perm_sales_view"')
-        self.assertContains(self.client.get(self.list_url), "صلاحيات كاملة")
+        self.assertContains(self.client.get(self.list_url), "المدير صلاحيات كاملة")
 
     def test_employee_permissions_remain_editable(self):
         employee = StoreUser.objects.create(store=self.store, identifier="staff", name="Staff")

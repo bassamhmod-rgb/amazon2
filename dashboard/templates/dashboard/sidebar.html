@@ -76,10 +76,6 @@
 
     <!-- روابط القائمة -->
     <nav class="sidebar-links">
-        {% if store.owner_id == request.user.id %}
-            <a href="{% url 'dashboard:owner_account' store.slug %}">🔐 اسم المستخدم وكلمة المرور</a>
-        {% endif %}
-
         {% with su=current_store_user %}
 
             {% if not store.is_active %}

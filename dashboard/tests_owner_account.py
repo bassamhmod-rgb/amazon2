@@ -117,10 +117,13 @@ class OwnerAccountTests(TestCase):
         response = other_session.get(self.url)
         self.assertTrue(response.context["account_login"])
 
-    def test_account_link_is_available_on_inactive_store_users_page(self):
+    def test_inactive_store_users_page_links_directly_to_owner_user_editor(self):
         self.client.force_login(self.owner)
         response = self.client.get(reverse("dashboard:store_users_list", kwargs={"store_slug": self.store.slug}))
-        self.assertContains(response, self.url)
+        edit_url = reverse("dashboard:store_user_update", kwargs={
+            "store_slug": self.store.slug, "user_id": self.profile.pk})
+        self.assertContains(response, edit_url)
+        self.assertNotContains(response, self.url)
 
     def test_owner_update_displays_sync_popup_once_after_success(self):
         self.change()
