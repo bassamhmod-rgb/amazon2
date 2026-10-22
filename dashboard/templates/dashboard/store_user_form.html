@@ -106,9 +106,12 @@
 
                 <div class="row g-3">
                     <div class="col-md-6">
-                        <label class="form-label">المعرف</label>
+                        <label class="form-label">اسم المستخدم</label>
                         {{ form.identifier }}
                         {% for error in form.identifier.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+                        {% if form.is_owner %}
+                        <div class="form-text">تغيير اسم المستخدم يحدّث دخول المدير إلى المتجر، ويصل إلى التطبيق بعد مزامنة المستخدمين.</div>
+                        {% endif %}
                     </div>
                     <div class="col-md-6">
                         <label class="form-label">الاسم</label>
@@ -140,11 +143,18 @@
                             <div class="card-body">
                                 <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
                                     <div class="fw-bold">الصلاحيات</div>
+                                    {% if form.is_owner %}
+                                    <span class="badge bg-success">صلاحيات كاملة</span>
+                                    {% else %}
                                     <div class="form-check">
                                         <input class="form-check-input" type="checkbox" id="permissionsToggleAll">
                                         <label class="form-check-label" for="permissionsToggleAll">تحديد الكل</label>
                                     </div>
+                                    {% endif %}
                                 </div>
+                                {% if form.is_owner %}
+                                <div class="text-muted">المدير لديه صلاحيات كاملة تلقائياً ولا يحتاج إلى تحديد الصلاحيات.</div>
+                                {% else %}
                                 <div class="row g-2">
                                     {% for field in form.permission_fields %}
                                         <div class="col-md-4">
@@ -155,6 +165,7 @@
                                         </div>
                                     {% endfor %}
                                 </div>
+                                {% endif %}
                             </div>
                         </div>
                     </div>

@@ -225,14 +225,21 @@ class StoreUser(models.Model):
         ordering = ["store_id", "name"]
 
     def save(self, *args, **kwargs):
+        update_fields = kwargs.get("update_fields")
+        sync_identifier = not self._state.adding and (update_fields is None or "identifier" in update_fields)
         _touch_update_time(self, kwargs)
         _touch_mobile_update_time(self, kwargs)
-        super().save(*args, **kwargs)
-        if self.auth_user_id:
-            self._sync_auth_user()
-        else:
-            self._ensure_auth_user()
+        with transaction.atomic():
+            super().save(*args, **kwargs)
+            if self.auth_user_id:
+                self._sync_auth_user(sync_identifier=sync_identifier)
+            else:
+                self._ensure_auth_user()
         return None
+
+    @property
+    def is_owner(self):
+        return bool(self.auth_user_id and self.store_id and self.auth_user_id == self.store.owner_id)
 
     def __str__(self):
         return f"{self.store} - {self.name} ({self.identifier})"
@@ -273,12 +280,15 @@ class StoreUser(models.Model):
 
         StoreUser.objects.filter(pk=self.pk).update(auth_user=self.auth_user)
 
-    def _sync_auth_user(self):
+    def _sync_auth_user(self, sync_identifier=True):
         auth_user = User.objects.filter(pk=self.auth_user_id).first()
         if not auth_user:
             return
 
         update_fields = []
+        if sync_identifier and self.is_owner and auth_user.username != self.identifier:
+            auth_user.username = self.identifier
+            update_fields.append("username")
         if self.password and auth_user.password != self.password:
             auth_user.password = self.password
             update_fields.append("password")

@@ -1,6 +1,7 @@
 ﻿# -*- coding: utf-8 -*-
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth import update_session_auth_hash
 from django.core.paginator import Paginator
 from django.http import JsonResponse, HttpResponse
 from django.http import Http404
@@ -397,7 +398,7 @@ def warehouse_delete(request, store_slug, warehouse_id):
 @login_required
 def store_users_list(request, store_slug):
     store = _get_store_for_dashboard(request, store_slug)
-    users = StoreUser.objects.filter(store=store).order_by("name", "id")
+    users = StoreUser.objects.filter(store=store).select_related("store").order_by("name", "id")
     for user in users:
         permissions = user.permissions or {}
         if permissions.get("stock.movement"):
@@ -461,6 +462,8 @@ def store_user_update(request, store_slug, user_id):
         form = StoreUserForm(request.POST, instance=obj, warehouses_qs=warehouses_qs)
         if form.is_valid():
             form.save()
+            if obj.is_owner and request.user.pk == obj.auth_user_id:
+                update_session_auth_hash(request, User.objects.get(pk=obj.auth_user_id))
             messages.success(request, "تم تعديل المستخدم.")
             notify_user_sync_required(request)
             return redirect("dashboard:store_users_list", store_slug=store.slug)

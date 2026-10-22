@@ -1,4 +1,5 @@
 from django import forms
+from django.contrib.auth.models import User
 
 from .models import StoreUser
 
@@ -115,6 +116,9 @@ class StoreUserForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         warehouses_qs = kwargs.pop("warehouses_qs", None)
         super().__init__(*args, **kwargs)
+        self.is_owner = self.instance.is_owner
+        if self.is_owner:
+            self.fields["identifier"].validators.extend(User._meta.get_field("username").validators)
 
         if warehouses_qs is not None:
             self.fields["warehouse"].queryset = warehouses_qs
@@ -137,7 +141,8 @@ class StoreUserForm(forms.ModelForm):
                 self.fields["raw_password"].help_text = "لم يتم تعيين كلمة مرور بعد. ضع كلمة مرور ليتمكن المستخدم من تسجيل الدخول."
 
         for key, _ in PERMISSION_FIELDS:
-            self.fields[permission_field_name(key)].initial = bool(perms.get(key))
+            self.fields[permission_field_name(key)].initial = self.is_owner or bool(perms.get(key))
+            self.fields[permission_field_name(key)].disabled = self.is_owner
 
         for field in self.fields.values():
             if isinstance(field.widget, forms.CheckboxInput):
@@ -145,10 +150,20 @@ class StoreUserForm(forms.ModelForm):
             else:
                 field.widget.attrs.setdefault("class", "form-control")
 
+    def clean_identifier(self):
+        value = self.cleaned_data["identifier"]
+        if self.is_owner:
+            owner_id = self.instance.auth_user_id
+            if User.objects.filter(username__iexact=value).exclude(pk=owner_id).exists():
+                raise forms.ValidationError("اسم المستخدم مستخدم مسبقاً.")
+            if StoreUser.objects.filter(store__owner_id=owner_id, identifier__iexact=value).exclude(auth_user_id=owner_id).exists():
+                raise forms.ValidationError("اسم المستخدم مستخدم من حساب آخر ضمن متاجرك.")
+        return value
+
     def save(self, commit=True):
         obj = super().save(commit=False)
         obj.permissions = {
-            key: bool(self.cleaned_data.get(permission_field_name(key)))
+            key: self.is_owner or bool(self.cleaned_data.get(permission_field_name(key)))
             for key, _ in PERMISSION_FIELDS
         }
         obj.permissions.update({
