@@ -916,6 +916,7 @@ def products_list(request, store_slug):
         "current_category": int(category_id) if category_id and category_id.isdigit() else None,
         "current_sub_category": int(sub_category_id) if sub_category_id and sub_category_id.isdigit() else None,
         "current_stock_filter": stock_filter,
+        "is_access_linked": _is_store_access_linked(store),
 
         "products_qs": products_qs,
     }

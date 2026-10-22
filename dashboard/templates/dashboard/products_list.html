@@ -273,7 +273,7 @@
                             <form method="post"
                                   action="{% url 'dashboard:product_delete' current_store.slug product.id %}"
                                   style="display:inline;"
-                                  onsubmit="return confirm('هل أنت متأكد من حذف المنتج؟');">
+                                  onsubmit="return confirm('{% if is_access_linked %}انتبه: قد توجد فواتير مرتبطة بهذه المادة لم تتم مزامنتها بعد من قاعدة البيانات المركزية أو نقاط البيع. حذف المادة قبل اكتمال المزامنة قد يمنع رفع هذه الفواتير.\n\nهل تريد الحذف بالتأكيد؟{% else %}هل أنت متأكد من حذف المنتج؟{% endif %}');">
                                 {% csrf_token %}
                                 <button type="submit"
                                  class="btn btn-danger js-confirm-delete">

@@ -3824,6 +3824,7 @@ def _serialize_order_for_mobile(order):
         "exchange_rate": _to_float(getattr(order.store, "exchange_rate", 1)),
         "amount_payment_currency": _to_float(getattr(order, "payment", 0)),
         "note": getattr(order, "note", "") or "",
+        "mobile_order_id": getattr(order, "mobile_local_order_id", None),
         "accounting_invoice_number": getattr(order, "accounting_invoice_number", None),
         "document_kind": getattr(order, "document_kind", 1),
         "payment_type": getattr(order, "payment_type", "") or "",
