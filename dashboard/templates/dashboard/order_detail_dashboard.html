@@ -167,7 +167,7 @@
                     </p>
                 {% endif %}
 
-                <p><strong>📅 التاريخ:</strong> {{ order.created_at|date:"Y-m-d H:i" }}</p>
+                <p><strong>📅 التاريخ:</strong> {{ order.created_at|date:"Y-m-d h:i" }} {% if order.created_at|date:"A" == "AM" %}ص{% else %}م{% endif %}</p>
 
                 <p>
                     <strong>الحالة:</strong>

@@ -332,7 +332,7 @@
                             {% endif %}
                         </td>
 
-                        <td>{{ order.created_at|date:"Y-m-d H:i" }}</td>
+                        <td>{{ order.created_at|date:"Y-m-d h:i" }} {% if order.created_at|date:"A" == "AM" %}ص{% else %}م{% endif %}</td>
                         <td>{{ order.discount|floatformat:2 }} $</td>
                         <td>{{ order.payment|floatformat:2 }} $</td>
                         <td>{{ order.transaction_type }}</td>

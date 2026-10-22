@@ -32,7 +32,7 @@
             <div class="d-flex justify-content-between">
                 <div>
                     <strong>رقم الطلب:</strong> #{{ order.id }}<br>
-                    <strong>التاريخ:</strong> {{ order.created_at|date:"Y-m-d H:i" }}<br>
+                    <strong>التاريخ:</strong> {{ order.created_at|date:"Y-m-d h:i" }} {% if order.created_at|date:"A" == "AM" %}ص{% else %}م{% endif %}<br>
                     <strong>المجموع:</strong> {{ order.total|floatformat:2 }} $
                 </div>
                 <div class="text-end">
