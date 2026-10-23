@@ -9,7 +9,12 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
 
     <style>
+        html{
+            max-width:100%;
+            overflow-x:hidden;
+        }
         body{
+            margin:0;
             background:#f7f9fc;
             font-family:"Cairo",sans-serif;
             overflow-x:hidden;
@@ -17,6 +22,7 @@
 
         /* ===== SIDEBAR ===== */
         .sidebar{
+            box-sizing:border-box;
             width:230px;
             background:#fff;
             height:100vh;
@@ -45,6 +51,9 @@
 
         /* ===== CONTENT ===== */
         .content{
+            box-sizing:border-box;
+            min-width:0;
+            max-width:100%;
             margin-right:240px;
             padding:20px;
             transition:.3s;
@@ -56,9 +65,22 @@
         }
 
         @media (max-width:768px){
-            .sidebar{ right:-260px; }
-            .sidebar.active{ right:0; }
-            .content{ margin-right:0; }
+            .sidebar{
+                display:none;
+                right:0;
+                max-width:calc(100% - 40px);
+            }
+            .sidebar.active{ display:block; }
+            .content{
+                margin-right:0;
+                width:100%;
+                padding:16px;
+            }
+            .form-card input,
+            .form-card select,
+            .form-card textarea{
+                font-size:16px;
+            }
 
             #sidebarArrow{
                 display:flex;
@@ -83,6 +105,9 @@
 
         /* ===== FORM CARD ===== */
         .form-card{
+            box-sizing:border-box;
+            min-width:0;
+            max-width:100%;
             background:#fff;
             padding:20px;
             border-radius:16px;
@@ -93,8 +118,15 @@
         .form-card select,
         .form-card textarea{
             width:100%;
+            min-width:0;
+            max-width:100%;
             border-radius:12px;
             box-sizing:border-box;
+        }
+
+        .form-card input[type="checkbox"],
+        .form-card input[type="radio"]{
+            width:auto;
         }
 
         .barcode-actions{
@@ -215,13 +247,16 @@
 
 <div class="content">
 
-    <h3 class="mb-3">
+    <div class="d-flex justify-content-between align-items-center mb-3 gap-2">
+    <h3 class="mb-0">
         {% if is_edit %}✏️ تعديل منتج{% else %}➕ إضافة منتج جديد{% endif %}
     </h3>
+    <button type="submit" form="productEditForm" class="btn btn-primary" aria-label="حفظ" title="حفظ"><span aria-hidden="true">💾</span></button>
+    </div>
 
     <div class="form-card">
 
-        <form method="post" enctype="multipart/form-data">
+        <form id="productEditForm" method="post" enctype="multipart/form-data"{% if is_edit %} data-select-display-order{% endif %}>
             {% csrf_token %}
             {% if form.errors %}
             <div class="alert alert-danger">
@@ -368,11 +403,12 @@
 
 <input type="file" id="barcode-image-input" accept="image/*" capture="environment" class="d-none">
 
+<script src="{% static 'js/catalog_edit_navigation.js' %}" defer></script>
 <script>
 const sidebar = document.getElementById("sidebar");
 const arrow = document.getElementById("sidebarArrow");
 
-arrow.onclick = () => {
+if (arrow && sidebar) arrow.onclick = () => {
     sidebar.classList.toggle("active");
     arrow.innerHTML = sidebar.classList.contains("active") ? "❮" : "❯";
 };

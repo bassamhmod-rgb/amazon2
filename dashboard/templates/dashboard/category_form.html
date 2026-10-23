@@ -75,9 +75,12 @@
 {% include "dashboard/sidebar.html" %}
 
 <div class="content">
-    <h3 class="mb-3">{% if is_edit %}تعديل الفئة{% else %}إضافة فئة جديدة{% endif %}</h3>
+    <div class="d-flex justify-content-between align-items-center mb-3 gap-2" style="max-width: 500px;">
+        <h3 class="mb-0">{% if is_edit %}تعديل الفئة{% else %}إضافة فئة جديدة{% endif %}</h3>
+        <button type="submit" form="categoryEditForm" class="btn btn-primary" aria-label="حفظ" title="حفظ"><span aria-hidden="true">💾</span></button>
+    </div>
 
-    <form method="post" enctype="multipart/form-data" class="bg-white p-4 rounded shadow-sm" style="max-width: 500px;">
+    <form id="categoryEditForm" method="post" enctype="multipart/form-data" class="bg-white p-4 rounded shadow-sm" style="max-width: 500px;"{% if is_edit %} data-select-display-order{% endif %}>
         {% csrf_token %}
         {% if error %}<div class="alert alert-danger">{{ error }}</div>{% endif %}
 
@@ -114,6 +117,7 @@
     </form>
 </div>
 
+<script src="{% static 'js/catalog_edit_navigation.js' %}" defer></script>
 <script>
 const sidebar = document.getElementById("sidebar");
 const arrow = document.getElementById("sidebarArrow");

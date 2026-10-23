@@ -251,7 +251,7 @@
                 </thead>
                 <tbody>
                     {% for product in products_qs %}
-                    <tr>
+                    <tr data-edit-url="{% url 'dashboard:product_update' current_store.slug product.id %}" tabindex="0" role="link" aria-label="تعديل {{ product.name }}">
                         
 
                         <td>{{ product.name }}</td>
@@ -308,6 +308,7 @@
     };
 </script>
 <script src="{% static 'js/confirm_delete.js' %}"></script>
+<script src="{% static 'js/catalog_edit_navigation.js' %}" defer></script>
 
 <script>
 (() => {

@@ -100,7 +100,7 @@
                 </thead>
                 <tbody>
                     {% for cat in categories %}
-                    <tr>
+                    <tr data-edit-url="{% url 'dashboard:edit_category' store.slug cat.id %}" tabindex="0" role="link" aria-label="تعديل {{ cat.name }}">
                         <td>
                             {% if cat.image %}
                                 <img src="{{ cat.image.url }}" alt="{{ cat.name }}" style="width:48px;height:48px;object-fit:cover;border-radius:8px;border:1px solid #dee2e6;">
@@ -140,5 +140,6 @@ if (arrow && sidebar) {
 }
 </script>
 <script src="{% static 'js/confirm_delete.js' %}"></script>
+<script src="{% static 'js/catalog_edit_navigation.js' %}" defer></script>
 </body>
 </html>
