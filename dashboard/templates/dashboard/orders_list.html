@@ -313,8 +313,10 @@
                     <tr>
                         <td>
                             {{ order.id }}
-                            {% if not order.is_seen_by_store %}
-                                <span class="badge bg-danger ms-2">جديد</span>
+                            {% if order.alert_state == "confirmation" %}
+                                <span class="badge bg-danger ms-2">بانتظار التأكيد</span>
+                            {% elif order.alert_state == "export" %}
+                                <span class="badge bg-warning text-dark ms-2">بانتظار الترحيل</span>
                             {% endif %}
                         </td>
 
@@ -569,6 +571,12 @@
     });
 </script>
 <script src="{% static 'js/confirm_delete.js' %}"></script>
+<script>
+// Back/Forward can restore the old list without requesting updated read flags.
+window.addEventListener("pageshow", function (event) {
+    if (event.persisted) window.location.reload();
+});
+</script>
 </body>
 </html>
 

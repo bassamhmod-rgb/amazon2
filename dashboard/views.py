@@ -20,6 +20,8 @@ from django.db.models.deletion import ProtectedError
 from django.db.models import Sum
 from django.utils import timezone
 from django.views.decorators.http import require_POST
+from django.views.decorators.cache import never_cache
+from orders.alerts import has_linked_app, order_alert_state
 from products.models import ProductDetails ,Product, ProductGallery, ProductBarcode
 from products.utils import fix_missing_buy_price_for_product, apply_purchase_price_to_empty_sales
 # --- استيراد المودلز من التطبيقات المختلفة ---
@@ -1726,6 +1728,7 @@ def order_update(request, store_slug, order_id):
 #برقم الطلب
 # قائمة الطلبات
 @login_required
+@never_cache
 def orders_list(request, store_slug):
     store = _get_store_for_dashboard(request, store_slug)
     status_filter = request.GET.get("status", "")
@@ -1798,6 +1801,9 @@ def orders_list(request, store_slug):
         # ترتيب حسب التاريخ (الأحدث أولاً)
         paginator = Paginator(orders_qs.order_by("-created_at", "-id"), 100)
         orders = paginator.get_page(request.GET.get("page"))
+        linked_app = has_linked_app(store)
+        for order in orders:
+            order.alert_state = order_alert_state(order, linked_app)
 
         # 🟢 عدد الطلبات الجديدة (لسّا is_seen_by_store = False)
         new_orders_count = Order.objects.filter(

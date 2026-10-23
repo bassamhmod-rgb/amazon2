@@ -108,11 +108,11 @@
                     <div class="sidebar-submenu">
                         <a href="{% url 'dashboard:orders_list' store.slug %}" class="position-relative">
                             قائمة الطلبات
-                            {% if new_orders_count > 0 %}
-                            <span class="badge bg-danger position-absolute top-50 start-0 translate-middle-y"
-                                  style="font-size:0.7rem;">
-                                {{ new_orders_count }}
-                            </span>
+                            {% if pending_confirmation_orders_count > 0 %}
+                                <span class="badge bg-danger" title="طلبات بانتظار التأكيد">تأكيد {{ pending_confirmation_orders_count }}</span>
+                            {% endif %}
+                            {% if awaiting_export_orders_count > 0 %}
+                                <span class="badge bg-warning text-dark" title="طلبات مؤكدة بانتظار الترحيل">ترحيل {{ awaiting_export_orders_count }}</span>
                             {% endif %}
                         </a>
                         <a href="{% url 'dashboard:order_create' store.slug %}">إنشاء طلب</a>
@@ -196,12 +196,12 @@
                         <div class="sidebar-submenu">
                             <a href="{% url 'dashboard:orders_list' store.slug %}" class="position-relative">
                                 قائمة الطلبات
-                                {% if new_orders_count > 0 %}
-                                <span class="badge bg-danger position-absolute top-50 start-0 translate-middle-y"
-                                      style="font-size:0.7rem;">
-                                    {{ new_orders_count }}
-                                </span>
-                                {% endif %}
+                                {% if pending_confirmation_orders_count > 0 %}
+                                <span class="badge bg-danger" title="طلبات بانتظار التأكيد">تأكيد {{ pending_confirmation_orders_count }}</span>
+                            {% endif %}
+                            {% if awaiting_export_orders_count > 0 %}
+                                <span class="badge bg-warning text-dark" title="طلبات مؤكدة بانتظار الترحيل">ترحيل {{ awaiting_export_orders_count }}</span>
+                            {% endif %}
                             </a>
                             <a href="{% url 'dashboard:order_create' store.slug %}">إنشاء طلب</a>
                         </div>

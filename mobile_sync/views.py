@@ -3430,6 +3430,40 @@ def sync_push(request):
 
 @api_view(["POST"])
 @permission_classes([AllowAny])
+def orders_received(request):
+    payload = request.data if isinstance(request.data, dict) else {}
+    merchant_id = _to_int(payload.get("merchant_id"))
+    client_id = _to_str(payload.get("sync_client_id")).strip()
+    receipts = payload.get("orders", [])
+    if merchant_id is None or not client_id or not isinstance(receipts, list):
+        return Response({"detail": "Invalid receipt payload"}, status=400)
+    _, device_error = _ensure_store_user_sync_device(request, merchant_id)
+    if device_error:
+        return device_error
+    received = []
+    with transaction.atomic():
+        for receipt in receipts:
+            if not isinstance(receipt, dict):
+                continue
+            local_id = _to_int(receipt.get("local_order_id"))
+            server_id = _to_int(receipt.get("server_order_id"))
+            if not local_id or local_id < 1 or not server_id:
+                continue
+            order = Order.objects.select_for_update().filter(
+                store_id=merchant_id, pk=server_id, status="confirmed", document_kind=1,
+            ).first()
+            if order is None:
+                continue
+            if not order.mobile_local_order_id and not order.mobile_sync_client_id:
+                order.mobile_local_order_id = local_id
+                order.mobile_sync_client_id = client_id
+                order.save(update_fields=["mobile_local_order_id", "mobile_sync_client_id"])
+            received.append(server_id)
+    return Response({"received": received})
+
+
+@api_view(["POST"])
+@permission_classes([AllowAny])
 def orders_push(request):
     payload = request.data if isinstance(request.data, dict) else None
     if not payload:

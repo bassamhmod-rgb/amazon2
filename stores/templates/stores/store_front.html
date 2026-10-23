@@ -432,14 +432,11 @@ button.btn-primary {
                     &#9881; لوحة التحكم
                 </a>
                 
-                {% if unexported_orders_count > 0 %}
-                    <span class="badge bg-danger fs-6 d-none d-md-inline">
-                        &#128666; طلبات للترحيل ({{ unexported_orders_count }})
-                    </span>
-                {% else %}
-                    <span class="badge bg-secondary fs-6 d-none d-md-inline">
-                        &#128666; طلبات للترحيل (0)
-                    </span>
+                {% if pending_confirmation_orders_count > 0 %}
+                    <span class="badge bg-danger fs-6 d-none d-md-inline">بانتظار التأكيد ({{ pending_confirmation_orders_count }})</span>
+                {% endif %}
+                {% if awaiting_export_orders_count > 0 %}
+                    <span class="badge bg-warning text-dark fs-6 d-none d-md-inline">بانتظار الترحيل ({{ awaiting_export_orders_count }})</span>
                 {% endif %}
             {% endif %}
         </div>

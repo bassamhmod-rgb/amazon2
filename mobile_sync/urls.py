@@ -41,4 +41,5 @@ urlpatterns = [
     path("sync/push/", views.sync_push, name="sync_push"),
     path("orders/", views.orders_pull, name="orders_pull"),
     path("orders/push/", views.orders_push, name="orders_push"),
+    path("orders/received/", views.orders_received, name="orders_received"),
 ]
