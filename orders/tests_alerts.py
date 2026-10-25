@@ -74,6 +74,36 @@ class OrderAlertTests(TestCase):
         self.assertEqual(order.amount, 10)
         self.assertEqual(order_alert_state(order, True), "")
 
+    def test_serialized_completed_invoice_can_acknowledge_and_retry(self):
+        from mobile_sync.views import _serialize_order_for_mobile
+        order = self.order(status="confirmed")
+        self.assertEqual(_serialize_order_for_mobile(order)["status"], "completed")
+        for attempt in range(2):
+            request = APIRequestFactory().post("/", {
+                "merchant_id": self.store.id, "sync_client_id": "receipt-client",
+                "orders": [{"server_order_id": order.pk, "local_order_id": 27}],
+            }, format="json")
+            with patch("mobile_sync.views._ensure_store_user_sync_device", return_value=(None, None)):
+                response = orders_received(request)
+            self.assertEqual(response.data["received"], [order.pk])
+            self.assertEqual(response.data["mobile_order_ids"][str(order.pk)], 27)
+            order.refresh_from_db()
+            self.assertEqual(order.mobile_local_order_id, 27)
+            self.assertEqual(order_alert_state(order, True), "")
+
+    def test_receipt_never_overwrites_existing_pos_number(self):
+        order = self.order(status="confirmed", mobile_local_order_id=123, mobile_sync_client_id="original-pos")
+        request = APIRequestFactory().post("/", {
+            "merchant_id": self.store.pk, "sync_client_id": "another-client",
+            "orders": [{"server_order_id": order.pk, "local_order_id": 999}],
+        }, format="json")
+        with patch("mobile_sync.views._ensure_store_user_sync_device", return_value=(None, None)):
+            response = orders_received(request)
+        order.refresh_from_db()
+        self.assertEqual(order.mobile_local_order_id, 123)
+        self.assertEqual(order.mobile_sync_client_id, "original-pos")
+        self.assertEqual(response.data["mobile_order_ids"][str(order.pk)], 123)
+
     def test_app_cannot_acknowledge_pending_or_another_stores_order(self):
         pending = self.order(status="pending")
         request = APIRequestFactory().post("/", {

@@ -3527,6 +3527,7 @@ def orders_received(request):
     if device_error:
         return device_error
     received = []
+    mobile_order_ids = {}
     with transaction.atomic():
         for receipt in receipts:
             if not isinstance(receipt, dict):
@@ -3536,16 +3537,18 @@ def orders_received(request):
             if not local_id or local_id < 1 or not server_id:
                 continue
             order = Order.objects.select_for_update().filter(
-                store_id=merchant_id, pk=server_id, status="confirmed", document_kind=1,
+                store_id=merchant_id, pk=server_id, status__in=["confirmed", "completed"], document_kind=1,
             ).first()
             if order is None:
                 continue
-            if not order.mobile_local_order_id and not order.mobile_sync_client_id:
+            if not order.mobile_local_order_id and order.mobile_sync_client_id in (None, "", client_id):
                 order.mobile_local_order_id = local_id
                 order.mobile_sync_client_id = client_id
                 order.save(update_fields=["mobile_local_order_id", "mobile_sync_client_id"])
-            received.append(server_id)
-    return Response({"received": received})
+            if order.mobile_local_order_id:
+                received.append(server_id)
+                mobile_order_ids[str(server_id)] = order.mobile_local_order_id
+    return Response({"received": received, "mobile_order_ids": mobile_order_ids})
 
 
 @api_view(["POST"])
