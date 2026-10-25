@@ -1,3 +1,4 @@
+from accounts.customer_notes import apply_customer_private_note
 from accounts.models import normalize_phone_number
 # -*- coding: utf-8 -*-
 from django.shortcuts import render, get_object_or_404, redirect
@@ -1545,6 +1546,8 @@ def order_create(request, store_slug):
         discount_value = _to_decimal(request.POST.get("discount", 0))
         payment_value = _to_decimal(request.POST.get("payment", 0))
         note_value = (request.POST.get("note") or "").strip()
+        if transaction_type == "sale" and customer:
+            note_value = apply_customer_private_note(note_value, customer.private_note)
         warehouse = _order_warehouse(request, store)
         error = _validate_order_stock(request, store, warehouse)
         if error:
@@ -1679,6 +1682,8 @@ def order_update(request, store_slug, order_id):
     new_orders_count = Order.objects.filter(store=store, is_seen_by_store=False).count()
 
     if request.method == "POST":
+        previous_customer = order.customer
+
         warehouse = _order_warehouse(request, store)
         error = _validate_order_stock(request, store, warehouse, order)
         if error:
@@ -1709,6 +1714,10 @@ def order_update(request, store_slug, order_id):
         if not order.warehouse_id:
             order.warehouse = _current_warehouse_for_request(request, store)
 
+        if transaction_type == "sale" and order.customer_id and (previous_customer is None or str(previous_customer.pk) != str(order.customer_id)):
+            customer = get_object_or_404(Customer, pk=order.customer_id, store=store)
+            order.note = apply_customer_private_note(order.note, customer.private_note,
+                previous_customer.private_note if previous_customer else "")
         order.save()
 
         products = request.POST.getlist("product_id[]")
@@ -1965,6 +1974,7 @@ def search_customers(request, store_slug):
         {
             "id": c.id,
             "name": c.name,
+            "private_note": c.private_note,
             "phone": c.phone,
             "preferred_price_level": getattr(c, "preferred_price_level", 0) or 0,
         }
@@ -2734,6 +2744,7 @@ def customer_create(request, store_slug):
             store=store,
             name=name,
             phone=phone,
+            private_note=(request.POST.get("private_note") or "").strip(),
             balance=balance,
             opening_balance=opening_balance,
             preferred_price_level=preferred_price_level,
@@ -2807,11 +2818,13 @@ def customer_update(request, store_slug, customer_id):
             "phone": phone,
             "address": address,
             "note": note,
+            "private_note": (request.POST.get("private_note") or "").strip(),
             "balance": balance,
             "opening_balance": opening_balance,
             "preferred_price_level": preferred_price_level,
             "is_subscription_active": is_subscription_active,
             "update_time": int(timezone.now().timestamp() // 60),
+            "mobile_update_time": int(timezone.now().timestamp() // 60),
         }
         Customer.objects.filter(id=customer.id, store=store).update(**update_data)
         messages.success(request, "تم تعديل بيانات العميل بنجاح.")

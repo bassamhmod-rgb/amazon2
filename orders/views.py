@@ -1,3 +1,4 @@
+from accounts.customer_notes import apply_customer_private_note
 from stores.storefront_stock import allocate_cart_items
 from django.contrib import messages
 from django.shortcuts import render, redirect, get_object_or_404
@@ -288,7 +289,7 @@ def confirm_order(request, store_slug):
         customer=customer,
         status="pending",
         shipping_address=data.get("customer_address", ""),
-        note=data.get("customer_note", ""),
+        note=apply_customer_private_note(data.get("customer_note", ""), customer.private_note),
         payment_type=data.get("payment_type"),
         payment_method=method,
         payment_method_name=method.name if method else "",

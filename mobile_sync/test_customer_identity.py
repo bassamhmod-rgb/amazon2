@@ -1,5 +1,6 @@
 from django.contrib.auth import get_user_model
 from django.test import TestCase
+from django.db import IntegrityError, transaction
 from django.test import RequestFactory
 from django.contrib.messages.storage.fallback import FallbackStorage
 
@@ -24,6 +25,14 @@ class CustomerIdentityTests(TestCase):
         self.assertEqual(self.customer.name, "First")
         self.assertEqual(self.customer.phone, "123")
         self.assertEqual(Customer.objects.filter(store=self.store).count(), 1)
+
+    def test_store_database_forbids_repeated_names_including_whitespace_and_general(self):
+        for name in ["First", " First "]:
+            with self.assertRaises(IntegrityError), transaction.atomic():
+                Customer.objects.create(store=self.store, name=name, phone="")
+        Customer.objects.create(store=self.store, name="زبون عام", phone="")
+        with self.assertRaises(IntegrityError), transaction.atomic():
+            Customer.objects.create(store=self.store, name=" زبون عام ", phone="")
 
     def test_name_matches_even_when_phone_changes(self):
         customer, action = _apply_customer_change(self.store, {"name": "First", "phone": "456"})

@@ -278,6 +278,7 @@
     </form>
 </div>
 
+{% include 'dashboard/customer_note_script.html' %}
 <script>
 /* منع Enter من إرسال الفورم بالغلط */
 document.addEventListener("DOMContentLoaded", function () {
@@ -493,6 +494,7 @@ if (customerSearchEl){
 }
 
 function selectCustomer(item){
+    applyInvoiceCustomerPrivateNote(item.private_note);
     customerIdEl.value = item.id;
     selectedCustomerNameEl.innerText = item.name;
 
@@ -504,6 +506,7 @@ function selectCustomer(item){
 }
 
 function removeCustomer(){
+    applyInvoiceCustomerPrivateNote('');
     customerIdEl.value="";
     customerSearchEl.value="";
     customerSearchContainerEl.style.display="block";

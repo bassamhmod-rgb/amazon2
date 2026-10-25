@@ -105,6 +105,8 @@
 
     <form method="post" class="bg-white p-4 rounded shadow-sm">
         {% csrf_token %}
+<div class="mb-3"><label class="form-label" for="private-note">&#1605;&#1604;&#1575;&#1581;&#1592;&#1577; &#1582;&#1575;&#1589;&#1577;</label>
+<textarea id="private-note" name="private_note" class="form-control" rows="3">{{ form_data.private_note|default:'' }}</textarea></div>
 
         <div class="mb-3">
             <label class="form-label">اسم العميل</label>

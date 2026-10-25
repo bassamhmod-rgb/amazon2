@@ -1,0 +1,19 @@
+<script>
+let previousCustomerPrivateNote = "{{ order.customer.private_note|default:''|escapejs }}";
+function applyInvoiceCustomerPrivateNote(nextNote) {
+    const type = document.querySelector('[name="transaction_type"]');
+    if (type && type.value !== 'sale') return;
+    const field = document.querySelector('[name="note"]');
+    if (!field) return;
+    let text = field.value.trimEnd();
+    const previous = previousCustomerPrivateNote.trim();
+    const next = (nextNote || '').trim();
+    if (previous && previous !== next) {
+        if (text === previous) text = '';
+        else if (text.endsWith('\n' + previous)) text = text.slice(0, -previous.length).trimEnd();
+    }
+    if (next && !('\n' + text + '\n').includes('\n' + next + '\n')) text += (text ? '\n' : '') + next;
+    field.value = text;
+    previousCustomerPrivateNote = next;
+}
+</script>

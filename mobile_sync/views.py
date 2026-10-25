@@ -336,6 +336,7 @@ def _serialize_customer(customer):
         "phone": "" if customer.name == GENERAL_CUSTOMER_NAME else customer.phone,
         "address": customer.address or "",
         "note": customer.note or "",
+        "private_note": customer.private_note or "",
         "balance": float(customer.balance),
         "opening_balance": float(customer.opening_balance),
         "preferred_price_level": getattr(customer, "preferred_price_level", 0) or 0,
@@ -982,6 +983,8 @@ def _apply_customer_change(store, payload, server_id=None):
         "is_subscription_active": _to_bool(payload.get("is_subscription_active")),
         "mobile_update_time": now_minute,
     }
+    if "private_note" in payload:
+        update_fields["private_note"] = _to_str(payload.get("private_note")).strip()
     if access_id is not None:
         update_fields["access_id"] = access_id
 
@@ -997,6 +1000,7 @@ def _apply_customer_change(store, payload, server_id=None):
         phone=phone,
         address=address,
         note=note,
+        private_note=update_fields.get("private_note", ""),
         balance=update_fields["balance"],
         opening_balance=update_fields["opening_balance"],
         preferred_price_level=preferred_price_level,
@@ -1742,6 +1746,7 @@ def customers_pull(request):
             "phone",
             "address",
             "note",
+            "private_note",
             "balance",
             "opening_balance",
             "preferred_price_level",

@@ -300,6 +300,7 @@ class StoreUser(models.Model):
             auth_user.save(update_fields=update_fields)
 
 class Customer(models.Model):
+    private_note = models.TextField(blank=True, default="")
     store = models.ForeignKey(Store, on_delete=models.CASCADE)
     update_time = models.BigIntegerField(blank=True, null=True)
     mobile_update_time = models.BigIntegerField(blank=True, null=True)
@@ -357,6 +358,7 @@ class Customer(models.Model):
     def save(self, *args, **kwargs):
         _touch_update_time(self, kwargs)
         _touch_mobile_update_time(self, kwargs)
+        self.name = self.name.strip()
         self.phone = normalize_phone_number(self.phone)
         if not self.name and self.phone:
             self.name = self.phone
