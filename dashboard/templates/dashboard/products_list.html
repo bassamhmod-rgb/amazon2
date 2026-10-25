@@ -251,7 +251,7 @@
                 </thead>
                 <tbody>
                     {% for product in products_qs %}
-                    <tr data-edit-url="{% url 'dashboard:product_update' current_store.slug product.id %}" tabindex="0" role="link" aria-label="تعديل {{ product.name }}">
+                    <tr data-edit-url="{% url 'dashboard:product_update' current_store.slug product.id %}?return_query={{ product_list_query|urlencode }}" tabindex="0" role="link" aria-label="تعديل {{ product.name }}">
                         
 
                         <td>{{ product.name }}</td>
@@ -265,7 +265,7 @@
                                 🔍
                             </a>
 
-                            <a href="{% url 'dashboard:product_update' current_store.slug product.id %}"
+                            <a href="{% url 'dashboard:product_update' current_store.slug product.id %}?return_query={{ product_list_query|urlencode }}"
                                class="btn btn-warning btn-sm">
                                 ✏️
                             </a>

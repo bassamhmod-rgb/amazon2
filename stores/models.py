@@ -40,6 +40,7 @@ class Store(models.Model):
     storefront_warehouses = models.ManyToManyField(
         "Warehouse", blank=True, related_name="storefront_stores",
     )
+    allow_negative_warehouse_sale = models.BooleanField(default=False)
     rkmdb = models.CharField(max_length=100, blank=True, null=True)
     rkmtb = models.CharField(max_length=100, blank=True, null=True)
     slug = models.SlugField(unique=True)

@@ -164,6 +164,10 @@ from stores.models import Store
 from products.models import Product, Category
 from orders.models import OrderItem
 
+from django.urls import reverse
+from products.ordering import display_order, product_display_order
+from stores.storefront_stock import with_storefront_stock, selected_warehouse_ids
+
 logger = logging.getLogger(__name__)
 
 INACTIVE_STORE_ALLOWED_DASHBOARD_VIEWS = {
@@ -175,16 +179,56 @@ INACTIVE_STORE_ALLOWED_DASHBOARD_VIEWS = {
 
 
 def _current_warehouse_for_request(request, store):
-    store_user_id = request.session.get("store_user_id")
-    if store_user_id:
-        su = (
-            StoreUser.objects.filter(pk=store_user_id, store=store, is_active=True)
-            .select_related("warehouse")
-            .first()
-        )
-        if su and su.warehouse_id:
-            return su.warehouse
-    return Warehouse.objects.filter(store=store, is_main=True).first()
+    if request.user.id == store.owner_id:
+        return store.warehouses.filter(is_main=True, is_active=True).first()
+    user = _current_store_user_for_request(request, store)
+    if user and user.warehouse_id and user.warehouse.is_active:
+        return user.warehouse
+    return None
+
+
+def _order_warehouse(request, store):
+    if request.user.id == store.owner_id and request.POST.get("warehouse_id"):
+        if not request.POST["warehouse_id"].isdigit():
+            raise Http404
+        return get_object_or_404(Warehouse, pk=request.POST["warehouse_id"], store=store, is_active=True)
+    return _current_warehouse_for_request(request, store)
+
+
+def _validate_order_stock(request, store, warehouse, order=None):
+    if warehouse is None:
+        return "يجب ربط المستخدم بمستودع فعال قبل إنشاء الطلب."
+    if request.POST.get("transaction_type", "sale") not in ("sale", "purchase", "sale_return", "purchase_return"):
+        return "نوع العملية غير صحيح."
+    products = request.POST.getlist("product_id[]")
+    quantities = request.POST.getlist("quantity[]")
+    prices = request.POST.getlist("price[]")
+    if not products or len(products) != len(quantities) or len(products) != len(prices):
+        return "بيانات مواد الطلب غير مكتملة."
+    totals = {}
+    item_ids = request.POST.getlist("item_id[]")
+    existing_items = {str(item.pk): item for item in order.items.all()} if order else {}
+    for index, (product_id, raw_quantity, raw_price) in enumerate(zip(products, quantities, prices)):
+        qty = _to_decimal(raw_quantity)
+        price = _to_decimal(raw_price, default="NaN")
+        if not qty.is_finite() or qty <= 0 or not price.is_finite() or price < 0:
+            return "يجب أن تكون الكمية موجبة والسعر رقماً غير سالب."
+        if not product_id.isdigit():
+            return "المادة المحددة غير صحيحة."
+        if index < len(item_ids) and item_ids[index] in existing_items:
+            qty += existing_items[item_ids[index]].bonus_quantity
+        totals[int(product_id)] = totals.get(int(product_id), Decimal("0")) + qty
+    locked = list(Product.objects.select_for_update().filter(store=store, pk__in=totals).order_by("pk"))
+    if len(locked) != len(totals):
+        return "المادة المحددة غير موجودة في المتجر."
+    if store.allow_negative_warehouse_sale or request.POST.get("transaction_type", "sale") not in ("sale", "purchase_return"):
+        return None
+    stock = with_storefront_stock(Product.objects.filter(pk__in=totals, store=store), store,
+                                  [warehouse.pk], exclude_order=order)
+    for product in stock:
+        if product.real_stock_calc < totals[product.pk]:
+            return f"الكمية غير كافية في المستودع {warehouse.name} للمادة {product.name}. البيع السالب غير مسموح."
+    return None
 
 
 def _current_store_user_for_request(request, store):
@@ -876,7 +920,7 @@ def products_list(request, store_slug):
         Product.objects
         .filter(store=store)
         .annotate(real_stock_calc=real_stock_calc, sold_qty=sold_qty)
-        .order_by("-sold_qty", "-id")
+        .order_by(*product_display_order())
     )
 
     # البحث بالاسم
@@ -901,7 +945,7 @@ def products_list(request, store_slug):
 
     # جلب كل الفئات الخاصة بهذا المتجر
     from products.models import Category
-    categories = Category.objects.filter(store=store)
+    categories = Category.objects.filter(store=store).order_by(display_order(), "id")
 
     # Pagination
     paginator = Paginator(products_qs, 10)
@@ -921,6 +965,7 @@ def products_list(request, store_slug):
         "is_access_linked": _is_store_access_linked(store),
 
         "products_qs": products_qs,
+        "product_list_query": request.GET.urlencode(),
     }
     return render(request, "dashboard/products_list.html", context)
 
@@ -984,6 +1029,11 @@ def product_create(request, store_slug):
 def product_update(request, store_slug, product_id):
     store = _get_store_for_dashboard(request, store_slug)
     product = get_object_or_404(Product, id=product_id, store=store)
+
+    return_query = request.POST.get("return_query", request.GET.get("return_query", ""))
+    return_url = reverse("dashboard:products_list", kwargs={"store_slug": store.slug})
+    if return_query:
+        return_url += "?" + return_query
 
     if request.method == "POST":
         form = ProductForm(request.POST, request.FILES, instance=product, store=store)
@@ -1051,7 +1101,7 @@ def product_update(request, store_slug, product_id):
                     image=img
                 )
 
-            return redirect("dashboard:products_list", store_slug=store.slug)
+            return redirect(return_url)
 
     else:
         form = ProductForm(instance=product, store=store)
@@ -1060,6 +1110,8 @@ def product_update(request, store_slug, product_id):
         "store": store,
         "form": form,
         "is_edit": True,
+        "return_query": return_query,
+        "product_list_return_url": return_url,
         "product": product,
     })
 #حذف صورة من المعرض
@@ -1130,7 +1182,7 @@ def product_detail(request, store_slug, product_id):
 #عرض
 def categories_list(request, store_slug):
     store = _get_store_for_dashboard(request, store_slug)
-    categories = Category.objects.filter(store=store).exclude(name__in=HIDDEN_CATEGORY_NAMES_IN_LISTS)
+    categories = Category.objects.filter(store=store).order_by(display_order(), "id").exclude(name__in=HIDDEN_CATEGORY_NAMES_IN_LISTS)
 
     return render(request, 'dashboard/categories_list.html', {
         'store': store,
@@ -1457,6 +1509,7 @@ def _to_decimal(val, default="0"):
 
 
 @login_required
+@transaction.atomic
 def order_create(request, store_slug):
     store = _get_store_for_dashboard(request, store_slug)
 
@@ -1491,7 +1544,11 @@ def order_create(request, store_slug):
         discount_value = _to_decimal(request.POST.get("discount", 0))
         payment_value = _to_decimal(request.POST.get("payment", 0))
         note_value = (request.POST.get("note") or "").strip()
-        warehouse = _current_warehouse_for_request(request, store)
+        warehouse = _order_warehouse(request, store)
+        error = _validate_order_stock(request, store, warehouse)
+        if error:
+            messages.error(request, error)
+            return redirect("dashboard:order_create", store_slug=store.slug)
 
         # 3) إنشاء الطلب
         store_user = None
@@ -1603,11 +1660,15 @@ def order_create(request, store_slug):
         return redirect("dashboard:orders_list", store_slug=store.slug)
 
     return render(request, "dashboard/order_create.html", {
-        "store": store
+        "store": store,
+        "can_select_warehouse": request.user.id == store.owner_id,
+        "order_warehouses": store.warehouses.filter(is_active=True),
+        "selected_order_warehouse": _current_warehouse_for_request(request, store),
     })
 
 # تعديل الطلب (بيع + شراء) — بدون حقول supplier
 @login_required
+@transaction.atomic
 def order_update(request, store_slug, order_id):
     store = _get_store_for_dashboard(request, store_slug)
     order = get_object_or_404(Order, id=order_id, store=store)
@@ -1617,6 +1678,12 @@ def order_update(request, store_slug, order_id):
     new_orders_count = Order.objects.filter(store=store, is_seen_by_store=False).count()
 
     if request.method == "POST":
+        warehouse = _order_warehouse(request, store)
+        error = _validate_order_stock(request, store, warehouse, order)
+        if error:
+            messages.error(request, error)
+            return redirect("dashboard:order_update", store_slug=store.slug, order_id=order.pk)
+        order.warehouse = warehouse
 
         # 🟦 1) نوع العملية (بيع / شراء)
         transaction_type = request.POST.get("transaction_type", "sale")
@@ -1680,7 +1747,8 @@ def order_update(request, store_slug, order_id):
                     existing_item.price != price or
                     existing_item.quantity != qty or
                     existing_item.direction != direction or
-                    existing_item.buy_price != buy_price
+                    existing_item.buy_price != buy_price or
+                    existing_item.warehouse_id != order.warehouse_id
                 )
                 if changed or (order.warehouse_id and existing_item.warehouse_id is None):
                     existing_item.product = product
@@ -1688,7 +1756,7 @@ def order_update(request, store_slug, order_id):
                     existing_item.quantity = qty
                     existing_item.direction = direction
                     existing_item.buy_price = buy_price
-                    if order.warehouse_id and existing_item.warehouse_id is None:
+                    if order.warehouse_id:
                         existing_item.warehouse_id = order.warehouse_id
                     existing_item.save()
             else:
@@ -1719,6 +1787,9 @@ def order_update(request, store_slug, order_id):
 
     return render(request, "dashboard/order_update.html", {
         "store": store,
+        "can_select_warehouse": request.user.id == store.owner_id,
+        "order_warehouses": store.warehouses.filter(is_active=True),
+        "selected_order_warehouse": order.warehouse or _current_warehouse_for_request(request, store),
         "order": order,
         "new_orders_count": new_orders_count,
     })
@@ -2962,10 +3033,13 @@ def store_settings(request, store_slug):
             return _perform_store_reset(request, store)
 
         selected_ids = None
-        if request.POST.get("storefront_warehouses_present") == "1":
+        if request.method == "POST":
             raw_ids = request.POST.getlist("storefront_warehouses")
             if any(not value.isdigit() for value in raw_ids):
                 messages.error(request, "Invalid warehouse selection.")
+                return redirect("dashboard:store_settings", store_slug=store.slug)
+            if not raw_ids:
+                messages.error(request, "يجب تحديد مستودع واحد على الأقل للمتجر الإلكتروني.")
                 return redirect("dashboard:store_settings", store_slug=store.slug)
             selected_ids = {int(value) for value in raw_ids}
             valid_ids = set(store.warehouses.filter(pk__in=selected_ids, is_active=True).values_list("pk", flat=True))
@@ -3006,6 +3080,7 @@ def store_settings(request, store_slug):
         store.instagram_url = request.POST.get("instagram_url", "").strip()
         store.telegram_url = request.POST.get("telegram_url", "").strip()
         store.whatsapp_url = request.POST.get("whatsapp_url", "").strip()
+        store.allow_negative_warehouse_sale = "allow_negative_warehouse_sale" in request.POST
         store.sales_paused = "sales_paused" in request.POST
         store.sales_pause_message = request.POST.get("sales_pause_message", "").strip()
 
@@ -3108,7 +3183,7 @@ def store_settings(request, store_slug):
     products_count = Product.objects.filter(store=store).count()
     return render(request, "dashboard/store_settings.html", {"store": store, "products_count": products_count,
         "storefront_warehouses": store.warehouses.filter(is_active=True).order_by("name"),
-        "selected_storefront_warehouse_ids": set(store.storefront_warehouses.values_list("pk", flat=True))})
+        "selected_storefront_warehouse_ids": set(selected_warehouse_ids(store))})
 
 
 @login_required
@@ -3772,32 +3847,11 @@ def inventory_list(request, store_slug):
         order__transaction_type="purchase",
     ).order_by("-order__created_at", "-id").values("price")[:1]
 
-    inventory_adjustments_qs = (
-        InventoryAdjustment.objects
-        .filter(product=OuterRef("pk"), store=store)
-        .values("product")
-        .annotate(
-            total_difference=Coalesce(
-                Sum("difference_quantity"),
-                Value(0, output_field=DecimalField(max_digits=10, decimal_places=2)),
-                output_field=DecimalField(max_digits=10, decimal_places=2),
-            )
-        )
-        .values("total_difference")[:1]
-    )
-    stock_movements_qs = (
-        StockMovement.objects
-        .filter(product=OuterRef("pk"), store=store)
-        .values("product")
-        .annotate(
-            total_quantity=Coalesce(
-                Sum("quantity_change"),
-                Value(0, output_field=DecimalField(max_digits=10, decimal_places=2)),
-                output_field=DecimalField(max_digits=10, decimal_places=2),
-            )
-        )
-        .values("total_quantity")[:1]
-    )
+    warehouses = store.warehouses.all().order_by("name")
+    warehouse_id = request.GET.get("warehouse", "")
+    if warehouse_id and not warehouse_id.isdigit():
+        raise Http404
+    selected_warehouse = get_object_or_404(warehouses, pk=warehouse_id) if warehouse_id else None
 
     base_qs = Product.objects.filter(store=store)
 
@@ -3821,67 +3875,17 @@ def inventory_list(request, store_slug):
 
     qty_filter = (request.GET.get("qty_filter") or "").strip()
 
-    products_qs = (
-        base_qs
-        .annotate(
-            # ✅ الكمية المتبقية (Decimal مضمون)
-            remaining_qty=Coalesce(
-                Cast(F("stock"), DecimalField(max_digits=10, decimal_places=2)),
-                Value(0, output_field=DecimalField(max_digits=10, decimal_places=2)),
-                output_field=DecimalField(max_digits=10, decimal_places=2),
-            )
-            + Coalesce(
-                Sum(
-                    ExpressionWrapper(
-                        (F("order_items__quantity") + F("order_items__bonus_quantity")) * F("order_items__direction"),
-                        output_field=DecimalField(max_digits=10, decimal_places=2)
-                    ),
-                    filter=Q(
-                        order_items__order__document_kind=1,
-                        order_items__order__status__in=["confirmed", "completed"],
-                    ),
-                ),
-                Value(0, output_field=DecimalField(max_digits=10, decimal_places=2)),
-                output_field=DecimalField(max_digits=10, decimal_places=2),
-            )
-            + Coalesce(
-                Subquery(
-                    inventory_adjustments_qs,
-                    output_field=DecimalField(max_digits=10, decimal_places=2),
-                ),
-                Value(0, output_field=DecimalField(max_digits=10, decimal_places=2)),
-                output_field=DecimalField(max_digits=10, decimal_places=2),
-            )
-            + Coalesce(
-                Subquery(
-                    stock_movements_qs,
-                    output_field=DecimalField(max_digits=10, decimal_places=2),
-                ),
-                Value(0, output_field=DecimalField(max_digits=10, decimal_places=2)),
-                output_field=DecimalField(max_digits=10, decimal_places=2),
-            ),
-
-            # ✅ آخر سعر شراء (Decimal مضمون)
-            last_buy_price=Coalesce(
-                Subquery(
-                    last_buy_price_qs,
-                    output_field=DecimalField(max_digits=10, decimal_places=2)
-                ),
-                "buy_price",
-                Value(0, output_field=DecimalField(max_digits=10, decimal_places=2)),
-                output_field=DecimalField(max_digits=10, decimal_places=2),
-            ),
-        )
-        .annotate(
-            # ✅ قيمة المخزون (Decimal × Decimal)
-            stock_value=ExpressionWrapper(
-                F("remaining_qty") * F("last_buy_price"),
-                output_field=DecimalField(max_digits=14, decimal_places=2)
-            )
-        )
-        # ترتيب تصاعدي حسب اسم الصنف (مع id لضمان ثبات الترتيب عند تكرار الأسماء)
-        .order_by("name", "id")
-    )
+    products_qs = with_storefront_stock(
+        base_qs, store, [selected_warehouse.pk] if selected_warehouse else [], active_only=False
+    ).annotate(
+        remaining_qty=F("real_stock_calc"),
+        last_buy_price=Coalesce(Subquery(last_buy_price_qs,
+            output_field=DecimalField(max_digits=10, decimal_places=2)), "buy_price",
+            Value(0, output_field=DecimalField(max_digits=10, decimal_places=2))),
+    ).annotate(stock_value=ExpressionWrapper(
+        F("remaining_qty") * F("last_buy_price"),
+        output_field=DecimalField(max_digits=14, decimal_places=2),
+    )).order_by("name", "id")
 
     if qty_filter == "gt0":
         products_qs = products_qs.filter(remaining_qty__gt=0)
@@ -3984,7 +3988,7 @@ def inventory_list(request, store_slug):
         response["Content-Disposition"] = f'attachment; filename="inventory_{store.slug}.xlsx"'
         return response
 
-    categories = Category.objects.filter(store=store)
+    categories = Category.objects.filter(store=store).order_by(display_order(), "id")
 
     # 💰 إجمالي قيمة المخزون
     total_inventory_value = products_qs.aggregate(
@@ -4005,6 +4009,8 @@ def inventory_list(request, store_slug):
 
     context = {
         "store": store,
+        "inventory_warehouses": warehouses,
+        "selected_inventory_warehouse": selected_warehouse,
         "page_obj": page_obj,
         "categories": categories,
         "q": q,

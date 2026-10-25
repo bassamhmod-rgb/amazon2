@@ -1,3 +1,4 @@
+from products.ordering import display_order, product_display_order
 from .storefront_stock import with_storefront_stock, available_quantity
 from .pricing import set_display_prices
 from django.shortcuts import render, get_object_or_404, redirect
@@ -86,7 +87,7 @@ def store_front(request, slug):
         with_storefront_stock(Product.objects.filter(store=store, active=True), store)
         .annotate(sold_qty=sold_qty)
         .filter(Q(real_stock_calc__gt=0) | Q(allow_negative_stock_sale=True))
-        .order_by(F("category__display_order").asc(nulls_last=True), "category_id", "display_order", "-sold_qty", "-id")
+        .order_by(*product_display_order())
     )
 
     # ============ 🔎 البحث ============
@@ -95,7 +96,7 @@ def store_front(request, slug):
         products = products.filter(name__icontains=q)
 
     # ============ 🟦 جلب الفئات ============
-    categories = Category.objects.filter(store=store).order_by("display_order", "id")
+    categories = Category.objects.filter(store=store).order_by(display_order(), "id")
 
     # ============ 🟨 التصفية بالحقل category ============
     category_id = request.GET.get("category")

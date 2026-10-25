@@ -8,22 +8,28 @@ from .models import StockMovement, WarehouseTransferItem, InventoryAdjustment
 
 
 def selected_warehouse_ids(store):
-    return list(store.storefront_warehouses.filter(store=store).values_list("pk", flat=True))
+    selected = list(store.storefront_warehouses.filter(store=store).values_list("pk", flat=True))
+    return selected or list(store.warehouses.filter(is_main=True).values_list("pk", flat=True))
 
 
-def with_storefront_stock(products, store, warehouse_ids=None):
+def with_storefront_stock(products, store, warehouse_ids=None, exclude_order=None, active_only=True):
     """Opening/legacy unassigned stock belongs to the main warehouse."""
     selected = selected_warehouse_ids(store) if warehouse_ids is None else warehouse_ids
     main_id = store.warehouses.filter(is_main=True).values_list("pk", flat=True).first()
     number = DecimalField(max_digits=18, decimal_places=4)
     zero = Value(Decimal("0"), output_field=number)
     items = OrderItem.objects.filter(product_id=OuterRef("pk"), order__store=store)
+    if exclude_order is not None:
+        items = items.exclude(order=exclude_order)
     movements = StockMovement.objects.filter(product_id=OuterRef("pk"), store=store)
     adjustments = InventoryAdjustment.objects.filter(product_id=OuterRef("pk"), store=store)
     transfers = WarehouseTransferItem.objects.filter(product_id=OuterRef("pk"), store=store)
     transfer_delta = zero
     if selected:
-        active_ids = list(store.warehouses.filter(pk__in=selected, is_active=True).values_list("pk", flat=True))
+        warehouses = store.warehouses.filter(pk__in=selected)
+        if active_only:
+            warehouses = warehouses.filter(is_active=True)
+        active_ids = list(warehouses.values_list("pk", flat=True))
         item_scope = Q(warehouse_id__in=active_ids) | Q(
             warehouse__isnull=True, order__warehouse_id__in=active_ids)
         movement_scope = Q(warehouse_id__in=active_ids)
@@ -71,6 +77,8 @@ def allocate_cart_items(store, items):
         product = item.product
         if not product.active or not product.show_price or item.quantity <= 0:
             raise ValueError(f"المادة غير متاحة للطلب: {product.name}")
+        if not active:
+            raise ValueError("يجب تحديد مستودع فعال واحد على الأقل للطلب.")
         if product.allow_negative_stock_sale:
             allocations.append((item, active[0] if active else None, item.quantity))
             continue

@@ -136,6 +136,18 @@
 
 <form method="post">
 {% csrf_token %}
+<div class="mb-3">
+    <label class="form-label">مستودع الطلب</label>
+    {% if can_select_warehouse %}
+    <select name="warehouse_id" class="form-select" required>
+        {% for w in order_warehouses %}
+        <option value="{{ w.pk }}" {% if w.pk == selected_order_warehouse.pk %}selected{% endif %}>{{ w.name }}</option>
+        {% endfor %}
+    </select>
+    {% else %}
+    <div>{{ selected_order_warehouse.name|default:"يجب ربط المستخدم بمستودع فعال قبل إنشاء الطلب." }}</div>
+    {% endif %}
+</div>
 <input type="hidden" name="customer_id" id="customer_id">
 <input type="hidden" name="supplier_id" id="supplier_id">
 

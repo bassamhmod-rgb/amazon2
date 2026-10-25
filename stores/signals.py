@@ -15,13 +15,15 @@ def create_main_warehouse_for_store(sender, instance, created, **kwargs):
     if Warehouse.objects.filter(store=instance).exists():
         return
 
-    Warehouse.objects.create(
+    warehouse = Warehouse.objects.create(
         store=instance,
         is_main=True,
         identifier="main",
         name=Warehouse.MAIN_WAREHOUSE_NAME,
         percentage=Decimal("0.00"),
     )
+
+    instance.storefront_warehouses.add(warehouse)
 
 
 @receiver(post_save, sender=Store)

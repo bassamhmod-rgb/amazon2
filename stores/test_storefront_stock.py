@@ -22,8 +22,10 @@ class StorefrontWarehouseTests(TestCase):
         StockMovement.objects.create(store=self.store, product=self.product,
                                      warehouse=self.other, quantity_change=5, movement_type="manual")
 
-    def test_no_selection_preserves_total_and_selected_excludes_opening(self):
-        self.assertEqual(available_quantity(self.product, self.store), 15)
+    def test_no_selection_defaults_to_main_and_selected_excludes_opening(self):
+        self.assertEqual(available_quantity(self.product, self.store), 10)
+        self.store.storefront_warehouses.clear()
+        self.assertEqual(available_quantity(self.product, self.store), 10)
         self.store.storefront_warehouses.set([self.other])
         self.assertEqual(available_quantity(self.product, self.store), 5)
         self.store.storefront_warehouses.set([self.main])

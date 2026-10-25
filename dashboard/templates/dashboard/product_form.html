@@ -258,6 +258,7 @@
 
         <form id="productEditForm" method="post" enctype="multipart/form-data"{% if is_edit %} data-select-display-order{% endif %}>
             {% csrf_token %}
+            {% if is_edit %}<input type="hidden" name="return_query" value="{{ return_query }}">{% endif %}
             {% if form.errors %}
             <div class="alert alert-danger">
                 <ul class="mb-0">
@@ -374,7 +375,7 @@
                 <button class="btn btn-primary">
                     {% if is_edit %}حفظ التعديلات{% else %}حفظ المنتج{% endif %}
                 </button>
-                <a href="{% url 'dashboard:products_list' store.slug %}" class="btn btn-secondary">
+                <a href="{% if product_list_return_url %}{{ product_list_return_url }}{% else %}{% url 'dashboard:products_list' store.slug %}{% endif %}" class="btn btn-secondary">
                     إلغاء
                 </a>
             </div>

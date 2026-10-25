@@ -239,7 +239,7 @@
                             <input type="hidden" name="storefront_warehouses_present" value="1">
                             <fieldset class="mb-4">
                                 <legend class="h6">مستودعات العرض بالمتجر الإلكتروني</legend>
-                                <p class="text-muted small">اختَر المستودعات التي يُحسب منها توفر المواد للعرض والطلب. ترك الجميع بدون اختيار يعني جميع المستودعات. المواد المسموح بيعها بدون مخزون تبقى متاحة.</p>
+                                <p class="text-muted small">اختَر المستودعات التي يُحسب منها توفر المواد للعرض والطلب. يجب تحديد مستودع واحد على الأقل. المستودع الرئيسي هو الافتراضي. المواد المسموح بيعها بدون مخزون تبقى متاحة.</p>
                                 {% for warehouse in storefront_warehouses %}
                                 <label class="d-block mb-2">
                                     <input type="checkbox" name="storefront_warehouses" value="{{ warehouse.pk }}" {% if warehouse.pk in selected_storefront_warehouse_ids %}checked{% endif %}>
@@ -247,7 +247,11 @@
                                 </label>
                                 {% empty %}<p class="text-muted">لا توجد مستودعات فعالة.</p>{% endfor %}
                             </fieldset>
-                            <label for="product_layout" class="form-label">طريقة عرض المنتجات</label>
+                                                          <label class="d-block mb-4">
+                                  <input type="checkbox" name="allow_negative_warehouse_sale" {% if store.allow_negative_warehouse_sale %}checked{% endif %}>
+                                  السماح بالبيع السالب في مستودع الطلب الداخلي المحدد
+                              </label>
+<label for="product_layout" class="form-label">طريقة عرض المنتجات</label>
                             <select id="product_layout" class="form-select" name="product_layout">
                                 <option value="vertical" {% if store.product_layout == "vertical" %}selected{% endif %}>عمودي — الصورة فوق التفاصيل</option>
                                 <option value="horizontal" {% if store.product_layout == "horizontal" %}selected{% endif %}>أفقي — الصورة بجانب التفاصيل</option>

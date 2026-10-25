@@ -118,6 +118,15 @@
 
         <!-- Filters -->
         <form method="get" class="row g-2 mb-3">
+            <div class="col-md-3">
+                <label for="inventoryWarehouse">المستودع</label>
+                <select id="inventoryWarehouse" name="warehouse" class="form-select" onchange="this.form.submit()">
+                    <option value="">جميع المستودعات</option>
+                    {% for w in inventory_warehouses %}
+                    <option value="{{ w.pk }}" {% if w.pk == selected_inventory_warehouse.pk %}selected{% endif %}>{{ w.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
             <div class="col-md-3 position-relative">
                 <input type="text" name="q" id="inventoryNameSearch" class="form-control"
                        value="{{ q }}" placeholder="&#1576;&#1581;&#1579; &#1576;&#1575;&#1604;&#1575;&#1587;&#1605;" autocomplete="off">
@@ -129,7 +138,7 @@
             </div>
             <div class="col-md-3">
                 <select name="category" id="inventoryCategory" class="form-select">
-                    <option value="">كل الكميات</option>
+                    <option value="">الفئة الأولى</option>
                     {% for cat in categories %}
                         <option value="{{ cat.id }}" {% if current_category == cat.id %}selected{% endif %}>
                             {{ cat.name }}
