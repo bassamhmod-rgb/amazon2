@@ -1,0 +1,66 @@
+<script>
+(() => {
+    const frontUrl = new URL("{% url 'stores:store_front' store.slug %}", location.origin);
+    const storageKey = 'storefront-position:' + frontUrl.pathname;
+    let saved;
+    try {
+        saved = JSON.parse(sessionStorage.getItem(storageKey) || 'null');
+        if (saved) {
+            const url = new URL(saved.url, location.origin);
+            if (url.origin !== location.origin || url.pathname !== frontUrl.pathname) saved = null;
+        }
+    } catch (_) {
+        saved = null;
+    }
+
+    if (location.pathname !== frontUrl.pathname) {
+        // Keep the catalog's search and category filters on explicit return links.
+        if (saved) {
+            document.querySelectorAll('a[href]').forEach(link => {
+                const url = new URL(link.href, location.origin);
+                if (url.origin === location.origin && url.pathname === frontUrl.pathname) {
+                    link.href = saved.url;
+                }
+            });
+        }
+        return;
+    }
+
+    let interacted = false;
+    ['wheel', 'touchstart', 'pointerdown', 'keydown'].forEach(eventName => {
+        window.addEventListener(eventName, () => { interacted = true; }, {passive: true});
+    });
+
+    function rememberPosition(event) {
+        const productLink = event && event.target.closest && event.target.closest('.product-image-link');
+        const product = productLink ? productLink.closest('[data-product-id]') :
+            Array.from(document.querySelectorAll('[data-product-id]')).find(item =>
+                item.getBoundingClientRect().bottom > 0);
+        const position = {
+            url: location.pathname + location.search,
+            y: window.scrollY,
+            productId: product ? product.dataset.productId : null,
+            offset: product ? product.getBoundingClientRect().top : 0,
+        };
+        try { sessionStorage.setItem(storageKey, JSON.stringify(position)); } catch (_) {}
+    }
+
+    function restorePosition() {
+        if (!saved || interacted || saved.url !== location.pathname + location.search) return;
+        const product = Array.from(document.querySelectorAll('[data-product-id]'))
+            .find(item => item.dataset.productId === saved.productId);
+        const y = product ? window.scrollY + product.getBoundingClientRect().top - saved.offset : saved.y;
+        if (Number.isFinite(y)) window.scrollTo({top: y, left: 0, behavior: 'instant'});
+    }
+
+    document.addEventListener('click', event => {
+        if (event.target.closest && event.target.closest('a[href]')) rememberPosition(event);
+    }, true);
+    window.addEventListener('pagehide', rememberPosition);
+    window.addEventListener('pageshow', restorePosition);
+    window.addEventListener('load', restorePosition);
+    // Restore again once fonts settle, since they can change product row heights.
+    if (document.fonts) document.fonts.ready.then(restorePosition);
+    requestAnimationFrame(restorePosition);
+})();
+</script>
