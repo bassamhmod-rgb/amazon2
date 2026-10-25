@@ -32,6 +32,7 @@ def current_store(request):
         if store_user:
             permissions = dict(store_user.permissions or {})
             permissions["stock_view"] = bool(permissions.get("stock.view"))
+            permissions["warehouse_transfer"] = bool(permissions.get("warehouses.transfer"))
             store_user.permissions = permissions
 
     return {

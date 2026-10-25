@@ -1,0 +1,34 @@
+{% extends 'dashboard/warehouse_transfer_base.html' %}
+{% block title %}مناقلة جديدة{% endblock %}
+{% block content %}
+<h3 class="mb-4">مناقلة جديدة بين المستودعات</h3>
+<form method="post" class="card shadow-sm p-4">
+    {% csrf_token %}
+    {{ form.non_field_errors }}
+    <div class="row g-3 mb-4">{% for field in form %}<div class="col-md-6">
+        <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}{{ field.errors }}
+    </div>{% endfor %}</div>
+    <h5>مواد المناقلة</h5>
+    <p class="text-muted">تُخصم الكمية من المصدر وتُضاف إلى الوجهة عند الحفظ. تُحسب الوحدة الثانية حسب معاملها المحدد في المادة.</p>
+    {{ items.management_form }}{{ items.non_form_errors }}
+    <div id="transfer-items">{% for item in items %}<div class="transfer-item border rounded p-3 mb-3">
+        {{ item.non_field_errors }}
+        <div class="row g-3">{% for field in item %}<div class="col-md-3"><label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}{{ field.errors }}</div>{% endfor %}</div>
+    </div>{% endfor %}</div>
+    <template id="empty-item"><div class="transfer-item border rounded p-3 mb-3"><div class="row g-3">{% for field in items.empty_form %}<div class="col-md-3"><label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}</div>{% endfor %}</div></div></template>
+    <div class="d-flex gap-2 flex-wrap">
+        <button type="button" id="add-item" class="btn btn-outline-primary">+ إضافة مادة</button>
+        <button type="submit" class="btn btn-primary">حفظ المناقلة</button>
+        <a class="btn btn-outline-secondary" href="{% url 'dashboard:warehouse_transfers' store.slug %}">رجوع</a>
+    </div>
+</form>
+{% endblock %}
+{% block scripts %}<script>
+    const total = document.getElementById('id_items-TOTAL_FORMS');
+    document.getElementById('add-item').onclick = () => {
+        const index = Number(total.value);
+        if (index >= 100) return;
+        document.getElementById('transfer-items').insertAdjacentHTML('beforeend', document.getElementById('empty-item').innerHTML.replaceAll('__prefix__', String(index)));
+        total.value = index + 1;
+    };
+</script>{% endblock %}

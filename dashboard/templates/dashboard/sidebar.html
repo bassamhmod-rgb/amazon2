@@ -99,6 +99,7 @@
                             <a href="{% url 'dashboard:product_create' store.slug %}">إضافة منتج</a>
                             <a href="{% url 'dashboard:categories_list' store.slug %}">الفئات</a>
                             <a href="{% url 'dashboard:warehouses_list' store.slug %}">المستودعات</a>
+                            <a href="{% url 'dashboard:warehouse_transfers' store.slug %}">&#1605;&#1606;&#1575;&#1602;&#1604;&#1575;&#1578; &#1575;&#1604;&#1605;&#1587;&#1578;&#1608;&#1583;&#1593;&#1575;&#1578;</a>
                             <a href="{% url 'dashboard:inventory_list' store.slug %}">جرد المنتجات</a>
                         </div>
                     </details>
@@ -158,7 +159,7 @@
 
                 {% else %}
 
-                {% if su.permissions.products or su.permissions.stock_view %}
+                {% if su.permissions.products or su.permissions.stock_view or su.permissions.warehouse_transfer %}
                     <details class="sidebar-group">
                         <summary class="sidebar-summary">🛍 المنتجات</summary>
                         <div class="sidebar-submenu">
@@ -166,6 +167,9 @@
                             <a href="{% url 'dashboard:products_list' store.slug %}">قائمة المنتجات</a>
                             <a href="{% url 'dashboard:product_create' store.slug %}">إضافة منتج</a>
                             <a href="{% url 'dashboard:categories_list' store.slug %}">الفئات</a>
+                            {% endif %}
+                            {% if su.permissions.warehouse_transfer %}
+                            <a href="{% url 'dashboard:warehouse_transfers' store.slug %}">&#1605;&#1606;&#1575;&#1602;&#1604;&#1575;&#1578; &#1575;&#1604;&#1605;&#1587;&#1578;&#1608;&#1583;&#1593;&#1575;&#1578;</a>
                             {% endif %}
                             {% if su.permissions.stock_view %}
                             <a href="{% url 'dashboard:inventory_list' store.slug %}">جرد المنتجات</a>

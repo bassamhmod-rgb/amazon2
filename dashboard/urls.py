@@ -2,9 +2,13 @@
 from django.urls import path
 from . import views
 from . import views_api
+from . import warehouse_transfer_views
 from .account_views import owner_account
 app_name = "dashboard"
 urlpatterns = [
+    path("<slug:store_slug>/products/transfers/", warehouse_transfer_views.transfer_list, name="warehouse_transfers"),
+    path("<slug:store_slug>/products/transfers/add/", warehouse_transfer_views.transfer_create, name="warehouse_transfer_create"),
+    path("<slug:store_slug>/products/transfers/<int:transfer_id>/", warehouse_transfer_views.transfer_detail, name="warehouse_transfer_detail"),
     path("<slug:store_slug>/account/", owner_account, name="owner_account"),
     path("<slug:store_slug>/", views.dashboard_home, name="home"),
     path("<slug:store_slug>/orders/", views.orders_list, name="orders_list"),

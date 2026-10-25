@@ -950,35 +950,26 @@ def _apply_customer_change(store, payload, server_id=None):
     preferred_price_level = _to_int(payload.get("preferred_price_level"), 0)
     if preferred_price_level not in (0, 1, 2, 3, 4, 5):
         preferred_price_level = 0
-    if not name and not phone:
-        raise ValueError("Customer name or phone is required")
-
-    if not name and phone:
-        name = phone
+    if not name:
+        raise ValueError("اسم العميل مطلوب للمزامنة.")
 
     now_minute = _now_minute()
     obj = None
+    if access_id not in (None, 0) and Customer.objects.filter(store=store, access_id=access_id).count() > 1:
+        raise ValueError(f"تعارض معرّف العملاء {access_id}: مرتبط بأكثر من سجل. يجب تصحيحه قبل المزامنة.")
     if server_id:
         obj = Customer.objects.filter(id=server_id, store=store).first()
     if not obj and access_id not in (None, 0, ""):
         obj = Customer.objects.filter(store=store, access_id=access_id).first()
-    if not obj and phone:
-        phone_match = Customer.objects.filter(store=store, phone=phone).first()
-        if phone_match and phone_match.name == name:
-            obj = phone_match
-        elif phone_match:
-            phone = ""
     if not obj:
         obj = Customer.objects.filter(store=store, name=name).first()
-    if obj and phone:
-        duplicate_phone = (
-            Customer.objects
-            .filter(store=store, phone=phone)
-            .exclude(id=obj.id)
-            .exists()
-        )
-        if duplicate_phone:
-            phone = ""
+    if obj and access_id not in (None, 0) and Customer.objects.filter(
+            store=store, access_id=access_id).exclude(pk=obj.pk).exists():
+        raise ValueError(f"تعارض معرّف العملاء {access_id}: مرتبط بعميل آخر. يجب تصحيح المعرّف قبل المزامنة.")
+    if Customer.objects.filter(store=store, name=name).exclude(pk=obj.pk if obj else None).exists():
+        raise ValueError("اسم العميل مرتبط بمعرف آخر. يرجى تصحيح التعارض قبل المزامنة.")
+    if phone and Customer.objects.filter(store=store, phone=phone).exclude(pk=obj.pk if obj else None).exists():
+        raise ValueError("رقم الموبايل مسجل لعميل آخر. يرجى تصحيح الرقم قبل المزامنة.")
 
     update_fields = {
         "name": name,
@@ -1015,28 +1006,108 @@ def _apply_customer_change(store, payload, server_id=None):
     return obj, "created"
 
 
+def _customer_identity_conflicts(store, changes):
+    """Reject every member of an ambiguous batch before applying any member."""
+    groups = {}
+    for item in changes:
+        if str(item.get("entity", "")).lower() != "customer":
+            continue
+        payload = item.get("payload") or {}
+        server_id = _to_int(item.get("server_id"))
+        access_id = _to_int(payload.get("access_id"))
+        name = _to_str(payload.get("name")).strip()
+        keys = []
+        local_id = _to_int(item.get("local_id"))
+        if local_id is not None:
+            keys.append(("local", local_id))
+        if server_id:
+            keys.append(("server", server_id))
+        if access_id:
+            keys.append(("access", access_id))
+            keys.extend(("server", pk) for pk in Customer.objects.filter(
+                store=store, access_id=access_id).values_list("pk", flat=True))
+        if name:
+            keys.append(("name", name))
+            target = Customer.objects.filter(store=store, name=name).first()
+            if target:
+                keys.append(("server", target.pk))
+        for key in set(keys):
+            groups.setdefault(key, []).append(item)
+    conflicts = {}
+    for (_, identity), items in groups.items():
+        if len(items) < 2:
+            continue
+        names = "، ".join(f"{(item.get('payload') or {}).get('name', '')} (محلي {item.get('local_id')})" for item in items)
+        detail = f"تعارض هوية العملاء {identity}: {names}. لم تتم مزامنة هذه السجلات؛ يجب تصحيح المعرّفات أولاً."
+        for item in items:
+            conflicts[id(item)] = detail
+    return conflicts
+
+
+def _supplier_identity_conflicts(store, changes):
+    """Reject every member of an ambiguous batch before applying any member."""
+    groups = {}
+    for item in changes:
+        if str(item.get("entity", "")).lower() != "supplier":
+            continue
+        payload = item.get("payload") or {}
+        server_id = _to_int(item.get("server_id"))
+        access_id = _to_int(payload.get("access_id"))
+        name = _to_str(payload.get("name")).strip()
+        keys = []
+        local_id = _to_int(item.get("local_id"))
+        if local_id is not None:
+            keys.append(("local", local_id))
+        if server_id:
+            keys.append(("server", server_id))
+        if access_id:
+            keys.append(("access", access_id))
+            keys.extend(("server", pk) for pk in Supplier.objects.filter(
+                store=store, access_id=access_id).values_list("pk", flat=True))
+        if name:
+            keys.append(("name", name))
+            target = Supplier.objects.filter(store=store, name=name).first()
+            if target:
+                keys.append(("server", target.pk))
+        for key in set(keys):
+            groups.setdefault(key, []).append(item)
+    conflicts = {}
+    for (_, identity), items in groups.items():
+        if len(items) < 2:
+            continue
+        names = "، ".join(f"{(item.get('payload') or {}).get('name', '')} (محلي {item.get('local_id')})" for item in items)
+        detail = f"تعارض هوية الموردين {identity}: {names}. لم تتم مزامنة هذه السجلات؛ يجب تصحيح المعرّفات أولاً."
+        for item in items:
+            conflicts[id(item)] = detail
+    return conflicts
+
+
 def _apply_supplier_change(store, payload, server_id=None):
     name = _to_str(payload.get("name")).strip()
     phone = _to_str(payload.get("phone")).strip()
     address = _to_str(payload.get("address")).strip()
     email = _to_str(payload.get("email")).strip()
     access_id = _to_int(payload.get("access_id"))
-    if not name and not phone:
-        raise ValueError("Supplier name or phone is required")
-
     if not name:
-        name = phone
+        raise ValueError("اسم المورد مطلوب للمزامنة.")
 
     now_minute = _now_minute()
     obj = None
+    if access_id not in (None, 0) and Supplier.objects.filter(store=store, access_id=access_id).count() > 1:
+        raise ValueError(f"تعارض معرّف الموردين {access_id}: مرتبط بأكثر من سجل. يجب تصحيحه قبل المزامنة.")
     if server_id:
         obj = Supplier.objects.filter(id=server_id, store=store).first()
     if not obj and access_id not in (None, 0, ""):
         obj = Supplier.objects.filter(store=store, access_id=access_id).first()
-    if not obj and phone:
-        obj = Supplier.objects.filter(store=store, phone=phone).first()
     if not obj:
         obj = Supplier.objects.filter(store=store, name=name).first()
+
+    if obj and access_id not in (None, 0) and Supplier.objects.filter(store=store, access_id=access_id).exclude(pk=obj.pk).exists():
+        raise ValueError(f"تعارض معرّف الموردين {access_id}: مرتبط بمورد آخر. يجب تصحيح المعرّف قبل المزامنة.")
+    if Supplier.objects.filter(store=store, name=name).exclude(pk=obj.pk if obj else None).exists():
+        raise ValueError("اسم المورد مرتبط بمعرف آخر. يرجى تصحيح التعارض قبل المزامنة.")
+    if phone and Supplier.objects.filter(store=store, phone=phone).exclude(pk=obj.pk if obj else None).exists():
+        raise ValueError("رقم الموبايل مسجل لمورد آخر. يرجى تصحيح الرقم قبل المزامنة.")
 
     update_fields = {
         "name": name,
@@ -1047,8 +1118,6 @@ def _apply_supplier_change(store, payload, server_id=None):
         "opening_balance": Decimal(str(_to_float(payload.get("opening_balance"), 0.0))),
         "mobile_update_time": now_minute,
     }
-    if name == GENERAL_CUSTOMER_NAME and not phone:
-        update_fields["phone"] = GENERAL_CUSTOMER_PHONE
     if access_id is not None:
         update_fields["access_id"] = access_id
 
@@ -2864,6 +2933,8 @@ def sync_push(request):
 
     upserts.sort(key=entity_priority)
     deletes.sort(key=entity_priority, reverse=True)
+    party_conflicts = _customer_identity_conflicts(store, changes)
+    party_conflicts.update(_supplier_identity_conflicts(store, changes))
 
     try:
         with transaction.atomic():
@@ -2872,6 +2943,11 @@ def sync_push(request):
                 local_id = item.get("local_id")
                 server_id = item.get("server_id")
                 payload_item = item.get("payload") or {}
+
+                if id(item) in party_conflicts:
+                    errors.append({"entity": entity, "local_id": local_id,
+                                   "detail": party_conflicts[id(item)]})
+                    continue
 
                 if entity == "category":
                     obj, action = _apply_category_change(
@@ -2931,11 +3007,13 @@ def sync_push(request):
                         "update_time": obj.update_time or 0,
                     })
                 elif entity == "customer":
-                    obj, action = _apply_customer_change(
-                        store,
-                        payload_item,
-                        server_id=_to_int(server_id),
-                    )
+                    try:
+                        with transaction.atomic():
+                            obj, action = _apply_customer_change(
+                                store, payload_item, server_id=_to_int(server_id))
+                    except (ValueError, IntegrityError) as exc:
+                        errors.append({"entity": "customer", "local_id": local_id, "detail": str(exc)})
+                        continue
                     if local_id not in (None, ""):
                         customer_local_to_server[int(local_id)] = obj
                     applied.append({
@@ -2946,11 +3024,13 @@ def sync_push(request):
                         "update_time": obj.update_time or 0,
                     })
                 elif entity == "supplier":
-                    obj, action = _apply_supplier_change(
-                        store,
-                        payload_item,
-                        server_id=_to_int(server_id),
-                    )
+                    try:
+                        with transaction.atomic():
+                            obj, action = _apply_supplier_change(
+                                store, payload_item, server_id=_to_int(server_id))
+                    except (ValueError, IntegrityError) as exc:
+                        errors.append({"entity": "supplier", "local_id": local_id, "detail": str(exc)})
+                        continue
                     if local_id not in (None, ""):
                         supplier_local_to_server[int(local_id)] = obj
                     applied.append({
@@ -3157,6 +3237,10 @@ def sync_push(request):
                 server_id = _to_int(item.get("server_id"))
                 local_id = item.get("local_id")
                 payload_item = item.get("payload") or {}
+                if id(item) in party_conflicts:
+                    errors.append({"entity": entity, "local_id": local_id,
+                                   "detail": party_conflicts[id(item)]})
+                    continue
                 if entity == "production_stock_movement_delete":
                     reference_type = _to_str(payload_item.get("reference_type")).strip()
                     reference_id = _to_str(payload_item.get("reference_id")).strip()
@@ -3424,6 +3508,8 @@ def sync_push(request):
                         })
 
         return Response({"status": "ok", "applied": applied, "errors": errors})
+    except ValueError as exc:
+        return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
     except Exception as exc:
         return Response({"detail": str(exc)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 

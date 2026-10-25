@@ -1,4 +1,5 @@
-﻿# -*- coding: utf-8 -*-
+from accounts.models import normalize_phone_number
+# -*- coding: utf-8 -*-
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth import update_session_auth_hash
@@ -2699,7 +2700,7 @@ def customer_create(request, store_slug):
 
     if request.method == "POST":
         name = (request.POST.get("name") or "").strip()
-        phone = (request.POST.get("phone") or "").strip()
+        phone = normalize_phone_number(request.POST.get("phone"))
         balance_raw = (request.POST.get("balance") or "0").strip()
         opening_balance_raw = (request.POST.get("opening_balance") or "0").strip()
         preferred_price_level = _preferred_price_level_from_request(
@@ -2753,7 +2754,7 @@ def customer_update(request, store_slug, customer_id):
 
     if request.method == "POST":
         name = (request.POST.get("name") or "").strip()
-        phone = (request.POST.get("phone") or "").strip()
+        phone = normalize_phone_number(request.POST.get("phone"))
         address = (request.POST.get("address") or "").strip()
         note = (request.POST.get("note") or "").strip()
         balance_raw = (request.POST.get("balance") or "0").strip()
