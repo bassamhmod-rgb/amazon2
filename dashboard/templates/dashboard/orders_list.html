@@ -179,13 +179,7 @@
         <div><strong>المستودع:</strong> {{ current_store_warehouse.name|default:"-" }}</div>
     </div>
 
-    {% if messages %}
-        <div class="mb-3">
-            {% for message in messages %}
-                <div class="alert alert-{{ message.tags }} mb-2">{{ message }}</div>
-            {% endfor %}
-        </div>
-    {% endif %}
+    {% include "core/message_dialog.html" %}
 
     {% if orders_page_error %}
         <div class="alert alert-danger">

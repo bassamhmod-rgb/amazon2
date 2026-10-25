@@ -8,7 +8,7 @@ from stores.models import Store
 from cart.models import Cart, CartItem
 from .models import Order, OrderItem
 from products.models import Product
-from accounts.models import Customer
+from accounts.models import Customer, normalize_phone_number
 from stores.models import StorePaymentMethod
 from django.urls import reverse
 from decimal import Decimal
@@ -68,6 +68,11 @@ def checkout(request, store_slug):
     payment_methods = StorePaymentMethod.objects.filter(store=store, is_active=True)
 
     checkout_data = request.session.get("checkout_data", {})
+    # Old quick registrations used the phone itself as a placeholder name.
+    customer_name = customer.name.strip()
+    if normalize_phone_number(customer_name) == normalize_phone_number(customer.phone):
+        customer_name = ""
+    customer_name_locked = bool(customer_name)
 
     required_percent = store.payment_required_percentage or 0
     required_amount = (cart.get_total() * required_percent) / 100 if required_percent else 0
@@ -75,8 +80,8 @@ def checkout(request, store_slug):
 
     if request.method == "POST":
 
-        new_name = request.POST.get("customer_name") or ""
-        new_phone = request.POST.get("customer_phone") or ""
+        new_name = customer_name if customer_name_locked else request.POST.get("customer_name", "").strip()
+        new_phone = normalize_phone_number(customer.phone)
         new_address = request.POST.get("customer_address") or ""
         note = request.POST.get("customer_note") or ""
         payment_type = request.POST.get("payment_type") or ""
@@ -84,6 +89,27 @@ def checkout(request, store_slug):
 
         proof_image_file = request.FILES.get("payment_proof_image")
         transaction_id = request.POST.get("payment_transaction_id", "").strip()
+
+        checkout_error = None
+        allowed_payments = {
+            "full": store.allow_full_payment,
+            "partial": store.allow_partial_payment,
+            "cod": store.allow_cash_on_delivery,
+        }
+        if not new_name:
+            checkout_error = "يرجى إدخال اسم العميل."
+        elif Customer.objects.filter(store=store, name=new_name).exclude(pk=customer.pk).exists():
+            checkout_error = "اسم العميل مسجل مسبقاً. يرجى مراجعة المتجر."
+        elif not allowed_payments.get(payment_type, False):
+            checkout_error = "يرجى اختيار طريقة دفع متاحة."
+        if checkout_error:
+            return render(request, "stores/checkout/checkout.html", {
+                "store": store, "customer": customer, "cart": cart,
+                "payment_methods": payment_methods, "checkout_data": request.POST,
+                "customer_name_value": customer_name, "customer_name_locked": customer_name_locked,
+                "error_message": checkout_error, "required_percent": required_percent,
+                "required_amount": required_amount, "required_amount_syp": required_amount_syp,
+            })
 
         changed = False
 
@@ -118,6 +144,8 @@ def checkout(request, store_slug):
                 return render(request, "stores/checkout/checkout.html", {
                     "store": store,
                     "customer": customer,
+                    "customer_name_value": new_name,
+                    "customer_name_locked": customer_name_locked,
                     "payment_methods": payment_methods,
                     "cart": cart,
                     "checkout_data": checkout_data,
@@ -139,6 +167,8 @@ def checkout(request, store_slug):
     return render(request, "stores/checkout/checkout.html", {
         "store": store,
         "customer": customer,
+        "customer_name_value": customer_name,
+        "customer_name_locked": customer_name_locked,
         "payment_methods": payment_methods,
         "cart": cart,
         "checkout_data": {
@@ -266,6 +296,16 @@ def confirm_order(request, store_slug):
 
     method = None
     method_id = data.get("payment_method_id")
+    if (not customer.name.strip() or
+            normalize_phone_number(customer.name) == normalize_phone_number(customer.phone)):
+        return redirect("orders:checkout", store_slug=store.slug)
+    allowed_payments = {
+        "full": store.allow_full_payment,
+        "partial": store.allow_partial_payment,
+        "cod": store.allow_cash_on_delivery,
+    }
+    if not allowed_payments.get(data.get("payment_type"), False):
+        return redirect("orders:checkout", store_slug=store.slug)
     if method_id:
         method = StorePaymentMethod.objects.filter(id=method_id, store=store).first()
 
@@ -321,9 +361,9 @@ def confirm_order(request, store_slug):
             item_note=item.item_note,
         )
 
-    # اعتبر الطلب مدفوع بالكامل عند إنشائه من قبل الزبون
+    # Cash on delivery is still unpaid when the customer places the order.
     order.amount = order.net_total
-    order.payment = order.net_total
+    order.payment = Decimal("0") if order.payment_type == "cod" else order.net_total
     order.save(update_fields=["amount", "payment"])
 
     cart.items.all().delete()

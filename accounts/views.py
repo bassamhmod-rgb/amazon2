@@ -1,6 +1,6 @@
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib import messages
-from django.db import models
+from django.db import models, IntegrityError, transaction
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth import authenticate, login
 from stores.models import Store
@@ -20,9 +20,13 @@ def customer_register(request, store_slug):
         phone = normalize_phone_number(phone_raw)
         name = request.POST.get("name", "").strip()
 
-        # 🔐 fallback: إذا الاسم ما انكتب، خليه رقم الموبايل
-        if not name:
-            name = phone
+        # Require a real name instead of creating a phone-named customer.
+        if not name or not phone:
+            messages.error(request, "يرجى إدخال اسم العميل ورقم الموبايل.")
+            return redirect("accounts:customer_register", store_slug=store.slug)
+        if Customer.objects.filter(store=store, name=name).exists():
+            messages.error(request, "الاسم مستخدم مسبقاً، يرجى إدخال اسم مختلف.")
+            return redirect("accounts:customer_register", store_slug=store.slug)
 
         # 🔥 منع تكرار رقم الهاتف فقط عند نفس المتجر
         phone_candidates = [p for p in dict.fromkeys([phone_raw, phone, f"0{phone}" if phone else ""]) if p]
@@ -48,46 +52,52 @@ def customer_register(request, store_slug):
     return render(request, "accounts/customer_register.html", {
         "store": store,
     })
-def customer_login(request, store_slug):
-
-    next_page = request.GET.get("next") or f"/orders/{store_slug}/checkout/"
-
-    store = Store.objects.filter(slug=store_slug).first()
+def _customer_phone_login(request, store_slug, next_page):
+    store = get_object_or_404(Store, slug=store_slug)
+    phone_raw = request.POST.get("phone", "").strip() if request.method == "POST" else ""
+    phone = normalize_phone_number(phone_raw)
+    confirmation = None
     message = None
-
+    pending_key = "customer_login_confirmation"
     if request.method == "POST":
-        phone_raw = request.POST.get("phone", "").strip()
-        phone = normalize_phone_number(phone_raw)
-
-        if not store:
-            message = "خطأ: لا يمكن تحديد المتجر."
-        elif not phone_raw:
-            message = "❌ يرجى إدخال رقم الهاتف."
+        if request.POST.get("action") == "back":
+            request.session.pop(pending_key, None)
+        elif not phone or phone == "0":
+            message = "\u064a\u0631\u062c\u0649 \u0625\u062f\u062e\u0627\u0644 \u0631\u0642\u0645 \u0627\u0644\u0645\u0648\u0628\u0627\u064a\u0644."
         else:
-            phone_candidates = [
-                p for p in dict.fromkeys([phone_raw, phone, f"0{phone}" if phone else ""]) if p
-            ]
-            customer = Customer.objects.filter(store=store, phone__in=phone_candidates).first()
-
-            # ✔️ إذا موجود → تابع مباشرة
-            if customer:
-                request.session["customer_id"] = customer.id
-                return redirect(next_page)
-
-            # ❗ إذا غير موجود → صفحة تأكيد
-            request.session["temp_phone"] = phone
-            request.session["next_after_register"] = next_page
-
-            return render(request, "accounts/customer_confirm_new.html", {
-                "store": store,
-                "phone": phone,
-            })
-
+            candidates = list(dict.fromkeys([phone_raw, phone, f"0{phone}"]))
+            customer = Customer.objects.filter(store=store, phone__in=candidates).first()
+            expected = {"store_id": store.pk, "phone": phone, "next": next_page,
+                        "customer_id": customer.pk if customer else None,
+                        "name": customer.name if customer else ""}
+            if request.POST.get("confirm_phone") == "1" and request.session.get(pending_key) == expected:
+                request.session.pop(pending_key, None)
+                if customer:
+                    if customer.phone != phone:
+                        customer.phone = phone
+                        customer.save(update_fields=["phone"])
+                    request.session["customer_id"] = customer.pk
+                    request.session.pop("temp_phone", None)
+                    return redirect(next_page)
+                request.session["temp_phone"] = phone
+                request.session["next_after_register"] = next_page
+                return render(request, "accounts/customer_confirm_new.html", {
+                    "store": store, "phone": phone,
+                })
+            request.session[pending_key] = expected
+            confirmation = {"phone": phone, "name": customer.name if customer else "", "is_new": customer is None}
     return render(request, "accounts/customer_login.html", {
-        "next": next_page,
-        "store": store,
-        "message": message,
+        "next": next_page, "store": store, "message": message,
+        "phone": phone_raw, "confirmation": confirmation,
     })
+
+
+def customer_login(request, store_slug):
+    from django.utils.http import url_has_allowed_host_and_scheme
+    next_page = request.POST.get("next") or request.GET.get("next") or f"/orders/{store_slug}/checkout/"
+    if not url_has_allowed_host_and_scheme(next_page, allowed_hosts={request.get_host()}, require_https=request.is_secure()):
+        next_page = f"/orders/{store_slug}/checkout/"
+    return _customer_phone_login(request, store_slug, next_page)
 
 
 def login_view(request):
@@ -219,12 +229,32 @@ def quick_register(request, store_slug):
     if not phone:
         return redirect("accounts:customer_login", store_slug=store_slug)
 
-    # 🔥 إنشاء حساب بالخلفية
-    customer = Customer.objects.create(
-        store=store,
-        phone=phone,
-        name=""     # يكتب اسمو لاحقاً داخل checkout
-    )
+    candidates = [phone, f"0{phone}"]
+    customer = Customer.objects.filter(store=store, phone__in=candidates).first()
+    if not customer:
+        name = request.POST.get("name", "").strip()
+        error = None
+        if not name:
+            error = "يرجى إدخال اسم العميل."
+        elif Customer.objects.filter(store=store, name=name).exists():
+            error = "الاسم مستخدم مسبقاً، يرجى إدخال اسم مختلف."
+        if error:
+            return render(request, "accounts/customer_confirm_new.html", {
+                "store": store, "phone": phone, "name": name, "error_message": error,
+            })
+        try:
+            with transaction.atomic():
+                customer = Customer.objects.create(store=store, phone=phone, name=name)
+        except IntegrityError:
+            customer = Customer.objects.filter(store=store, phone__in=candidates).first()
+            if not customer:
+                return render(request, "accounts/customer_confirm_new.html", {
+                    "store": store, "phone": phone, "name": name,
+                    "error_message": "الاسم مستخدم مسبقاً، يرجى إدخال اسم مختلف.",
+                })
+    elif customer.phone != phone:
+        customer.phone = phone
+        customer.save(update_fields=["phone"])
 
     request.session["customer_id"] = customer.id
     return redirect(next_page)
@@ -310,46 +340,7 @@ def customer_points(request, store_slug):
 
 #تسجيل دخول للكاش باك
 def customer_points_login(request, store_slug):
-        
-    next_page = f"/accounts/{store_slug}/points/"
-
-    store = Store.objects.filter(slug=store_slug).first()
-    message = None
-
-    if request.method == "POST":
-        phone_raw = request.POST.get("phone", "").strip()
-        phone = normalize_phone_number(phone_raw)
-
-        if not store:
-            message = "خطأ: لا يمكن تحديد المتجر."
-        elif not phone_raw:
-            message = "❌ يرجى إدخال رقم الهاتف."
-        else:
-            phone_candidates = [
-                p for p in dict.fromkeys([phone_raw, phone, f"0{phone}" if phone else ""]) if p
-            ]
-            customer = Customer.objects.filter(store=store, phone__in=phone_candidates).first()
-
-            # ✔️ إذا موجود → روح مباشرة على صفحة النقاط
-            if customer:
-                request.session["customer_id"] = customer.id
-                return redirect(next_page)
-
-            # ❗ إذا غير موجود → نفس منطق التسجيل الجديد
-            request.session["temp_phone"] = phone
-            request.session["next_after_register"] = next_page
-
-            return render(request, "accounts/customer_confirm_new.html", {
-                "store": store,
-                "phone": phone,
-            })
-    print("NEXT PAGE =", next_page)
-
-    return render(request, "accounts/customer_login.html", {
-        "next": next_page,
-        "store": store,
-        "message": message,
-    })
+    return _customer_phone_login(request, store_slug, f"/accounts/{store_slug}/points/")
 #عند حصول خطأ
 from django.shortcuts import redirect
 from django.contrib import messages

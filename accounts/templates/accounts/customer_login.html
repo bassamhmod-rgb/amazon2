@@ -92,6 +92,10 @@
 
             <h2 class="text-center login-title mb-3">يرجى إدخال رقم الموبايل للمتابعة</h2>
 
+            <div class="alert alert-info" role="note">
+                إذا كنت عميلاً سابقاً، أدخل رقم الموبايل المستخدم سابقاً لتجنّب تعدّد الحسابات.
+            </div>
+
             {% if message %}
             <div class="error-box">
                 {{ message }}
@@ -103,7 +107,8 @@
 
                 <input type="hidden" name="next" value="{{ next }}">
 
-                <input type="text" name="phone" placeholder="الرقم" required>
+                <input id="customerPhone" type="tel" name="phone" placeholder="الرقم"
+                       value="{{ phone }}" autocomplete="tel" inputmode="tel" required autofocus>
 
                 <button type="submit" class="login-btn">متابعة</button>
 
@@ -113,6 +118,37 @@
         </div>
 
     </div>
+
+    {% if confirmation %}
+    <dialog id="phoneConfirmation" open dir="rtl" aria-labelledby="phoneConfirmationTitle"
+            style="border:0;border-radius:18px;padding:24px;width:min(90vw,440px);box-shadow:0 8px 32px #0004;">
+        <h3 id="phoneConfirmationTitle" class="login-title mb-3">تأكيد رقم الموبايل</h3>
+        <p>رقم الموبايل: <strong dir="ltr">{{ confirmation.phone }}</strong></p>
+        <p>{% if confirmation.is_new %}<strong>زبون جديد</strong>{% else %}اسم الزبون: <strong>{{ confirmation.name }}</strong>{% endif %}</p>
+        <form method="POST">
+            {% csrf_token %}
+            <input type="hidden" name="next" value="{{ next }}">
+            <input type="hidden" name="phone" value="{{ confirmation.phone }}">
+            <button type="submit" name="confirm_phone" value="1" class="login-btn" autofocus>متابعة</button>
+            <button type="submit" name="action" value="back" class="btn btn-outline-secondary w-100 mt-2">الرجوع لتغيير الرقم</button>
+        </form>
+    </dialog>
+    <style>#phoneConfirmation::backdrop { background: #0006; }</style>
+    <script>
+    (() => {
+        const dialog = document.getElementById('phoneConfirmation');
+        if (typeof dialog.showModal === 'function') {
+            dialog.removeAttribute('open');
+            dialog.showModal();
+        }
+        dialog.addEventListener('close', () => {
+            const input = document.getElementById('customerPhone');
+            input.focus();
+            input.select();
+        });
+    })();
+    </script>
+    {% endif %}
 
 </body>
 </html>

@@ -20,7 +20,7 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework import status
 
-from mobile_sync.models import MobileDeleteSync
+from mobile_sync.models import MobileDeleteSync, CustomerSyncOrigin
 from accounts.models import Customer, Supplier, normalize_phone_number, PointsTransaction
 from accounts.models import StoreUser
 from products.models import Category
@@ -942,6 +942,27 @@ def _apply_barcode_change(store, payload, server_id=None, product_resolver=None)
     return obj, "created"
 
 
+def _unique_customer_sync_name(store, name, phone, identifier, exclude_id=None):
+    def occupied(value):
+        return Customer.objects.filter(store=store, name=value).exclude(pk=exclude_id).exists()
+    if not occupied(name):
+        return name
+    suffix = phone or str(identifier)
+    def candidate(tail):
+        return name[:max(0, 150 - len(tail) - 3)] + " \u2014 " + tail
+    value = candidate(suffix)
+    if not occupied(value):
+        return value
+    suffix = f"{suffix}-{identifier}"
+    value = candidate(suffix)
+    attempt = 2
+    while occupied(value):
+        value = candidate(f"{suffix}-{attempt}")
+        attempt += 1
+    return value
+
+
+@transaction.atomic
 def _apply_customer_change(store, payload, server_id=None):
     name = _to_str(payload.get("name")).strip()
     phone = normalize_phone_number(_to_str(payload.get("phone")).strip())
@@ -955,18 +976,38 @@ def _apply_customer_change(store, payload, server_id=None):
         raise ValueError("اسم العميل مطلوب للمزامنة.")
 
     now_minute = _now_minute()
-    obj = None
+    # Serialize name allocation and origin registration for this store.
+    Store.objects.select_for_update().get(pk=store.pk)
+    origin = _to_str(payload.get("sync_origin")).strip()
+    independent = _to_bool(payload.get("independent_customer"))
+    resolve_name = _to_bool(payload.get("resolve_name_conflict"))
+    if independent and not origin:
+        raise ValueError("A stable sync_origin is required for a new customer")
+    if len(origin) > 100:
+        raise ValueError("Invalid customer sync_origin")
+    origin_link = CustomerSyncOrigin.objects.filter(merchant_id=store.pk, origin_key=origin).first() if origin else None
+    obj = origin_link.customer if origin_link else None
+    if obj and independent and not server_id:
+        # A retried creation must keep the already allocated name.
+        name = obj.name
+    if obj and server_id and obj.pk != server_id:
+        raise ValueError("Customer sync origin and server identifier disagree")
     if access_id not in (None, 0) and Customer.objects.filter(store=store, access_id=access_id).count() > 1:
         raise ValueError(f"تعارض معرّف العملاء {access_id}: مرتبط بأكثر من سجل. يجب تصحيحه قبل المزامنة.")
-    if server_id:
+    if server_id and not obj:
         obj = Customer.objects.filter(id=server_id, store=store).first()
+        if not obj and resolve_name:
+            raise ValueError("The linked customer no longer exists; pull deletions before retrying")
     if not obj and access_id not in (None, 0, ""):
         obj = Customer.objects.filter(store=store, access_id=access_id).first()
-    if not obj:
+    if not obj and not independent:
         obj = Customer.objects.filter(store=store, name=name).first()
     if obj and access_id not in (None, 0) and Customer.objects.filter(
             store=store, access_id=access_id).exclude(pk=obj.pk).exists():
         raise ValueError(f"تعارض معرّف العملاء {access_id}: مرتبط بعميل آخر. يجب تصحيح المعرّف قبل المزامنة.")
+    if resolve_name:
+        identifier = obj.pk if obj else f"app-{origin[:12]}-{payload.get('source_local_id', '')}"
+        name = _unique_customer_sync_name(store, name, phone, identifier, obj.pk if obj else None)
     if Customer.objects.filter(store=store, name=name).exclude(pk=obj.pk if obj else None).exists():
         raise ValueError("اسم العميل مرتبط بمعرف آخر. يرجى تصحيح التعارض قبل المزامنة.")
     if phone and Customer.objects.filter(store=store, phone=phone).exclude(pk=obj.pk if obj else None).exists():
@@ -991,6 +1032,8 @@ def _apply_customer_change(store, payload, server_id=None):
     if obj:
         Customer.objects.filter(id=obj.id, store=store).update(**update_fields)
         obj.refresh_from_db()
+        if origin and not origin_link:
+            CustomerSyncOrigin.objects.create(merchant_id=store.pk, origin_key=origin, customer=obj)
         return obj, "updated"
 
     obj = Customer.objects.create(
@@ -1007,6 +1050,8 @@ def _apply_customer_change(store, payload, server_id=None):
         is_subscription_active=update_fields["is_subscription_active"],
         mobile_update_time=now_minute,
     )
+    if origin:
+        CustomerSyncOrigin.objects.create(merchant_id=store.pk, origin_key=origin, customer=obj)
     return obj, "created"
 
 
@@ -1022,6 +1067,11 @@ def _customer_identity_conflicts(store, changes):
         name = _to_str(payload.get("name")).strip()
         keys = []
         local_id = _to_int(item.get("local_id"))
+        origin = _to_str(payload.get("sync_origin")).strip()
+        if origin:
+            keys.append(("origin", origin))
+            keys.extend(("server", pk) for pk in CustomerSyncOrigin.objects.filter(
+                merchant_id=store.pk, origin_key=origin).values_list("customer_id", flat=True))
         if local_id is not None:
             keys.append(("local", local_id))
         if server_id:
@@ -1030,7 +1080,7 @@ def _customer_identity_conflicts(store, changes):
             keys.append(("access", access_id))
             keys.extend(("server", pk) for pk in Customer.objects.filter(
                 store=store, access_id=access_id).values_list("pk", flat=True))
-        if name:
+        if name and not _to_bool(payload.get("resolve_name_conflict")):
             keys.append(("name", name))
             target = Customer.objects.filter(store=store, name=name).first()
             if target:
@@ -3026,6 +3076,7 @@ def sync_push(request):
                         "action": action,
                         "local_id": local_id,
                         "server_id": obj.id,
+                        "name": obj.name,
                         "update_time": obj.update_time or 0,
                     })
                 elif entity == "supplier":

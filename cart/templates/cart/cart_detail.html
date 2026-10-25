@@ -163,11 +163,7 @@
 <body>
 
 <div class="cart-container">
-    {% if messages %}
-        {% for message in messages %}
-            <div class="alert alert-{{ message.tags }} mb-3">{{ message }}</div>
-        {% endfor %}
-    {% endif %}
+    {% include "core/message_dialog.html" %}
     
     <h2 class="cart-header">سلة المشتريات</h2>
 

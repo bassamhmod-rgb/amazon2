@@ -99,6 +99,10 @@
 
         <form method="POST" action="{% url 'accounts:quick_register' store.slug %}">
             {% csrf_token %}
+            {% if error_message %}<div class="alert alert-danger">{{ error_message }}</div>{% endif %}
+            <label for="newCustomerName" class="form-label">اسم العميل</label>
+            <input id="newCustomerName" name="name" type="text" class="form-control mb-3" value="{{ name|default:'' }}" maxlength="150" required autofocus>
+
             <button class="primary-btn">متابعة</button>
         </form>
 

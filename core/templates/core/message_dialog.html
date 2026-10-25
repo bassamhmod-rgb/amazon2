@@ -1,0 +1,27 @@
+{% if messages %}
+<dialog id="pageMessageDialog" dir="rtl" aria-labelledby="pageMessageTitle"
+        style="border:0;border-radius:14px;padding:24px;max-width:min(90vw,560px);box-shadow:0 12px 48px #0004;">
+    <h4 id="pageMessageTitle">تنبيه</h4>
+    <div id="pageMessageBody">
+        {% for message in messages %}<p>{{ message }}</p>{% endfor %}
+    </div>
+    <form method="dialog"><button autofocus class="btn btn-primary" type="submit">موافق</button></form>
+</dialog>
+<style>#pageMessageDialog::backdrop { background: #0006; }</style>
+<script>
+(() => {
+    const dialog = document.getElementById('pageMessageDialog');
+    const seen = new Set();
+    dialog.querySelectorAll('#pageMessageBody p').forEach(item => {
+        const text = item.textContent.trim();
+        if (seen.has(text)) item.remove();
+        else seen.add(text);
+    });
+    if (typeof dialog.showModal === 'function') dialog.showModal();
+    else {
+        window.alert(Array.from(seen).join('\n'));
+        dialog.remove();
+    }
+})();
+</script>
+{% endif %}
