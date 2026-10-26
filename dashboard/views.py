@@ -1683,6 +1683,7 @@ def order_update(request, store_slug, order_id):
 
     if request.method == "POST":
         previous_customer = order.customer
+        previous_transaction_type = order.transaction_type
 
         warehouse = _order_warehouse(request, store)
         error = _validate_order_stock(request, store, warehouse, order)
@@ -1738,11 +1739,6 @@ def order_update(request, store_slug, order_id):
             price = _to_decimal(prices[i])
             qty = _to_decimal(qtys[i])
             direction = -1 if transaction_type in ("sale", "purchase_return") else 1
-            if transaction_type in ("sale", "purchase_return"):
-                buy_price = _to_decimal(product.get_avg_buy_price())
-            else:
-                buy_price = _to_decimal(price)
-
             item_id = None
             if i < len(item_ids):
                 raw_item_id = (item_ids[i] or "").strip()
@@ -1750,6 +1746,19 @@ def order_update(request, store_slug, order_id):
                     item_id = int(raw_item_id)
 
             existing_item = existing_items.get(item_id) if item_id else None
+            if transaction_type in ("sale", "sale_return"):
+                saved_buy_price = (
+                    existing_item.buy_price
+                    if existing_item is not None
+                    and existing_item.product_id == product.id
+                    and previous_transaction_type == transaction_type
+                    else None
+                )
+                buy_price = product.get_sale_item_buy_price(order, saved_buy_price)
+            elif transaction_type == "purchase_return":
+                buy_price = _to_decimal(product.get_avg_buy_price())
+            else:
+                buy_price = _to_decimal(price)
             if existing_item:
                 kept_item_ids.add(existing_item.id)
                 changed = (

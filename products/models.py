@@ -1,7 +1,7 @@
 from django.db import models
 import time
 from stores.models import Store
-from django.db.models import Sum, F
+from django.db.models import Sum, F, Q
 from decimal import Decimal
 from orders.models import OrderItem
 
@@ -142,7 +142,14 @@ class Product(models.Model):
         return self.stock + movements + stock_movements
 
     # ⭐ حساب متوسط سعر الشراء (آمن 100%)
-    def get_avg_buy_price(self):
+    def get_sale_item_buy_price(self, order, saved_buy_price=None):
+        if saved_buy_price is not None:
+            saved_buy_price = Decimal(saved_buy_price)
+            if saved_buy_price.is_finite() and saved_buy_price > 0:
+                return saved_buy_price
+        return self.get_avg_buy_price(before_order=order)
+
+    def get_avg_buy_price(self, before_order=None):
         total_qty = Decimal(self.stock or 0)
         total_cost = total_qty * Decimal(self.buy_price or 0)
         purchase_subtotals = {}
@@ -151,8 +158,15 @@ class Product(models.Model):
             OrderItem.objects
             .filter(product=self)
             .select_related("order")
-            .order_by("order__created_at", "id")
+            .order_by("order__created_at", "order_id", "id")
         )
+        if before_order is not None:
+            items = items.exclude(order_id=before_order.pk).filter(
+                Q(order__created_at__lt=before_order.created_at)
+                | Q(order__created_at=before_order.created_at, order_id__lt=before_order.pk),
+                order__status__in=("confirmed", "completed"),
+                order__document_kind=1,
+            )
 
         for item in items:
             qty = Decimal(item.quantity or 0) + Decimal(item.bonus_quantity or 0)
@@ -186,7 +200,7 @@ class Product(models.Model):
                 total_qty += qty
                 total_cost += cost
             elif is_outbound_cost:
-                if item.buy_price is None:
+                if item.buy_price is None or (before_order is not None and item.buy_price <= 0):
                     current_avg = (total_cost / total_qty) if total_qty > 0 else Decimal("0")
                     cost = current_avg * qty
                 total_qty -= qty
@@ -199,7 +213,7 @@ class Product(models.Model):
         if total_qty > 0:
             return total_cost / total_qty
 
-        return self.buy_price or Decimal("0")
+        return Decimal("0") if before_order is not None else self.buy_price or Decimal("0")
 
 class ProductDetails(models.Model):
     update_time = models.BigIntegerField(blank=True, null=True)
