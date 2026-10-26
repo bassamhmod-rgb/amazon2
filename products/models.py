@@ -66,6 +66,7 @@ class Product(models.Model):
     )
 
     name = models.CharField(max_length=200)
+    product_number = models.CharField(max_length=100, blank=True, default="", verbose_name="رقم المادة")
     description = models.TextField(blank=True)
 
     price = models.DecimalField(max_digits=8, decimal_places=2)

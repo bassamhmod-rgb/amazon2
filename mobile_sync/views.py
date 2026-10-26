@@ -295,6 +295,7 @@ def _serialize_product(product, request=None):
     return {
         "id": product.id,
         "name": product.name,
+        "product_number": product.product_number,
         "price": float(product.price if isinstance(product.price, Decimal) else product.price),
         "description": product.description or "",
         "price2": float(product.price2 if isinstance(product.price2, Decimal) else product.price2),
@@ -857,6 +858,11 @@ def _apply_product_change(store, payload, server_id=None, category_resolver=None
         "active": _to_bool(payload.get("active"), True),
         "mobile_update_time": now_minute,
     }
+    if "product_number" in payload:
+        product_number = _to_str(payload.get("product_number")).strip()
+        if len(product_number) > 100:
+            raise ValueError("رقم المادة يجب ألا يتجاوز 100 حرف")
+        update_fields["product_number"] = product_number
     if category is not None:
         update_fields["category"] = category
     if category2 is not None:
@@ -884,6 +890,7 @@ def _apply_product_change(store, payload, server_id=None, category_resolver=None
         access_id=_to_int(payload.get("access_id")),
         name=name,
         price=update_fields["price"],
+        product_number=update_fields.get("product_number", ""),
         description=update_fields["description"],
         price2=update_fields["price2"],
         price3=update_fields["price3"],
@@ -2363,6 +2370,7 @@ def products_pull(request):
         {
             "id": p.id,
             "name": p.name,
+            "product_number": p.product_number,
             "price": float(p.price if isinstance(p.price, Decimal) else p.price),
             "description": p.description or "",
             "price2": float(p.price2 if isinstance(p.price2, Decimal) else p.price2),
@@ -2386,6 +2394,7 @@ def products_pull(request):
         for p in qs.only(
             "id",
             "name",
+            "product_number",
             "price",
             "description",
             "price2",
