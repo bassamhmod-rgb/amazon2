@@ -498,8 +498,9 @@ function selectCustomer(item){
     customerIdEl.value = item.id;
     selectedCustomerNameEl.innerText = item.name;
 
-    customerSearchContainerEl.style.display="none";
-    selectedCustomerCardEl.style.display="flex";
+    customerSearchContainerEl.classList.add("d-none");
+    selectedCustomerCardEl.classList.remove("d-none");
+    selectedCustomerCardEl.classList.add("d-flex");
     customerResultsEl.style.display="none";
     customerResultsEl.innerHTML="";
     customerIndex=-1;
@@ -509,11 +510,13 @@ function removeCustomer(){
     applyInvoiceCustomerPrivateNote('');
     customerIdEl.value="";
     customerSearchEl.value="";
-    customerSearchContainerEl.style.display="block";
-    selectedCustomerCardEl.style.display="none";
+    customerSearchContainerEl.classList.remove("d-none");
+    selectedCustomerCardEl.classList.remove("d-flex");
+    selectedCustomerCardEl.classList.add("d-none");
     customerResultsEl.style.display="none";
     customerResultsEl.innerHTML="";
     customerIndex=-1;
+    customerSearchEl.focus();
 }
 
 /* ============================ SUPPLIERS (أسهم + Enter) ============================ */
