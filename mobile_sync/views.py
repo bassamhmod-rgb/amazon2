@@ -1,3 +1,4 @@
+import hashlib
 import base64
 import time
 import json
@@ -463,15 +464,39 @@ def _serialize_expense_reason(expense_reason):
     }
 
 
+def _mobile_currency_value(obj, name, fallback):
+    value = getattr(obj, name, None)
+    return fallback if value is None or value == "" else value
+
+
+def _currency_sync_fields(payload, names):
+    # Omitted fields from older clients must not erase saved currency metadata.
+    result = {}
+    for name in names:
+        value = payload.get(name)
+        if value is None or value == "":
+            continue
+        if name.endswith("currency") and name != "amount_payment_currency":
+            value = str(value).strip().upper()
+            if value not in ("SYP", "USD"):
+                raise ValueError("Unsupported currency: " + value)
+        else:
+            value = float(value)
+            if not math.isfinite(value) or (name == "exchange_rate" and value <= 0):
+                raise ValueError("Invalid currency value: " + name)
+        result[name] = value
+    return result
+
+
 def _serialize_expense(expense):
     store = expense.store
-    payment_currency = getattr(store, "pricing_currency", "SYP") or "SYP"
+    payment_currency = _mobile_currency_value(expense, "payment_currency", getattr(store, "pricing_currency", "SYP") or "SYP")
     return {
         "id": expense.id,
         "amount": float(expense.amount or 0),
         "payment_currency": payment_currency,
-        "exchange_rate": float(getattr(store, "exchange_rate", 1) or 1),
-        "amount_payment_currency": float(expense.amount or 0),
+        "exchange_rate": float(_mobile_currency_value(expense, "exchange_rate", getattr(store, "exchange_rate", 1) or 1)),
+        "amount_payment_currency": float(_mobile_currency_value(expense, "amount_payment_currency", expense.amount or 0)),
         "date": expense.date.strftime("%Y-%m-%d"),
         "expense_type_server_id": expense.expense_type_id,
         "expense_type": expense.expense_type.name if expense.expense_type else "",
@@ -1655,6 +1680,7 @@ def _apply_expense_change(store, payload, server_id=None, mobile_sync_key=None):
         "notes": _to_str(payload.get("notes")),
         "mobile_update_time": now_minute,
     }
+    update_fields.update(_currency_sync_fields(payload, ("payment_currency", "exchange_rate", "amount_payment_currency")))
     obj = Expense.objects.filter(id=server_id, store=store).first() if server_id else None
     if not obj and mobile_sync_key:
         obj = Expense.objects.filter(store=store, mobile_sync_key=mobile_sync_key).first()
@@ -3875,6 +3901,8 @@ def orders_push(request):
                         order.shipping_cost = Decimal(str(shipping_cost))
                 else:
                     order.shipping_cost = Decimal("0")
+                for field, value in _currency_sync_fields(order_payload, ('base_currency', 'payment_currency', 'exchange_rate', 'amount_payment_currency', 'subtotal_alt', 'discount_alt', 'total_alt')).items():
+                    setattr(order, field, value)
                 order.payment = Decimal(str(payment))
                 order.amount = Decimal(str(amount))
                 order.note = note
@@ -3943,6 +3971,11 @@ def orders_push(request):
                     })
 
                 cashback_entry = _sync_mobile_invoice_cashback(store, order, customer)
+                # Snapshot the accepted version so its source need not download it again.
+                order.refresh_from_db()
+                Order.objects.filter(pk=order.pk).update(
+                    mobile_uploaded_digest=_order_mobile_digest(_serialize_order_for_mobile(order))
+                )
 
                 applied.append({
                     "local_order_id": local_order_id,
@@ -3980,6 +4013,19 @@ def _serialize_order_item_for_mobile(item):
     }
 
 
+def _order_mobile_digest(payload):
+    return hashlib.sha256(json.dumps(payload, sort_keys=True, default=str).encode("utf-8")).hexdigest()
+
+
+def _is_unchanged_upload(order, payload, sync_client_id):
+    return bool(
+        sync_client_id
+        and order.mobile_sync_client_id == sync_client_id
+        and order.mobile_uploaded_digest
+        and order.mobile_uploaded_digest == _order_mobile_digest(payload)
+    )
+
+
 def _serialize_order_for_mobile(order):
     created_by_store_user = getattr(order, "created_by_store_user", None)
     prefetched_items = getattr(order, "prefetched_mobile_items", None)
@@ -3988,7 +4034,9 @@ def _serialize_order_for_mobile(order):
     items = [_serialize_order_item_for_mobile(item) for item in prefetched_items]
     if getattr(order, "document_kind", 1) == 1:
         items_total = sum(Decimal(str(item.get("price", 0))) * Decimal(str(abs(item.get("quantity", 0)))) for item in items)
-        sync_amount = items_total - Decimal(str(getattr(order, "discount", 0) or 0))
+        # Mobile stores the subtotal and subtracts the separate discount once.
+        # Freight affects purchase cost, not the supplier invoice subtotal.
+        sync_amount = items_total
     else:
         sync_amount = getattr(order, "amount", 0)
     return {
@@ -4007,10 +4055,13 @@ def _serialize_order_for_mobile(order):
         "shipping_cost": _to_float(getattr(order, "shipping_cost", 0)),
         "payment": _to_float(getattr(order, "payment", 0)),
         "amount": _to_float(sync_amount),
-        "base_currency": getattr(order.store, "pricing_currency", "SYP") or "SYP",
-        "payment_currency": getattr(order.store, "pricing_currency", "SYP") or "SYP",
-        "exchange_rate": _to_float(getattr(order.store, "exchange_rate", 1)),
-        "amount_payment_currency": _to_float(getattr(order, "payment", 0)),
+        "base_currency": _mobile_currency_value(order, "base_currency", getattr(order.store, "pricing_currency", "SYP") or "SYP"),
+        "payment_currency": _mobile_currency_value(order, "payment_currency", getattr(order.store, "pricing_currency", "SYP") or "SYP"),
+        "exchange_rate": _mobile_currency_value(order, "exchange_rate", _to_float(getattr(order.store, "exchange_rate", 1))),
+        "amount_payment_currency": _mobile_currency_value(order, "amount_payment_currency", _to_float(getattr(order, "payment", 0))),
+        "subtotal_alt": _mobile_currency_value(order, "subtotal_alt", 0),
+        "discount_alt": _mobile_currency_value(order, "discount_alt", 0),
+        "total_alt": _mobile_currency_value(order, "total_alt", 0),
         "note": getattr(order, "note", "") or "",
         "mobile_order_id": getattr(order, "mobile_local_order_id", None),
         "accounting_invoice_number": getattr(order, "accounting_invoice_number", None),
@@ -4070,8 +4121,10 @@ def orders_pull(request):
                 since_int = int(since)
             except (TypeError, ValueError):
                 return Response({"detail": "since must be an integer"}, status=status.HTTP_400_BAD_REQUEST)
-            qs = qs.filter(_mobile_since_q(since_int) | Q(mobile_update_time__isnull=True, update_time__isnull=True))
+            qs = qs.filter(Q(mobile_update_time__gte=since_int) | Q(update_time__gte=since_int) | Q(mobile_update_time__isnull=True, update_time__isnull=True))
 
+        # Include the boundary minute so edits within the same minute remain visible.
+        sync_client_id = request.query_params.get("sync_client_id") if since not in (None, "", "0") else None
         page_rows = list(qs.prefetch_related(
             Prefetch(
                 "items",
@@ -4084,7 +4137,9 @@ def orders_pull(request):
         errors = []
         for order in page_rows[:limit]:
             try:
-                data.append(_serialize_order_for_mobile(order))
+                payload = _serialize_order_for_mobile(order)
+                if not _is_unchanged_upload(order, payload, sync_client_id):
+                    data.append(payload)
             except Exception as exc:
                 errors.append({
                     "order_id": getattr(order, "id", None),
@@ -4095,9 +4150,9 @@ def orders_pull(request):
         return Response({
             "merchant_id": merchant_id_int,
             "items": data,
-            "max_update_time": max((x["update_time"] for x in data), default=0),
+            "max_update_time": max((_mobile_time(order) for order in page_rows[:limit]), default=0),
             "has_more": has_more,
-            "next_offset": offset + len(data),
+            "next_offset": offset + min(len(page_rows), limit),
             "errors": errors,
         })
     except Exception as exc:

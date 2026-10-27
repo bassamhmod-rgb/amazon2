@@ -52,6 +52,15 @@ def _touch_mobile_update_time(instance, kwargs):
 
 
 class Order(models.Model):
+    mobile_uploaded_digest = models.CharField(max_length=64, blank=True, default="")
+    base_currency = models.CharField(max_length=3, blank=True, null=True)
+    payment_currency = models.CharField(max_length=3, blank=True, null=True)
+    exchange_rate = models.FloatField(blank=True, null=True)
+    amount_payment_currency = models.FloatField(blank=True, null=True)
+    subtotal_alt = models.FloatField(blank=True, null=True)
+    discount_alt = models.FloatField(blank=True, null=True)
+    total_alt = models.FloatField(blank=True, null=True)
+
     is_seen_by_store = models.BooleanField(default=False)
     update_time = models.BigIntegerField(blank=True, null=True)
     mobile_update_time = models.BigIntegerField(blank=True, null=True)

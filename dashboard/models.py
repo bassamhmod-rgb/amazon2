@@ -65,6 +65,10 @@ class ExpenseReason(models.Model):
         _touch_mobile_update_time(self, kwargs)
         return super().save(*args, **kwargs)
 class Expense(models.Model):
+    payment_currency = models.CharField(max_length=3, blank=True, null=True)
+    exchange_rate = models.FloatField(blank=True, null=True)
+    amount_payment_currency = models.FloatField(blank=True, null=True)
+
     update_time = models.BigIntegerField(blank=True, null=True)
     mobile_update_time = models.BigIntegerField(blank=True, null=True)
     access_id = models.BigIntegerField(blank=True, null=True)
