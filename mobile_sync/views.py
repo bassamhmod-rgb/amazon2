@@ -2330,10 +2330,10 @@ def stores_pull(request):
     )
 
 
-@api_view(["GET"])
+@api_view(["GET", "POST"])
 @permission_classes([AllowAny])
 def store_currency_settings(request):
-    merchant_id = request.query_params.get("merchant_id")
+    merchant_id = _request_value(request, "merchant_id")
     try:
         merchant_id_int = int(merchant_id)
     except (TypeError, ValueError):
@@ -2342,18 +2342,49 @@ def store_currency_settings(request):
             status=status.HTTP_400_BAD_REQUEST,
         )
 
-    store = Store.objects.filter(pk=merchant_id_int, is_active=True).only(
-        "id", "pricing_currency", "exchange_rate"
-    ).first()
-    if store is None:
-        return Response({"detail": "Store not found"}, status=status.HTTP_404_NOT_FOUND)
+    if request.method == "POST":
+        _, error = _ensure_store_user_sync_device(request, merchant_id_int)
+        if error is not None:
+            return error
 
-    return Response(
-        {
+    with transaction.atomic():
+        stores = Store.objects.filter(pk=merchant_id_int, is_active=True)
+        if request.method == "POST":
+            stores = stores.select_for_update()
+        store = stores.first()
+        if store is None:
+            return Response({"detail": "Store not found"}, status=status.HTTP_404_NOT_FOUND)
+        if request.method == "POST":
+            # POS devices can only read. Only the registered permanent copy writes.
+            if not store.licensed_device_id or store.licensed_device_id != _request_value(request, "device_id"):
+                return Response({"detail": "Only the permanent device can update the exchange rate"},
+                                status=status.HTTP_403_FORBIDDEN)
+            if _request_value(request, "base_currency") != store.pricing_currency:
+                return Response({"detail": "وحّد العملة الرئيسية أولاً."},
+                                status=status.HTTP_409_CONFLICT)
+            try:
+                rate = Decimal(str(_request_value(request, "exchange_rate")))
+                updated_at = int(_request_value(request, "exchange_rate_updated_at"))
+                if not rate.is_finite() or rate <= 0 or rate > Decimal("9999999999.99") or not 0 <= updated_at <= 9223372036854775807:
+                    raise ValueError()
+                rate = rate.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+                if rate <= 0:
+                    raise ValueError()
+            except (ValueError, TypeError, ArithmeticError):
+                return Response({"detail": "Invalid exchange rate or modification time"},
+                                status=status.HTTP_400_BAD_REQUEST)
+            # Equal/unknown timestamps use the store value, making retries stable.
+            if updated_at > store.exchange_rate_updated_at:
+                Store.objects.filter(pk=store.pk).update(
+                    exchange_rate=rate, exchange_rate_updated_at=updated_at,
+                    update_time=_now_minute(), mobile_update_time=_now_minute())
+                store.exchange_rate = rate
+                store.exchange_rate_updated_at = updated_at
+        return Response({
             "base_currency": store.pricing_currency,
             "exchange_rate": float(store.exchange_rate or 0),
-        }
-    )
+            "exchange_rate_updated_at": store.exchange_rate_updated_at,
+        })
 
 
 @api_view(["GET"])

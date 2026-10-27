@@ -118,6 +118,8 @@ class Store(models.Model):
         default=Decimal("0.00"),
         help_text="سعر صرف الدولار مقابل الليرة السورية (1 USD = ? SYP)"
     )
+    # UTC epoch milliseconds; independent of unrelated store edits.
+    exchange_rate_updated_at = models.BigIntegerField(default=0)
     hero_fit = models.CharField(
         max_length=10,
         choices=[
@@ -144,6 +146,15 @@ class Store(models.Model):
     
     
     def save(self, *args, **kwargs):
+        fields = kwargs.get("update_fields")
+        if fields is None or "exchange_rate" in fields:
+            previous_rate = (Store.objects.filter(pk=self.pk)
+                             .values_list("exchange_rate", flat=True).first()) if self.pk else None
+            if previous_rate is None or previous_rate != Decimal(str(self.exchange_rate)):
+                self.exchange_rate_updated_at = max(
+                    int(time.time() * 1000), (self.exchange_rate_updated_at or 0) + 1)
+                if fields is not None:
+                    kwargs["update_fields"] = set(fields) | {"exchange_rate_updated_at"}
         # توليد slug (مثل ما كان)
         if not self.slug:
             self.slug = slugify(self.name)
