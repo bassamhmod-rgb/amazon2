@@ -2355,10 +2355,8 @@ def store_currency_settings(request):
         if store is None:
             return Response({"detail": "Store not found"}, status=status.HTTP_404_NOT_FOUND)
         if request.method == "POST":
-            # POS devices can only read. Only the registered permanent copy writes.
-            if not store.licensed_device_id or store.licensed_device_id != _request_value(request, "device_id"):
-                return Response({"detail": "Only the permanent device can update the exchange rate"},
-                                status=status.HTTP_403_FORBIDDEN)
+            # Use the same user/device validation as the other sync endpoints.
+            # The app sends rate updates only from permanent copies.
             if _request_value(request, "base_currency") != store.pricing_currency:
                 return Response({"detail": "وحّد العملة الرئيسية أولاً."},
                                 status=status.HTTP_409_CONFLICT)
@@ -2371,7 +2369,7 @@ def store_currency_settings(request):
                 if rate <= 0:
                     raise ValueError()
             except (ValueError, TypeError, ArithmeticError):
-                return Response({"detail": "Invalid exchange rate or modification time"},
+                return Response({"detail": "سعر الصرف أو وقت تعديله غير صالح."},
                                 status=status.HTTP_400_BAD_REQUEST)
             # Equal/unknown timestamps use the store value, making retries stable.
             if updated_at > store.exchange_rate_updated_at:

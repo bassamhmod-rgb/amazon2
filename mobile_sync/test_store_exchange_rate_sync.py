@@ -40,8 +40,20 @@ class StoreExchangeRateSyncTests(TestCase):
             self.assertEqual(response.data["exchange_rate"], 100)
             self.assertEqual(response.data["exchange_rate_updated_at"], 2000)
 
-    def test_pos_can_read_but_cannot_push_even_with_newer_time(self):
-        self.assertEqual(self.sync(device_id="pos-device").status_code, 403)
+    def test_rate_sync_does_not_require_license_device_binding(self):
+        for binding in (None, "", "another-device"):
+            Store.objects.filter(pk=self.store.pk).update(licensed_device_id=binding)
+            self.assertEqual(self.sync().status_code, 200)
+
+    def test_rate_sync_preserves_standard_sync_validation(self):
+        from rest_framework.response import Response
+        with patch("mobile_sync.views._ensure_store_user_sync_device",
+                   return_value=(None, Response({"detail": "رفض المزامنة"}, status=403))):
+            response = store_currency_settings(APIRequestFactory().post(
+                "/", {"merchant_id": self.store.pk}, format="json"))
+        self.assertEqual(response.status_code, 403)
+
+    def test_pos_can_read_store_rate(self):
         response = store_currency_settings(APIRequestFactory().get(
             "/", {"merchant_id": self.store.pk}))
         self.assertEqual(response.data["exchange_rate"], 100)
