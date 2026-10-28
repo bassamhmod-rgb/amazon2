@@ -65,6 +65,12 @@ class ExpenseReason(models.Model):
         _touch_mobile_update_time(self, kwargs)
         return super().save(*args, **kwargs)
 class Expense(models.Model):
+    @property
+    def input_amount(self):
+        import json
+        return json.loads(self.input_data)['values']['amount'] if self.input_data else self.amount
+
+    input_data = models.TextField(blank=True, null=True)
     payment_currency = models.CharField(max_length=3, blank=True, null=True)
     exchange_rate = models.FloatField(blank=True, null=True)
     amount_payment_currency = models.FloatField(blank=True, null=True)
@@ -74,7 +80,7 @@ class Expense(models.Model):
     access_id = models.BigIntegerField(blank=True, null=True)
     mobile_sync_key = models.CharField(max_length=160, blank=True, null=True)
     store = models.ForeignKey(Store, on_delete=models.CASCADE, related_name="expenses")
-    amount = models.DecimalField(max_digits=14, decimal_places=2, default=Decimal("0.00"))
+    amount = models.DecimalField(max_digits=28, decimal_places=12, default=Decimal("0.00"))
     date = models.DateField(default=timezone.now)
     expense_type = models.ForeignKey(
         ExpenseType,

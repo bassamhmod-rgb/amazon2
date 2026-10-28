@@ -55,6 +55,7 @@ class Category(models.Model):
 
 
 class Product(models.Model):
+    input_data = models.TextField(blank=True, null=True)
     display_order = models.PositiveIntegerField(default=0, verbose_name="ترتيب العرض")
     update_time = models.BigIntegerField(blank=True, null=True)
     mobile_update_time = models.BigIntegerField(blank=True, null=True)
@@ -69,12 +70,12 @@ class Product(models.Model):
     product_number = models.CharField(max_length=100, blank=True, default="", verbose_name="رقم المادة")
     description = models.TextField(blank=True)
 
-    price = models.DecimalField(max_digits=8, decimal_places=2)
-    price2 = models.DecimalField(max_digits=10, decimal_places=2, default=0, blank=True)
-    price3 = models.DecimalField(max_digits=10, decimal_places=2, default=0, blank=True)
+    price = models.DecimalField(max_digits=28, decimal_places=12)
+    price2 = models.DecimalField(max_digits=28, decimal_places=12, default=0, blank=True)
+    price3 = models.DecimalField(max_digits=28, decimal_places=12, default=0, blank=True)
 
     unit2 = models.CharField(max_length=100, default="", blank=True)
-    unit2_price = models.DecimalField(max_digits=10, decimal_places=2, default=0, blank=True)
+    unit2_price = models.DecimalField(max_digits=28, decimal_places=12, default=0, blank=True)
     unit2_pieces = models.DecimalField(
         max_digits=10,
         decimal_places=3,
@@ -85,8 +86,8 @@ class Product(models.Model):
     show_price = models.BooleanField(default=True)
 
     buy_price = models.DecimalField(
-        max_digits=10,
-        decimal_places=2,
+        max_digits=28,
+        decimal_places=12,
         default=0,
         help_text="متوسط سعر شراء المنتج"
     )

@@ -1,3 +1,4 @@
+from .input_money import validate_input_data
 import hashlib
 import base64
 import time
@@ -294,6 +295,7 @@ def _product_main_image_url(request, product):
 
 def _serialize_product(product, request=None):
     return {
+        "input_data": getattr(product, "input_data", None),
         "id": product.id,
         "name": product.name,
         "product_number": product.product_number,
@@ -492,6 +494,7 @@ def _serialize_expense(expense):
     store = expense.store
     payment_currency = _mobile_currency_value(expense, "payment_currency", getattr(store, "pricing_currency", "SYP") or "SYP")
     return {
+        "input_data": getattr(expense, "input_data", None),
         "id": expense.id,
         "amount": float(expense.amount or 0),
         "payment_currency": payment_currency,
@@ -883,6 +886,8 @@ def _apply_product_change(store, payload, server_id=None, category_resolver=None
         "active": _to_bool(payload.get("active"), True),
         "mobile_update_time": now_minute,
     }
+    if "input_data" in payload:
+        update_fields["input_data"] = validate_input_data(payload["input_data"], obj.input_data if obj else None)
     if "product_number" in payload:
         product_number = _to_str(payload.get("product_number")).strip()
         if len(product_number) > 100:
@@ -914,6 +919,7 @@ def _apply_product_change(store, payload, server_id=None, category_resolver=None
         store=store,
         access_id=_to_int(payload.get("access_id")),
         name=name,
+        input_data=update_fields.get("input_data"),
         price=update_fields["price"],
         product_number=update_fields.get("product_number", ""),
         description=update_fields["description"],
@@ -1684,6 +1690,8 @@ def _apply_expense_change(store, payload, server_id=None, mobile_sync_key=None):
     obj = Expense.objects.filter(id=server_id, store=store).first() if server_id else None
     if not obj and mobile_sync_key:
         obj = Expense.objects.filter(store=store, mobile_sync_key=mobile_sync_key).first()
+    if "input_data" in payload:
+        update_fields["input_data"] = validate_input_data(payload["input_data"], obj.input_data if obj else None)
     if mobile_sync_key:
         update_fields["mobile_sync_key"] = mobile_sync_key
     if obj:
@@ -2436,6 +2444,7 @@ def products_pull(request):
                 p.unit2_pieces if isinstance(p.unit2_pieces, Decimal) else p.unit2_pieces
             ),
             "show_price": p.show_price,
+            "input_data": p.input_data,
             "buy_price": float(p.buy_price if isinstance(p.buy_price, Decimal) else p.buy_price),
             "stock": p.stock,
             "stock_alert_threshold": p.stock_alert_threshold,
@@ -3944,6 +3953,17 @@ def orders_push(request):
                 order.is_seen_by_store = is_seen_by_store
                 order.created_at = created_at
                 order.mobile_update_time = _now_minute()
+                if order.input_data and not order_payload.get("input_data"):
+                    raise ValueError("يجب إرسال أرقام عملة الإدخال الأصلية لهذه الفاتورة.")
+                if "input_data" in order_payload:
+                    order.input_data = validate_input_data(order_payload["input_data"], order.input_data)
+                if order.input_data:
+                    from .input_money import source_base_value
+                    original_values = json.loads(order.input_data)["values"]
+                    for field, key in (("amount", "subtotal"), ("discount", "discount"),
+                                       ("payment", "payment"), ("shipping_cost", "shipping")):
+                        if key in original_values:
+                            setattr(order, field, source_base_value(order, key, getattr(order, field)))
                 order._skip_update_time_touch = True
                 order.save()
 
@@ -3984,6 +4004,7 @@ def orders_push(request):
                         quantity=Decimal(str(quantity)),
                         bonus_quantity=Decimal(str(max(0, _to_float(item_payload.get("bonus_quantity"), 0)))),
                         price=Decimal(str(price)),
+                        input_data=validate_input_data(item_payload.get("input_data")),
                         direction=direction if direction is not None else -1,
                         buy_price=None if buy_price in (None, "") else Decimal(str(_to_float(buy_price))),
                         warehouse=warehouse,
@@ -4027,13 +4048,28 @@ def orders_push(request):
 
 def _serialize_order_item_for_mobile(item):
     buy_price = getattr(item, "buy_price", None)
+    price_alt = total_alt = 0
+    if getattr(item, "input_data", None):
+        source = json.loads(item.input_data)
+        values = source["values"]
+        base_currency = item.order.base_currency or item.order.store.pricing_currency
+        rate = Decimal(str(item.order.exchange_rate or 1))
+        if source["currency"] != base_currency:
+            price_alt = Decimal(values["price"]) / Decimal(values.get("factor", "1"))
+            total_alt = Decimal(values["total"])
+        else:
+            price_alt = item.price * rate if base_currency == "USD" else item.price / rate
+            total_alt = item.subtotal * rate if base_currency == "USD" else item.subtotal / rate
     return {
+        "input_data": getattr(item, "input_data", None),
         "id": item.id,
         "product_id": getattr(item, "product_id", None),
         "warehouse_id": getattr(item, "warehouse_id", None),
         "quantity": _to_float(getattr(item, "quantity", 0)),
         "bonus_quantity": _to_float(getattr(item, "bonus_quantity", 0)),
         "price": _to_float(getattr(item, "price", 0)),
+        "price_alt": float(price_alt),
+        "total_alt": float(total_alt),
         "direction": getattr(item, "direction", -1),
         "buy_price": None if buy_price is None else _to_float(buy_price),
         "item_note": getattr(item, "item_note", "") or "",
@@ -4065,10 +4101,12 @@ def _serialize_order_for_mobile(order):
         items_total = sum(Decimal(str(item.get("price", 0))) * Decimal(str(abs(item.get("quantity", 0)))) for item in items)
         # Mobile stores the subtotal and subtracts the separate discount once.
         # Freight affects purchase cost, not the supplier invoice subtotal.
-        sync_amount = items_total
+        from .input_money import source_base_value
+        sync_amount = source_base_value(order, "subtotal", items_total)
     else:
         sync_amount = getattr(order, "amount", 0)
     return {
+        "input_data": getattr(order, "input_data", None),
         "id": order.id,
         "update_time": _mobile_time(order),
         "customer_id": order.customer_id,

@@ -138,6 +138,7 @@
 
     <form method="post">
         {% csrf_token %}
+        <p>{{ order.input_currency_label }}</p>
 <div class="mb-3">
     <label class="form-label">مستودع الطلب</label>
     {% if can_select_warehouse %}
@@ -231,14 +232,14 @@
                             <input type="hidden" name="item_id[]" value="{{ item.id }}">
                         </td>
                         <td>
-                            <input type="number" name="price[]" value="{{ item.price }}" step="0.01"
+                            <input type="number" name="price[]" value="{{ item.input_price }}" step="any"
                                    class="form-control price en-num" oninput="calculateTotal()">
                         </td>
                         <td>
-                            <input type="number" name="quantity[]" value="{{ item.quantity }}" step="0.01" min="0.01"
+                            <input type="number" name="quantity[]" value="{{ item.input_quantity }}" step="any" min="0.01"
                                    class="form-control quantity en-num" oninput="calculateTotal()">
                         </td>
-                        <td class="subtotal fw-bold en-num">{{ item.subtotal }}</td>
+                        <td class="subtotal fw-bold en-num">{{ item.input_subtotal }}</td>
                         <td>
                             <button type="button" class="btn btn-danger btn-sm"
                                     onclick="this.closest('tr').remove();calculateTotal()">×</button>
@@ -252,19 +253,19 @@
         <div class="row g-3 mt-3">
             <div class="col-md-4">
                 <label>الحسم</label>
-                <input type="number" name="discount" value="{{ order.discount }}" step="0.01"
+                <input type="number" name="discount" value="{{ order.input_discount }}" step="any"
                        class="form-control en-num" oninput="calculateTotal()">
             </div>
             <div class="col-md-4">
                 <label>المدفوع</label>
-                <input type="number" name="payment" value="{{ order.payment }}" step="0.01"
+                <input type="number" name="payment" value="{{ order.input_payment }}" step="any"
                        class="form-control en-num">
             </div>
             <div class="col-md-4">
                 <label>المجموع الكلي</label>
                 <input type="text" id="totalDisplay" readonly
                        class="form-control fw-bold text-success en-num"
-                       value="{{ order.items_total }}">
+                       value="{{ order.input_total }}">
             </div>
         </div>
 
@@ -406,11 +407,11 @@ function selectProduct(item){
             <input type="hidden" name="item_id[]" value="">
         </td>
         <td>
-            <input type="number" name="price[]" value="${item.price}" step="0.01"
+            <input type="number" name="price[]" value="${item.price}" step="any"
                    class="form-control price en-num" oninput="calculateTotal()">
         </td>
         <td>
-            <input type="number" name="quantity[]" value="1" step="0.01" min="0.01"
+            <input type="number" name="quantity[]" value="1" step="any" min="0.01"
                    class="form-control quantity en-num" oninput="calculateTotal()">
         </td>
         <td class="subtotal fw-bold en-num">${item.price}</td>

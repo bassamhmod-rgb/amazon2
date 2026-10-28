@@ -1,3 +1,4 @@
+from .input_money import prepare_order_input
 from accounts.customer_notes import apply_customer_private_note
 from accounts.models import normalize_phone_number
 # -*- coding: utf-8 -*-
@@ -1516,6 +1517,11 @@ def order_create(request, store_slug):
     store = _get_store_for_dashboard(request, store_slug)
 
     if request.method == "POST":
+        try:
+            input_data, input_items, input_base, input_currency, input_rate = prepare_order_input(request, store)
+        except (ValueError, ArithmeticError):
+            messages.error(request, "أرقام عملة الإدخال غير صالحة.")
+            return redirect("dashboard:order_create", store_slug=store.slug)
 
         # 1) نوع العملية
         transaction_type = request.POST.get("transaction_type", "sale")
@@ -1566,6 +1572,7 @@ def order_create(request, store_slug):
             ).first()
 
         order = Order.objects.create(
+            input_data=input_data, base_currency=input_base, payment_currency=input_currency, exchange_rate=input_rate,
             store=store,
             warehouse=warehouse,
             created_by=request.user,
@@ -1600,6 +1607,7 @@ def order_create(request, store_slug):
 
                 OrderItem.objects.create(
                     order=order,
+                    input_data=input_items[i],
                     product=product,
                     price=price,
                     quantity=qty,
@@ -1614,6 +1622,7 @@ def order_create(request, store_slug):
             else:  # purchase / sale_return
                 OrderItem.objects.create(
                     order=order,
+                    input_data=input_items[i],
                     product=product,
                     price=price,
                     quantity=qty,
@@ -1682,6 +1691,11 @@ def order_update(request, store_slug, order_id):
     new_orders_count = Order.objects.filter(store=store, is_seen_by_store=False).count()
 
     if request.method == "POST":
+        try:
+            input_data, input_items, input_base, input_currency, input_rate = prepare_order_input(request, store, order)
+        except (ValueError, ArithmeticError):
+            messages.error(request, "أرقام عملة الإدخال غير صالحة.")
+            return redirect("dashboard:order_update", store_slug=store.slug, order_id=order.pk)
         previous_customer = order.customer
         previous_transaction_type = order.transaction_type
 
@@ -1719,6 +1733,10 @@ def order_update(request, store_slug, order_id):
             customer = get_object_or_404(Customer, pk=order.customer_id, store=store)
             order.note = apply_customer_private_note(order.note, customer.private_note,
                 previous_customer.private_note if previous_customer else "")
+        order.input_data = input_data
+        order.base_currency = input_base
+        order.payment_currency = input_currency
+        order.exchange_rate = input_rate
         order.save()
 
         products = request.POST.getlist("product_id[]")
@@ -1771,6 +1789,7 @@ def order_update(request, store_slug, order_id):
                 )
                 if changed or (order.warehouse_id and existing_item.warehouse_id is None):
                     existing_item.product = product
+                    existing_item.input_data = input_items[i]
                     existing_item.price = price
                     existing_item.quantity = qty
                     existing_item.direction = direction
@@ -1781,6 +1800,7 @@ def order_update(request, store_slug, order_id):
             else:
                 new_item = OrderItem.objects.create(
                     order=order,
+                    input_data=input_items[i],
                     product=product,
                     price=price,
                     quantity=qty,
@@ -2204,6 +2224,9 @@ def notice_create(request, store_slug):
         Order.objects.create(
             store=store,
             document_kind=2,
+            input_data=json.dumps(dict(version=1, currency=store.pricing_currency, values={'subtotal': amount_raw or '0', 'payment': payment_raw or '0'})),
+            base_currency=store.pricing_currency, payment_currency=store.pricing_currency,
+            exchange_rate=store.exchange_rate, amount_payment_currency=payment,
             transaction_type=transaction_type,
             customer=customer,
             supplier=supplier,
@@ -2321,6 +2344,11 @@ def expenses_list(request, store_slug):
         Expense.objects.create(
             store=store,
             amount=amount,
+            input_data=json.dumps(dict(version=1, currency=store.pricing_currency,
+                values={'amount': request.POST.get('amount') or '0'})),
+            payment_currency=store.pricing_currency,
+            exchange_rate=store.exchange_rate,
+            amount_payment_currency=amount,
             date=date_value,
             expense_type=expense_type,
             expense_reason=expense_reason,
@@ -2473,7 +2501,13 @@ def expense_edit(request, store_slug, expense_id):
             if reason_id and reason_id.isdigit()
             else None
         )
-        expense.amount = amount
+        source = json.loads(expense.input_data) if expense.input_data else None
+        currency = source['currency'] if source else store.pricing_currency
+        expense.input_data = json.dumps(dict(version=1, currency=currency,
+            values={'amount': request.POST.get('amount') or '0'}))
+        expense.amount_payment_currency = amount
+        rate = Decimal(str(expense.exchange_rate or store.exchange_rate or 1))
+        expense.amount = amount if currency == store.pricing_currency else amount / rate if store.pricing_currency == 'USD' else amount * rate
         expense.notes = (request.POST.get("notes") or "").strip()
         expense.save()
 
