@@ -1,5 +1,6 @@
 ﻿from django.db import models
 from django.contrib.auth.models import User
+from decimal import Decimal
 
 from stores.models import Store, StorePaymentMethod, Warehouse
 from accounts.models import Customer, StoreUser
