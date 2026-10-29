@@ -849,6 +849,28 @@ def _content_file_from_data_url(value, default_prefix="image"):
     return ContentFile(raw, name=f"{default_prefix}_{uuid.uuid4().hex}.{extension}")
 
 
+def _can_product_enrichment(actor, permission):
+    return bool(actor and (actor.is_owner or _normalize_mobile_permissions(actor.permissions).get(permission)))
+
+
+def _apply_product_image_change(store, payload, server_id):
+    if set(payload) != {"main_image"}:
+        raise ValueError("تعديل صورة المادة يقبل الصورة فقط دون بقية بيانات المادة.")
+    obj = Product.objects.filter(pk=server_id, store=store).first()
+    if not obj:
+        raise ValueError("المادة غير موجودة. زامن المواد أولاً.")
+    raw = payload["main_image"]
+    if raw == "":
+        obj.main_image = None
+    else:
+        image = _content_file_from_data_url(raw, "product")
+        if image is None:
+            raise ValueError("بيانات صورة المادة غير صالحة.")
+        obj.main_image = image
+    obj.save(update_fields=["main_image"])
+    return obj
+
+
 def _apply_product_change(store, payload, server_id=None, category_resolver=None):
     name = _to_str(payload.get("name")).strip()
     if not name:
@@ -2972,7 +2994,7 @@ def sync_push(request):
     store = Store.objects.filter(id=merchant_id).first()
     if not store:
         return Response({"detail": "Merchant not found"}, status=status.HTTP_404_NOT_FOUND)
-    _, device_error = _ensure_store_user_sync_device(request, merchant_id)
+    sync_actor, device_error = _ensure_store_user_sync_device(request, merchant_id)
     if device_error:
         return device_error
     _ensure_mobile_default_records(store)
@@ -3092,6 +3114,15 @@ def sync_push(request):
                         "server_id": obj.id,
                         "update_time": obj.update_time or 0,
                     })
+                elif entity == "product_image":
+                    if not _can_product_enrichment(sync_actor, "products.edit"):
+                        errors.append({"entity": entity, "local_id": local_id, "detail": "Product image permission required"})
+                        continue
+                    product = product_local_to_server.get(_to_int(local_id))
+                    obj = _apply_product_image_change(store, payload_item,
+                        _to_int(server_id) or (product.pk if product else None))
+                    applied.append({"entity": "product_image", "action": "updated",
+                        "local_id": local_id, "server_id": obj.pk, "update_time": _mobile_time(obj)})
                 elif entity == "product":
                     obj, action = _apply_product_change(
                         store,
@@ -3109,6 +3140,9 @@ def sync_push(request):
                         "update_time": obj.update_time or 0,
                     })
                 elif entity == "barcode":
+                    if not _can_product_enrichment(sync_actor, "products.edit"):
+                        errors.append({"entity": entity, "local_id": local_id, "detail": "Product barcode permission required"})
+                        continue
                     payload_item = dict(payload_item)
                     if "product_id" not in payload_item and "product_server_id" not in payload_item and "product_local_id" not in payload_item:
                         payload_item["product_server_id"] = item.get("product_server_id")
@@ -3409,6 +3443,9 @@ def sync_push(request):
                     continue
 
                 if entity == "barcode":
+                    if not _can_product_enrichment(sync_actor, "products.edit"):
+                        errors.append({"entity": entity, "local_id": local_id, "detail": "Product barcode permission required"})
+                        continue
                     obj = ProductBarcode.objects.filter(id=server_id, product__store_id=merchant_id).first()
                     if obj:
                         obj._skip_mobile_delete_sync = True
