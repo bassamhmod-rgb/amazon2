@@ -1,0 +1,20 @@
+{% load static %}
+<link rel="stylesheet" href="{% static 'css/storefront_cart.css' %}">
+<div id="local-cart-message" class="alert alert-warning" role="status" aria-live="polite" hidden></div>
+<button id="local-cart-bar" type="button" data-open-local-cart hidden aria-haspopup="dialog"></button>
+<dialog id="local-cart-dialog" aria-labelledby="local-cart-title">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2 id="local-cart-title" class="h4">اختياراتك</h2>
+        <button id="local-cart-close" type="button" class="btn btn-outline-secondary" aria-label="إغلاق السلة">إغلاق</button>
+    </div>
+    <div data-local-cart-message class="alert alert-warning" role="status" hidden></div>
+    <div id="local-cart-items"></div>
+    <p class="mt-3 fw-bold">المجموع: <span data-local-total aria-live="polite"></span></p>
+    <div class="local-cart-actions">
+        <button id="local-cart-clear" type="button" class="btn btn-outline-danger">تفريغ السلة</button>
+        <a id="local-checkout-link" href="{% url 'orders:checkout' store.slug %}?local=1" class="btn btn-primary">إتمام الطلب</a>
+    </div>
+</dialog>
+{{ storefront_data|json_script:"local-cart-config" }}
+<script src="{% static 'js/storefront_cart.js' %}" defer></script>
+<noscript><p class="alert alert-warning">فعّل JavaScript لاستخدام السلة المحلية.</p></noscript>

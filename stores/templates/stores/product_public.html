@@ -229,7 +229,7 @@
                 </div>
                 {% endif %}
 
-<form method="POST" action="{% url 'cart:add_to_cart' store.slug product.id %}">                    
+<form id="local-product-form" data-product-id="{{ product.id }}">
                                  {% csrf_token %}  <div class="row g-2 mb-3"></div>
                             <div class="row g-2 mb-3">
                         <div class="col-3">
@@ -239,7 +239,7 @@
 
                         <div class="col-9">
                             <label class="form-label-sm">ملاحظة (لون، قياس..)</label>
-                            <input type="text" name="item_note" class="form-control custom-input" placeholder="اكتب تفاصيل المنتج هنا...">
+                            <input type="text" name="item_note" maxlength="2000" class="form-control custom-input" placeholder="اكتب تفاصيل المنتج هنا...">
                         </div>
                     </div>
 
@@ -263,6 +263,7 @@
     }
 </script>
 
+{% include "stores/local_cart_dialog.html" %}
 {% include "stores/storefront_return_position.html" %}
 </body>
 </html>

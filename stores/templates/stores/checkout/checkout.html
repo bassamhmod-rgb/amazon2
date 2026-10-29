@@ -80,6 +80,7 @@
 </head>
 
 <body>
+{% include "stores/checkout/local_summary.html" %}
 
 <div class="container">
     <div class="checkout-container">
@@ -150,11 +151,13 @@
                 <strong>⚠️ ملاحظة:</strong><br>
                 يُنصَح أن لا تقل الدفعة الأولى عن:
                 <span class="fw-bold text-danger">
+                    {% if local_config %}<span id="local-required-amount"></span>{% else %}
                     {% if store.pricing_currency == "USD" %}
                         {{ required_amount|floatformat:2 }} $
                         <span class="text-muted">({{ required_amount_syp|floatformat:0 }} &#1604;.&#1587;)</span>
                     {% else %}
                         {{ required_amount_syp|floatformat:0 }} &#1604;.&#1587;
+                    {% endif %}
                     {% endif %}
                 </span>
                 ({{ required_percent }}%)
@@ -241,7 +244,7 @@
                 متابعة لإتمام الطلب
             </button>
 
-            <a href="{% url 'cart:cart_detail' store.slug %}" class="btn btn-link w-100 mt-3">
+            <a href="{% if local_config %}{% url 'stores:store_front' store.slug %}{% else %}{% url 'cart:cart_detail' store.slug %}{% endif %}" class="btn btn-link w-100 mt-3">
                 رجوع لسلة المشتريات
             </a>
 

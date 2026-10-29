@@ -126,4 +126,8 @@
 </div>
 
 </body>
+{% if local_config %}
+{{ local_config|json_script:"local-cart-config" }}
+<script src="{% static 'js/storefront_cart.js' %}" defer></script>
+{% endif %}
 </html>

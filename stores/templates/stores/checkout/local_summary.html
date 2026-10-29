@@ -1,0 +1,15 @@
+{% load static %}
+{% if local_config %}
+<link rel="stylesheet" href="{% static 'css/storefront_cart.css' %}">
+<div id="local-cart-message" class="alert alert-warning" role="status" hidden></div>
+<div class="container my-3">
+    <div class="bg-white rounded p-3">
+        <h5>سلة المشتريات</h5>
+        <div id="local-cart-items"></div>
+        <p class="fw-bold mt-3">المجموع: <span data-local-total></span></p>
+        <a href="{% url 'stores:store_front' store.slug %}">العودة للمتجر وتعديل السلة</a>
+    </div>
+</div>
+{{ local_config|json_script:"local-cart-config" }}
+<script src="{% static 'js/storefront_cart.js' %}" defer></script>
+{% endif %}

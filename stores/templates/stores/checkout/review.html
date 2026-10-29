@@ -73,6 +73,7 @@
 </head>
 
 <body>
+{% include "stores/checkout/local_summary.html" %}
 
 <div class="container">
 
@@ -140,6 +141,7 @@
         <!-- ================= محتوى الطلب ================ -->
         <h5 class="section-title">🛒 محتوى الطلب</h5>
 
+        {% if not local_config %}
         {% for item in items %}
             <p class="info-row">
                 {{ item.quantity }} × {{ item.product.name }}
@@ -163,17 +165,23 @@
             {% endif %}
         </p>
 
+        {% endif %}
+
         <div class="divider"></div>
 
         <!-- ================= الأزرار ================ -->
-        <form action="{% url 'orders:confirm_order' store.slug %}" method="post">
+        <form action="{% url 'orders:confirm_order' store.slug %}" method="post" {% if local_config %}id="local-confirm-form"{% endif %}>
             {% csrf_token %}
+            {% if local_config %}
+            <input type="hidden" name="local_cart">
+            <input type="hidden" name="checkout_token" value="{{ data.checkout_token }}">
+            {% endif %}
             <button class="btn btn-success w-100 confirm-btn">
                 ✔ تأكيد الطلب
             </button>
         </form>
 
-        <a href="{% url 'orders:checkout' store.slug %}"
+        <a href="{% url 'orders:checkout' store.slug %}{% if local_config %}?local=1{% endif %}"
            class="btn btn-secondary w-100 mt-3 back-btn">
             ← الرجوع وتعديل المعلومات
         </a>

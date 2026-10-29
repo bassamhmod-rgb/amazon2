@@ -53,6 +53,7 @@ def _touch_mobile_update_time(instance, kwargs):
 
 
 class Order(models.Model):
+    storefront_checkout_token = models.UUIDField(null=True, blank=True, unique=True, editable=False)
     @property
     def input_discount(self):
         from mobile_sync.input_money import source_values

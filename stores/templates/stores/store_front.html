@@ -355,7 +355,7 @@ button.btn-primary {
             <a href="{% url 'stores:store_contact_links' store.slug %}" class="btn btn-outline-primary d-none d-md-inline">&#1578;&#1608;&#1575;&#1589;&#1604; &#1605;&#1593;&#1606;&#1575;
             </a>
 
-            <a href="{% url 'cart:cart_detail' store.slug %}" class="btn btn-outline-primary cart-btn">
+            <a href="{% url 'cart:cart_detail' store.slug %}" class="btn btn-outline-primary cart-btn" data-open-local-cart aria-haspopup="dialog">
                 &#128722;
                 <span id="cart-count" class="cart-badge{% if not cart_count %} is-hidden{% endif %}">
                     {{ cart_count|default:0 }}
@@ -488,7 +488,7 @@ button.btn-primary {
                     <div id="install-help" class="install-help text-light mt-2 d-none"></div>
                 </div>
 
-                <form method="get" class="mt-3">
+                <form method="get" class="mt-3" id="local-catalog-search">
                     <input type="text" name="q" value="{{ q }}" class="form-control mb-2"
                            placeholder="ابحث عن منتج...">
 
@@ -573,15 +573,14 @@ button.btn-primary {
     </div>
 {% endif %}
                     </div>
-                    <form method="POST" action="{% url 'cart:add_to_cart' store.slug p.id %}" class="add-to-cart-form">
-                        {% csrf_token %}
-                        <div class="qty-control" data-qty>
-                            <button type="button" class="qty-btn" data-qty-dec aria-label="نقص الكمية">-</button>
-                            <input type="number" name="quantity" value="1" min="1" class="qty-input" inputmode="numeric">
-                            <button type="button" class="qty-btn" data-qty-inc aria-label="زيادة الكمية">+</button>
-                        </div>
-                        <button type="submit" class="btn btn-primary product-add-btn">أضف</button>
+                    {% if p.show_price %}
+                    <form class="add-to-cart-form">
+                        <div class="local-product-quantity"></div>
+                        <button type="submit" class="btn btn-primary product-add-btn">إضافة</button>
                     </form>
+                    {% else %}
+                    <p class="text-muted">الشراء من المركز مباشرة</p>
+                    {% endif %}
                     </div>
                 </div>
             </div>
@@ -590,6 +589,7 @@ button.btn-primary {
             {% endfor %}
         </div>
 
+        <p id="local-catalog-empty" class="text-muted mt-3" hidden>لا توجد منتجات مطابقة.</p>
         <div class="notice-box mt-4">
             {{ store.description5 }}
         </div>
@@ -694,83 +694,9 @@ button.btn-primary {
         showInstallHelp("تم تثبيت المتجر على الشاشة الرئيسية.");
     });
 
-    document.querySelectorAll("[data-qty]").forEach(function (wrapper) {
-        var input = wrapper.querySelector("input[type='number']");
-        var dec = wrapper.querySelector("[data-qty-dec]");
-        var inc = wrapper.querySelector("[data-qty-inc]");
-        var min = parseInt(input.min || "1", 10);
-
-        dec.addEventListener("click", function () {
-            var value = parseInt(input.value, 10);
-            if (isNaN(value)) value = min;
-            input.value = Math.max(min, value - 1);
-        });
-
-        inc.addEventListener("click", function () {
-            var value = parseInt(input.value, 10);
-            if (isNaN(value)) value = min;
-            input.value = value + 1;
-        });
-    });
-
-    function updateCartBadge(count) {
-        var badge = document.getElementById("cart-count");
-        if (!badge) return;
-        var value = parseInt(count, 10) || 0;
-        badge.textContent = value;
-        if (value > 0) {
-            badge.classList.remove("is-hidden");
-        } else {
-            badge.classList.add("is-hidden");
-        }
-    }
-
-    document.querySelectorAll(".add-to-cart-form").forEach(function (form) {
-        form.addEventListener("submit", function (e) {
-            e.preventDefault();
-
-            var submitBtn = form.querySelector("button[type='submit']");
-            if (submitBtn) submitBtn.disabled = true;
-
-            var csrfInput = form.querySelector("input[name='csrfmiddlewaretoken']");
-            var headers = { "X-Requested-With": "XMLHttpRequest" };
-            if (csrfInput) headers["X-CSRFToken"] = csrfInput.value;
-
-            fetch(form.action, {
-                method: "POST",
-                headers: headers,
-                credentials: "same-origin",
-                body: new FormData(form)
-            })
-            .then(function (res) {
-                return res.json()
-                    .catch(function () { return {}; })
-                    .then(function (data) {
-                        if (!res.ok) {
-                            var err = new Error(data.error || "");
-                            err.hasMessage = !!data.error;
-                            throw err;
-                        }
-                        return data;
-                    });
-            })
-            .then(function (data) {
-                updateCartBadge(data.cart_count);
-            })
-            .catch(function (err) {
-                if (err && err.hasMessage) {
-                    alert(err.message);
-                    return;
-                }
-                form.submit();
-            })
-            .finally(function () {
-                if (submitBtn) submitBtn.disabled = false;
-            });
-        });
-    });
 </script>
 
+{% include "stores/local_cart_dialog.html" %}
 {% include "stores/storefront_return_position.html" %}
 </body>
 </html>

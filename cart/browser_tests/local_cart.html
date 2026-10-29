@@ -1,0 +1,64 @@
+<!doctype html><html><head><meta charset="utf-8"></head><body>
+<pre id="result">RUNNING</pre>
+<div id="local-cart-message" hidden></div><span id="cart-count"></span>
+<button id="local-cart-bar" data-open-local-cart hidden></button>
+<form id="local-catalog-search"><input name="q"><select name="category"><option value=""></option><option value="1">one</option><option value="2">two</option></select><select name="category2"><option value=""></option></select></form>
+<div class="product-column" data-product-id="1"><form class="add-to-cart-form"><div class="local-product-quantity"></div><button type="submit">Add</button></form></div>
+<div class="product-column" data-product-id="2"><form class="add-to-cart-form"><div class="local-product-quantity"></div><button type="submit">Add</button></form></div>
+<p id="local-catalog-empty" hidden></p>
+<dialog id="local-cart-dialog"><button id="local-cart-close"></button><div id="local-cart-items"></div><button id="local-cart-clear"></button><a id="local-checkout-link" href="#checkout">Checkout</a><span data-local-total></span></dialog>
+<form id="local-confirm-form"><input name="local_cart"><input name="checkout_token" value="test-token"><button type="submit">Confirm</button></form>
+<script type="application/json" id="local-cart-config">{"key":"local-cart-browser-test","currency":"USD","displayCurrency":"BOTH","rate":"100","products":[{"id":"1","name":"First","price":"10","category":"1","category2":"","available":3,"unlimited":false,"sellable":true},{"id":"2","name":"Second","price":"20","category":"2","category2":"","available":5,"unlimited":false,"sellable":true}]}</script>
+<script>
+localStorage.removeItem('local-cart-browser-test');
+let requests=0;
+window.fetch=()=>{requests++;throw Error('Unexpected network');};
+window.addEventListener('error',e=>{document.getElementById('result').textContent='FAIL: '+e.message;});
+document.getElementById('local-confirm-form').addEventListener('submit',e=>e.preventDefault());
+</script>
+<script src="../../static/js/storefront_cart.js"></script>
+<script>
+const result=document.getElementById('result');
+let passed=0;
+function check(value,label){if(!value)throw Error(label);passed++;}
+function runScript(config,callback){
+ document.getElementById('local-cart-config').textContent=JSON.stringify(config);
+ const s=document.createElement('script');s.src='../../static/js/storefront_cart.js';s.onload=callback;document.body.append(s);
+}
+try {
+ const card=document.querySelector('[data-product-id="1"]');
+ card.querySelector('button[type=submit]').click();
+ check(document.getElementById('cart-count').textContent==='1','add updates count');
+ check(card.querySelector('button[type=submit]').hidden,'add switches to quantity control');
+ card.querySelector('.local-quantity button:last-child').click();
+ check(JSON.parse(localStorage.getItem('local-cart-browser-test'))[0].quantity===2,'quantity persisted');
+ card.querySelector('.local-quantity button:last-child').click();
+ card.querySelector('.local-quantity button:last-child').click();
+ check(JSON.parse(localStorage.getItem('local-cart-browser-test'))[0].quantity===3,'stock limit enforced');
+ const search=document.getElementById('local-catalog-search');
+ search.elements.category.value='2';search.dispatchEvent(new Event('change'));
+ check(card.hidden && !document.querySelector('[data-product-id="2"]').hidden,'local category filtering');
+ document.getElementById('local-cart-bar').click();
+ check(document.getElementById('local-cart-dialog').open,'cart opens without navigation');
+ document.getElementById('local-cart-close').click();
+ check(!document.getElementById('local-cart-dialog').open,'cart closes');
+ localStorage.setItem('local-cart-browser-test',JSON.stringify([{id:'1',name:'First',price:'10',quantity:2}]));
+ window.dispatchEvent(new StorageEvent('storage',{key:'local-cart-browser-test'}));
+ check(document.getElementById('cart-count').textContent==='2','cross-tab cart updates');
+ document.getElementById('local-confirm-form').dispatchEvent(new Event('submit',{bubbles:true,cancelable:true}));
+ const rows=JSON.parse(document.getElementById('local-confirm-form').elements.local_cart.value);
+ check(rows.length===1 && rows[0].quantity===2 && rows[0].price==='10','final confirmation includes cart');
+ check(requests===0,'no cart network requests');
+ localStorage.setItem('local-cart-browser-test',JSON.stringify([{id:'1',name:'First',price:'10',quantity:3}]));
+ const success={key:'local-cart-browser-test',currency:'USD',displayCurrency:'USD',page:'success',token:'test-token'};
+ runScript(success,()=>{
+  try{
+   check(JSON.parse(localStorage.getItem(success.key))[0].quantity===1,'success preserves additions made after submission');
+   runScript(success,()=>{
+    try{check(JSON.parse(localStorage.getItem(success.key))[0].quantity===1,'success refresh does not clear twice');result.textContent='PASS: '+passed+' browser checks';}
+    catch(e){result.textContent='FAIL: '+e.message;}
+   });
+  }catch(e){result.textContent='FAIL: '+e.message;}
+ });
+}catch(e){result.textContent='FAIL: '+e.message;}
+</script></body></html>
