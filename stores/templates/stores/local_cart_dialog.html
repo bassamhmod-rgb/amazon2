@@ -3,9 +3,9 @@
 <div id="local-cart-message" class="alert alert-warning" role="status" aria-live="polite" hidden></div>
 <button id="local-cart-bar" type="button" data-open-local-cart hidden aria-haspopup="dialog"></button>
 <dialog id="local-cart-dialog" aria-labelledby="local-cart-title">
-    <div class="d-flex justify-content-between align-items-center mb-3">
-        <h2 id="local-cart-title" class="h4">اختياراتك</h2>
-        <button id="local-cart-close" type="button" class="btn btn-outline-secondary" aria-label="إغلاق السلة">إغلاق</button>
+    <div class="local-dialog-header">
+        <h2 id="local-cart-title">اختياراتك</h2>
+        <button id="local-cart-close" type="button" class="local-dialog-close" aria-label="إغلاق السلة">&times;</button>
     </div>
     <div data-local-cart-message class="alert alert-warning" role="status" hidden></div>
     <div id="local-cart-items"></div>
@@ -14,6 +14,11 @@
         <button id="local-cart-clear" type="button" class="btn btn-outline-danger">تفريغ السلة</button>
         <a id="local-checkout-link" href="{% url 'orders:checkout' store.slug %}?local=1" class="btn btn-primary">إتمام الطلب</a>
     </div>
+</dialog>
+<dialog id="local-product-dialog" aria-label="تفاصيل المنتج">
+    <div class="local-dialog-header local-product-header"><button type="button" id="local-product-close" class="local-dialog-close" aria-label="إغلاق تفاصيل المنتج">&times;</button></div>
+    <div data-local-cart-message class="alert alert-warning" role="status" hidden></div>
+    <div id="local-product-content"></div>
 </dialog>
 {{ storefront_data|json_script:"local-cart-config" }}
 <script src="{% static 'js/storefront_cart.js' %}" defer></script>

@@ -3,7 +3,8 @@ Local storefront cart validation
 
 Open `local_cart.html` in a browser that allows local scripts, or serve the
 `amazon_syria_src` directory with Python's HTTP server and open
-`/cart/browser_tests/local_cart.html`. The page reports 12 functional checks.
+`/cart/browser_tests/local_cart.html`. The page reports 19 functional checks,
+including opening a product from its image and editing quantities/item notes.
 It uses its own `local-cart-browser-test` storage key, not a real store cart.
 
 Backend coverage: `python manage.py test orders.test_local_checkout

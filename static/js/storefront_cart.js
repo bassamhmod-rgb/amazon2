@@ -100,8 +100,16 @@
                 const line = node('div', undefined, 'local-cart-line');
                 const info = node('div');
                 info.append(node('strong', row.name || 'منتج غير متاح'), node('div', money(Number(row.price || 0) * row.quantity)));
-                if (row.note) info.append(node('small', row.note));
                 line.append(info, quantityControl(row), button('حذف', 'حذف ' + row.name, () => change(row.id, 0)));
+                const label = node('label', 'ملاحظة (لون، قياس..)', 'local-cart-note');
+                const note = node('textarea', undefined, 'form-control mt-1');
+                note.value = row.note || ''; note.maxLength = 2000; note.rows = 2;
+                note.setAttribute('aria-label', 'ملاحظة ' + row.name);
+                note.addEventListener('input', () => {
+                    const current = items.find(item => item.id === row.id);
+                    if (current) { current.note = note.value; save(); }
+                });
+                label.append(note); line.append(label);
                 list.append(line);
             });
         }
@@ -139,13 +147,56 @@
         event.preventDefault(); change(form.closest('[data-product-id]').dataset.productId, 1);
     }));
     const detail = document.getElementById('local-product-form');
-    if (detail) detail.addEventListener('submit', event => {
-        event.preventDefault();
-        const id = detail.dataset.productId;
-        const existing = items.find(row => row.id === id);
-        const changed = change(id, (existing ? existing.quantity : 0) + Number(detail.elements.quantity.value), detail.elements.item_note.value);
-        if (changed && storageOK) message('السلة محفوظة على الجهاز.');
-    });
+    function populateEditor(form) {
+        const existing = items.find(row => row.id === form.dataset.productId);
+        form.elements.quantity.value = existing ? existing.quantity : 1;
+        form.elements.item_note.value = existing ? existing.note || '' : '';
+        form.querySelector('button[type=submit]').textContent = existing ? 'حفظ التعديلات' : 'إضافة إلى السلة';
+    }
+    function bindEditor(form) {
+        populateEditor(form);
+        form.addEventListener('submit', event => {
+            event.preventDefault();
+            const quantity = Number(form.elements.quantity.value);
+            if (!Number.isSafeInteger(quantity) || quantity < 1) return message('أدخل كمية صحيحة أكبر من صفر.');
+            const changed = change(form.dataset.productId, quantity, form.elements.item_note.value);
+            if (changed && storageOK) {
+                populateEditor(form);
+                if (productDialog && productDialog.contains(form)) productDialog.close();
+                message('السلة محفوظة على الجهاز.');
+            }
+        });
+    }
+    const productDialog = document.getElementById('local-product-dialog');
+    if (detail) bindEditor(detail);
+    if (productDialog) {
+        document.getElementById('local-product-close').addEventListener('click', () => productDialog.close());
+        productDialog.addEventListener('click', event => { if (event.target === productDialog) productDialog.close(); });
+        document.querySelectorAll('.product-image-link').forEach(link => link.addEventListener('click', event => {
+            const card = link.closest('[data-product-id]');
+            const template = card && document.getElementById('local-product-' + card.dataset.productId);
+            if (!template || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+            event.preventDefault();
+            read(); render(); message('');
+            const content = document.getElementById('local-product-content');
+            content.replaceChildren(template.content.cloneNode(true));
+            const product = catalogue.get(card.dataset.productId);
+            const price = content.querySelector('[data-product-price]');
+            if (price && product) price.textContent = money(Number(product.price));
+            const editor = content.querySelector('[data-product-editor]');
+            if (editor) bindEditor(editor);
+            content.querySelectorAll('[data-product-image]').forEach(thumbnail => thumbnail.addEventListener('click', () => {
+                let image = content.querySelector('[data-product-main-image]');
+                if (!image) {
+                    image = node('img', undefined, 'local-product-image');
+                    image.setAttribute('data-product-main-image', ''); image.alt = product.name;
+                    content.querySelector('[data-product-title]').after(image);
+                }
+                image.src = thumbnail.dataset.productImage;
+            }));
+            productDialog.showModal();
+        }));
+    }
     const checkoutLink = document.getElementById('local-checkout-link');
     if (checkoutLink) checkoutLink.addEventListener('click', event => {
         save();
@@ -207,6 +258,7 @@
     window.addEventListener('storage', event => { if (event.key === config.key) { read(); render(); } });
     window.addEventListener('pageshow', () => {
         read(); render();
+        if (detail) populateEditor(detail);
         if (confirm) confirm.querySelector('button[type=submit], button:not([type])').disabled = false;
     });
     render();

@@ -3,7 +3,9 @@
 <div id="local-cart-message" hidden></div><span id="cart-count"></span>
 <button id="local-cart-bar" data-open-local-cart hidden></button>
 <form id="local-catalog-search"><input name="q"><select name="category"><option value=""></option><option value="1">one</option><option value="2">two</option></select><select name="category2"><option value=""></option></select></form>
-<div class="product-column" data-product-id="1"><form class="add-to-cart-form"><div class="local-product-quantity"></div><button type="submit">Add</button></form></div>
+<div class="product-column" data-product-id="1"><a class="product-image-link" href="/product/1/">Image</a><form class="add-to-cart-form"><div class="local-product-quantity"></div><button type="submit">Add</button></form></div>
+<template id="local-product-1"><h2 data-product-title>First</h2><span data-product-price></span><form data-product-editor data-product-id="1"><input name="quantity" type="number" min="1"><textarea name="item_note"></textarea><button type="submit">Save</button></form></template>
+<dialog id="local-product-dialog"><button id="local-product-close">Close</button><div id="local-product-content"></div></dialog>
 <div class="product-column" data-product-id="2"><form class="add-to-cart-form"><div class="local-product-quantity"></div><button type="submit">Add</button></form></div>
 <p id="local-catalog-empty" hidden></p>
 <dialog id="local-cart-dialog"><button id="local-cart-close"></button><div id="local-cart-items"></div><button id="local-cart-clear"></button><a id="local-checkout-link" href="#checkout">Checkout</a><span data-local-total></span></dialog>
@@ -42,6 +44,24 @@ try {
  check(document.getElementById('local-cart-dialog').open,'cart opens without navigation');
  document.getElementById('local-cart-close').click();
  check(!document.getElementById('local-cart-dialog').open,'cart closes');
+ const cartNote=document.querySelector('#local-cart-items textarea');
+ cartNote.value='blue size L';cartNote.dispatchEvent(new Event('input'));
+ check(JSON.parse(localStorage.getItem('local-cart-browser-test'))[0].note==='blue size L','cart note saved immediately');
+ card.querySelector('.product-image-link').click();
+ const productDialog=document.getElementById('local-product-dialog');
+ check(productDialog.open,'image opens local product details');
+ let editor=productDialog.querySelector('form');
+ check(editor.elements.quantity.value==='3' && editor.elements.item_note.value==='blue size L','details show existing quantity and note');
+ editor.elements.quantity.value='2';editor.elements.item_note.value='red size M';
+ editor.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true}));
+ check(!productDialog.open,'save returns to catalogue');
+ let saved=JSON.parse(localStorage.getItem('local-cart-browser-test'))[0];
+ check(saved.quantity===2 && saved.note==='red size M','product editor updates instead of adding duplicate quantity');
+ check(document.querySelector('#local-cart-items textarea').value==='red size M','cart note synchronized with product');
+ card.querySelector('.product-image-link').click();
+ editor=productDialog.querySelector('form');
+ check(editor.elements.quantity.value==='2' && editor.elements.item_note.value==='red size M','reopening product restores saved changes');
+ document.getElementById('local-product-close').click();
  localStorage.setItem('local-cart-browser-test',JSON.stringify([{id:'1',name:'First',price:'10',quantity:2}]));
  window.dispatchEvent(new StorageEvent('storage',{key:'local-cart-browser-test'}));
  check(document.getElementById('cart-count').textContent==='2','cross-tab cart updates');

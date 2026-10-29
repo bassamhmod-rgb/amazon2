@@ -108,7 +108,7 @@ def store_front(request, slug):
     if not category2_id or not category2_id.isdigit():
         category2_id = ""
 
-    products = list(products)
+    products = list(products.select_related("category", "category2").prefetch_related("gallery", "details"))
     for p in products:
         set_display_prices(p, store)
 

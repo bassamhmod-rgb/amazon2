@@ -1,0 +1,33 @@
+<template id="local-product-{{ product.id }}">
+    <h2 class="h4" data-product-title>{{ product.name }}</h2>
+    {% if product.main_image %}
+    <img src="{{ product.main_image.url }}" alt="{{ product.name }}" class="local-product-image" data-product-main-image>
+    {% endif %}
+    <div class="local-product-gallery">
+        {% if product.main_image %}
+        <button type="button" data-product-image="{{ product.main_image.url }}" aria-label="الصورة الرئيسية"><img src="{{ product.main_image.url }}" alt="{{ product.name }}"></button>
+        {% endif %}
+        {% for image in product.gallery.all %}
+        <button type="button" data-product-image="{{ image.image.url }}" aria-label="صورة {{ forloop.counter }}"><img src="{{ image.image.url }}" alt="{{ product.name }}" loading="lazy"></button>
+        {% endfor %}
+    </div>
+    {% if product.show_price %}
+    <p class="fw-bold" data-product-price></p>
+    {% endif %}
+    <p>الكمية المتوفرة: {{ product.real_stock_calc }}</p>
+    {% if product.category %}<p>الفئة: {{ product.category.name }}</p>{% endif %}
+    {% if product.category2 %}<p>الفئة الفرعية: {{ product.category2.name }}</p>{% endif %}
+    {{ product.description|linebreaks }}
+    {% for detail in product.details.all %}<p><strong>{{ detail.title }}:</strong> {{ detail.value }}</p>{% endfor %}
+    {% if product.show_price %}
+    <form data-product-editor data-product-id="{{ product.id }}">
+        <label class="form-label">الكمية
+            <input type="number" name="quantity" min="1" step="1" value="1" inputmode="numeric" class="form-control" required>
+        </label>
+        <label class="form-label d-block">ملاحظة (لون، قياس..)
+            <textarea name="item_note" maxlength="2000" rows="2" class="form-control" placeholder="اكتب تفاصيل المنتج هنا..."></textarea>
+        </label>
+        <button type="submit" class="btn btn-primary w-100">إضافة إلى السلة</button>
+    </form>
+    {% else %}<p>الشراء من المركز مباشرة</p>{% endif %}
+</template>
