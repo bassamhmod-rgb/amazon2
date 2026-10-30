@@ -1616,6 +1616,11 @@ def _apply_stock_movement_change(store, payload, server_id=None, product_resolve
     obj = StockMovement.objects.filter(id=server_id, store=store).first() if server_id else None
     reference_type = _to_str(payload.get("reference_type")).strip()
     reference_id = _to_str(payload.get("reference_id")).strip()
+    if reference_type == "stock_disposal":
+        if movement_type != "disposal" or quantity_change >= 0 or unit_cost < 0:
+            raise ValueError("Invalid stock disposal quantity or cost")
+        if not warehouse or not reference_id:
+            raise ValueError("Stock disposal requires a warehouse and stable reference")
     if not obj and reference_type and reference_id:
         obj = StockMovement.objects.filter(
             store=store,
@@ -1639,6 +1644,13 @@ def _apply_stock_movement_change(store, payload, server_id=None, product_resolve
         "mobile_update_time": now_minute,
     }
     if obj:
+        if obj.reference_type == "stock_disposal":
+            # Retries may acknowledge the same immutable line; never change it.
+            for key in ("product", "warehouse", "movement_type", "quantity_change",
+                        "unit_cost", "reference_type", "reference_id", "notes"):
+                if getattr(obj, key) != fields[key]:
+                    raise ValueError("Saved stock disposal cannot be edited")
+            return obj, "updated"
         StockMovement.objects.filter(id=obj.id, store=store).update(**fields)
         obj.refresh_from_db()
         return obj, "updated"
@@ -3554,14 +3566,16 @@ def sync_push(request):
                 elif entity == "stock_movement":
                     obj = StockMovement.objects.filter(id=server_id, store_id=merchant_id).first()
                     if obj:
-                        obj._skip_mobile_delete_sync = True
+                        # Disposal deletions must also reach other devices so
+                        # their local expiry allocations are restored.
+                        obj._skip_mobile_delete_sync = obj.reference_type != "stock_disposal"
                         obj.delete()
-                        applied.append({
-                            "entity": "stock_movement",
-                            "action": "deleted",
-                            "local_id": local_id,
-                            "server_id": server_id,
-                        })
+                    applied.append({
+                        "entity": "stock_movement",
+                        "action": "deleted",
+                        "local_id": local_id,
+                        "server_id": server_id,
+                    })
                 elif entity == "expense":
                     obj = Expense.objects.filter(id=server_id, store_id=merchant_id).first()
                     if obj:

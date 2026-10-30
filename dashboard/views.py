@@ -3678,7 +3678,17 @@ def profits_report(request, store_slug):
         Value(0, output_field=DecimalField(max_digits=14, decimal_places=2))
     ))["total"]
 
-    actual_profit = general_profit - work_expenses - salaries_total - inventory_adjustments_total
+    disposals = StockMovement.objects.filter(store=store, reference_type="stock_disposal")
+    if date_from:
+        disposals = disposals.filter(occurred_at__date__gte=date_from)
+    if date_to:
+        disposals = disposals.filter(occurred_at__date__lte=date_to)
+    disposal_loss = disposals.aggregate(total=Coalesce(
+        Sum(ExpressionWrapper(-F("quantity_change") * F("unit_cost"),
+                              output_field=DecimalField(max_digits=18, decimal_places=2))),
+        Value(0, output_field=DecimalField(max_digits=18, decimal_places=2)),
+    ))["total"]
+    actual_profit = general_profit - work_expenses - salaries_total - inventory_adjustments_total - disposal_loss
     net_profit = actual_profit - general_expenses
 
     return render(request, "dashboard/profits_report.html", {
@@ -3694,6 +3704,7 @@ def profits_report(request, store_slug):
         "actual_profit": actual_profit,
         "general_expenses": general_expenses,
         "inventory_adjustments_total": inventory_adjustments_total,
+        "disposal_loss": disposal_loss,
         "net_profit": net_profit,
     })
 #اضافة 

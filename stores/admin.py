@@ -113,3 +113,9 @@ class StockMovementAdmin(admin.ModelAdmin):
     list_filter = ("store", "movement_type", "warehouse")
     search_fields = ("product__name", "reference_type", "reference_id", "notes")
 
+    def has_change_permission(self, request, obj=None):
+        if obj and obj.reference_type == "stock_disposal":
+            return False
+        return super().has_change_permission(request, obj)
+
+

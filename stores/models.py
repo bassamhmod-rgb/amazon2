@@ -486,6 +486,7 @@ class StockMovement(models.Model):
         ("production_consumption", "Production consumption"),
         ("production_output", "Production output"),
         ("manual", "Manual"),
+        ("disposal", "إتلاف"),
     ]
 
     store = models.ForeignKey(Store, on_delete=models.CASCADE, related_name="stock_movements")
@@ -518,6 +519,11 @@ class StockMovement(models.Model):
 
     class Meta:
         ordering = ["-occurred_at", "-id"]
+        constraints = [models.UniqueConstraint(
+            fields=["store", "reference_type", "reference_id"],
+            condition=Q(reference_type="stock_disposal"),
+            name="unique_stock_disposal_line",
+        )]
         indexes = [
             models.Index(fields=["store", "product", "warehouse"]),
             models.Index(fields=["reference_type", "reference_id"]),
