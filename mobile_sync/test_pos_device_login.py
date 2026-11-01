@@ -4,7 +4,7 @@ from rest_framework.test import APIRequestFactory
 
 from accounts.models import StoreUser
 from stores.models import Store
-from .views import store_user_login, store_users_pull
+from .views import store_user_login, store_users_pull, check_pos_device
 
 
 class PosDeviceLoginTests(TestCase):
@@ -59,3 +59,30 @@ class PosDeviceLoginTests(TestCase):
         response = store_users_pull(self.factory.get("/", {"merchant_id": self.store.id}))
         row = next(u for u in response.data["items"] if u["id"] == self.seller.id)
         self.assertEqual(row["sync_device_id"], "device-a")
+
+    def check_device(self, device="device-a"):
+        return check_pos_device(self.factory.post("/", {
+            "merchant_id": self.store.id, "store_user_id": self.seller.id,
+            "device_id": device,
+        }, format="json"))
+
+    def test_monthly_check_never_claims_an_unbound_account(self):
+        self.assertFalse(self.check_device().data["valid"])
+        self.seller.refresh_from_db()
+        self.assertEqual(self.seller.sync_device_id, "")
+
+    def test_monthly_check_rejects_moved_device_and_recovers_when_restored(self):
+        self.assertEqual(self.login().status_code, 200)
+        self.assertTrue(self.check_device().data["valid"])
+        StoreUser.objects.filter(pk=self.seller.pk).update(sync_device_id="device-b")
+        self.assertFalse(self.check_device().data["valid"])
+        StoreUser.objects.filter(pk=self.seller.pk).update(sync_device_id="device-a")
+        self.assertTrue(self.check_device().data["valid"])
+
+    def test_monthly_check_rejects_disabled_user_or_store(self):
+        self.assertEqual(self.login().status_code, 200)
+        StoreUser.objects.filter(pk=self.seller.pk).update(is_active=False)
+        self.assertFalse(self.check_device().data["valid"])
+        StoreUser.objects.filter(pk=self.seller.pk).update(is_active=True)
+        Store.objects.filter(pk=self.store.pk).update(is_active=False)
+        self.assertFalse(self.check_device().data["valid"])

@@ -2880,6 +2880,8 @@ def store_user_login(request):
 
     device_id = _to_str(payload.get("device_id")).strip()
     if device_id:
+        if not store.is_active:
+            return Response({"detail": "Store is inactive"}, status=status.HTTP_403_FORBIDDEN)
         if len(device_id) > 128:
             return Response({"detail": "Invalid device ID"}, status=status.HTTP_400_BAD_REQUEST)
         user, error = _claim_store_user_device(user, device_id)
@@ -2906,6 +2908,26 @@ def store_user_login(request):
             },
         }
     )
+
+
+@api_view(["POST"])
+@permission_classes([AllowAny])
+def check_pos_device(request):
+    payload = request.data if isinstance(request.data, dict) else {}
+    merchant_id = _to_int(payload.get("merchant_id"))
+    user_id = _to_int(payload.get("store_user_id"))
+    device_id = _to_str(payload.get("device_id")).strip()
+    if not merchant_id or not user_id or not device_id:
+        return Response({"detail": "Store, user and device are required"},
+                        status=status.HTTP_400_BAD_REQUEST)
+    user = StoreUser.objects.select_related("store").filter(
+        pk=user_id, store_id=merchant_id).first()
+    # Verification never registers a new device or changes an existing binding.
+    valid = bool(user and user.is_active and user.store.is_active and
+                 not user.is_owner and
+                 _to_str(user.sync_device_id).strip() == device_id)
+    return Response({"valid": valid, "store_id": merchant_id, "user_id": user_id,
+                     "detail": "" if valid else "حساب نقطة البيع معطّل أو لم يعد مرتبطاً بهذا الجهاز."})
 
 
 @api_view(["POST"])
