@@ -59,3 +59,21 @@ class StockDisposalSyncTests(TestCase):
         self.assertFalse(StockMovement.objects.filter(id=server_id).exists())
         self.assertEqual(MobileDeleteSync.objects.filter(merchant_id=self.store.id,
             store_record_id=server_id, access_table_name="stock_movements").count(), 1)
+
+    def test_voucher_edit_replaces_movements_and_is_retry_safe(self):
+        old, _ = _apply_stock_movement_change(self.store, self.payload)
+        replacement = dict(self.payload, reference_id="new-revision:0", quantity_change=-2, unit_cost=1.7)
+        for _ in range(2):
+            request = APIRequestFactory().post("/", {"merchant_id": self.store.id,
+                "changes": [
+                    {"entity": "stock_movement", "action": "upsert", "local_id": 21, "payload": replacement},
+                    {"entity": "stock_movement", "action": "delete", "local_id": 20, "server_id": old.id},
+                ]}, format="json")
+            with patch("mobile_sync.views._ensure_store_user_sync_device", return_value=(None, None)):
+                response = sync_push(request)
+            self.assertEqual(response.status_code, 200, response.data)
+            self.assertFalse(response.data.get("errors"), response.data)
+        row = StockMovement.objects.get(store=self.store)
+        self.assertEqual(-row.quantity_change * row.unit_cost, Decimal("3.40"))
+        self.assertEqual(MobileDeleteSync.objects.filter(merchant_id=self.store.id,
+            store_record_id=old.id, access_table_name="stock_movements").count(), 1)

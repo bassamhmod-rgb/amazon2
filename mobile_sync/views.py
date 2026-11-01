@@ -213,6 +213,43 @@ def _request_value(request, key):
     return data.get(key)
 
 
+def _claim_store_user_device(store_user, device_id, *, allow_new=True):
+    # Lock the store as well as the user so two different accounts cannot
+    # concurrently claim the same device. Owners never change POS bindings.
+    with transaction.atomic():
+        store = Store.objects.select_for_update().get(pk=store_user.store_id)
+        user = StoreUser.objects.select_for_update().get(pk=store_user.pk)
+        if not user.is_active:
+            return None, Response(
+                {"detail": "User is inactive"}, status=status.HTTP_409_CONFLICT,
+            )
+        if user.is_owner:
+            return user, None
+        registered = _to_str(user.sync_device_id).strip()
+        if not registered and not allow_new:
+            return None, Response(
+                {"detail": "يلزم تسجيل الدخول عبر الإنترنت لربط الجهاز أولاً."},
+                status=status.HTTP_409_CONFLICT,
+            )
+        if registered and registered != device_id:
+            return None, Response(
+                {"detail": "هذا المستخدم مرتبط بجهاز آخر."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        occupied = StoreUser.objects.filter(
+            store=store, sync_device_id=device_id,
+        ).exclude(pk=user.pk).exclude(auth_user_id=store.owner_id).exists()
+        if occupied:
+            return None, Response(
+                {"detail": "هذا الجهاز مرتبط بمستخدم نقطة بيع آخر. يلزم فك الربط بواسطة المدير."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        if registered != device_id:
+            StoreUser.objects.filter(pk=user.pk).update(sync_device_id=device_id)
+            user.sync_device_id = device_id
+        return user, None
+
+
 def _ensure_store_user_sync_device(request, merchant_id):
     device_id = _to_str(_request_value(request, "device_id")).strip()
     store_user_id = _to_int(_request_value(request, "store_user_id"))
@@ -243,18 +280,7 @@ def _ensure_store_user_sync_device(request, merchant_id):
     if not store_user.is_active:
         return None, Response({"detail": "Store user is inactive"}, status=status.HTTP_409_CONFLICT)
 
-    registered_device_id = _to_str(store_user.sync_device_id).strip()
-    if registered_device_id and registered_device_id != device_id:
-        return None, Response(
-            {"detail": "هذا المستخدم مرتبط بجهاز آخر. لا يمكن استخدام نفس الحساب على أكثر من جهاز."},
-            status=status.HTTP_403_FORBIDDEN,
-        )
-
-    if registered_device_id != device_id:
-        StoreUser.objects.filter(pk=store_user.pk).update(sync_device_id=device_id)
-        store_user.sync_device_id = device_id
-
-    return store_user, None
+    return _claim_store_user_device(store_user, device_id, allow_new=False)
 
 
 def _ensure_mobile_default_records(store):
@@ -2581,6 +2607,7 @@ def store_users_pull(request):
             "has_password": bool(u.password),
             "password": u.password,
             "is_owner": False,
+            "sync_device_id": u.sync_device_id or "",
             "permissions": _normalize_mobile_permissions(u.permissions),
         }
         for u in qs.select_related("warehouse").only(
@@ -2592,6 +2619,7 @@ def store_users_pull(request):
             "is_active",
             "password",
             "permissions",
+            "sync_device_id",
         )
     )
 
@@ -2850,6 +2878,14 @@ def store_user_login(request):
     if not user.check_password(password):
         return Response({"detail": "Invalid credentials"}, status=status.HTTP_401_UNAUTHORIZED)
 
+    device_id = _to_str(payload.get("device_id")).strip()
+    if device_id:
+        if len(device_id) > 128:
+            return Response({"detail": "Invalid device ID"}, status=status.HTTP_400_BAD_REQUEST)
+        user, error = _claim_store_user_device(user, device_id)
+        if error is not None:
+            return error
+
     return Response(
         {
             "status": "ok",
@@ -2865,6 +2901,7 @@ def store_user_login(request):
                 "name": user.name,
                 "is_active": user.is_active,
                 "is_owner": False,
+                "sync_device_id": user.sync_device_id or "",
                 "permissions": _normalize_mobile_permissions(user.permissions),
             },
         }
