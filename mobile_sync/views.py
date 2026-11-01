@@ -2974,6 +2974,10 @@ def store_web_login(request):
             status=status.HTTP_403_FORBIDDEN,
         )
 
+    # Only known destinations are signed; never accept arbitrary redirect URLs.
+    if payload.get("destination") == "users":
+        ticket_payload["destination"] = "users"
+
     signer = TimestampSigner(salt=STORE_WEB_LOGIN_SIGNER_SALT)
     ticket = signer.sign(json.dumps(ticket_payload, separators=(",", ":")))
     open_path = reverse("mobile_sync:store_web_login_open")
@@ -3013,7 +3017,7 @@ def store_web_login_open(request):
         return Response({"detail": "Store not found"}, status=status.HTTP_404_NOT_FOUND)
 
     next_url = reverse("stores:store_front", kwargs={"slug": store.slug})
-    if not store.is_active:
+    if not store.is_active or payload.get("destination") == "users":
         next_url = reverse("dashboard:store_users_list", kwargs={"store_slug": store.slug})
 
     if kind == "owner":
