@@ -14,7 +14,7 @@
     {% if product.show_price %}
     <p class="fw-bold" data-product-price></p>
     {% endif %}
-    <p>الكمية المتوفرة: {{ product.real_stock_calc }}</p>
+    <p>الكمية المتوفرة: {{ product.real_stock_calc|floatformat:"-4" }}</p>
     {% if product.category %}<p>الفئة: {{ product.category.name }}</p>{% endif %}
     {% if product.category2 %}<p>الفئة الفرعية: {{ product.category2.name }}</p>{% endif %}
     {{ product.description|linebreaks }}

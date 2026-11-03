@@ -189,7 +189,7 @@
     </div>
 {% endif %}
 
-                <p><strong>الكمية المتوفرة:</strong> {{ product.real_stock_calc }}</p>
+                <p><strong>الكمية المتوفرة:</strong> {{ product.real_stock_calc|floatformat:"-4" }}</p>
                 <p><strong>الفئة:</strong>
                     {% if product.category %}
                         {{ product.category.name }}
