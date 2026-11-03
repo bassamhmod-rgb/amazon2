@@ -3534,6 +3534,8 @@ def sync_push(request):
                 elif entity == "product":
                     obj = Product.objects.filter(id=server_id, store_id=merchant_id).first()
                     if obj:
+                        from products.deletion import protect_product_movements
+                        protect_product_movements(Product, obj, obj._state.db)
                         for barcode in ProductBarcode.objects.filter(product_id=obj.id):
                             barcode._skip_mobile_delete_sync = True
                             barcode.delete()

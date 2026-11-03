@@ -1157,11 +1157,11 @@ def product_delete(request, store_slug, product_id):
         try:
             with transaction.atomic():
                 product_qs.delete()
-        except ProtectedError:
+        except ProtectedError as error:
+            from products.deletion import product_deletion_message
             messages.error(
                 request,
-                "لا يمكن حذف هذه المادة لوجود حركات مخزون أو سجلات مرتبطة بها. "
-                "يمكنك إلغاء تفعيلها من تعديل المادة مع الاحتفاظ بسجل حركاتها."
+                product_deletion_message(error)
             )
         else:
             messages.success(
