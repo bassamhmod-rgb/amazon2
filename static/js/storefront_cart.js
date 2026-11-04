@@ -142,8 +142,9 @@
         document.getElementById('local-cart-close').addEventListener('click', () => dialog.close());
         dialog.addEventListener('click', event => { if (event.target === dialog) dialog.close(); });
         document.getElementById('local-cart-clear').addEventListener('click', () => {
-            items = []; save(); render();
+            items = []; save();
             if (storageOK) dialog.close();
+            render();
         });
     }
     document.querySelectorAll('.add-to-cart-form').forEach(form => form.addEventListener('submit', event => {
