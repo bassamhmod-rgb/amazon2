@@ -1,4 +1,4 @@
-{% load static %}
+{% load static display_numbers %}
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
@@ -180,23 +180,23 @@
             </div>
 
             <div class="col-md-6 bg-light p-3 rounded">
-                <p><strong>مجموع العناصر:</strong> {{ order.input_total }} {{ order.input_currency_label }}</p>
+                <p><strong>مجموع العناصر:</strong> <bdi dir="ltr">{{ order.input_total|display_number }}</bdi> {{ order.input_currency_label }}</p>
                 <p><strong>الحسم:</strong>
-                    <span class="text-danger">{{ order.input_discount }} {{ order.input_currency_label }}</span>
+                    <span class="text-danger"><bdi dir="ltr">{{ order.input_discount|display_number }}</bdi> {{ order.input_currency_label }}</span>
                 </p>
 
                 <p class="fs-5 fw-bold">
-                    <strong>الصافي للدفع:</strong> {{ order.input_net }} {{ order.input_currency_label }}
+                    <strong>الصافي للدفع:</strong> <bdi dir="ltr">{{ order.input_net|display_number }}</bdi> {{ order.input_currency_label }}
                 </p>
 
                 <hr>
 
-                <p><strong>المدفوع:</strong> {{ order.input_payment }} {{ order.input_currency_label }}</p>
+                <p><strong>المدفوع:</strong> <bdi dir="ltr">{{ order.input_payment|display_number }}</bdi> {{ order.input_currency_label }}</p>
 
                 <p>
                     <strong>المتبقي:</strong>
                     <span class="{% if order.remaining > 0 %}text-danger{% else %}text-success{% endif %}">
-                        {{ order.input_remaining }} {{ order.input_currency_label }}
+                        <bdi dir="ltr">{{ order.input_remaining|display_number }}</bdi> {{ order.input_currency_label }}
                     </span>
                 </p>
             </div>
@@ -228,9 +228,9 @@
                     {% for item in order.items.all %}
                     <tr>
                         <td>{{ item.product.name }}</td>
-                        <td>{{ item.input_quantity }}</td>
-                        <td>{{ item.input_price }} {{ order.input_currency_label }}</td>
-                        <td class="fw-bold">{{ item.input_subtotal }} {{ order.input_currency_label }}</td>
+                        <td><bdi dir="ltr">{{ item.input_quantity|display_number }}</bdi></td>
+                        <td><bdi dir="ltr">{{ item.input_price|display_number }}</bdi> {{ order.input_currency_label }}</td>
+                        <td class="fw-bold"><bdi dir="ltr">{{ item.input_subtotal|display_number }}</bdi> {{ order.input_currency_label }}</td>
                     </tr>
                     {% endfor %}
                 </tbody>

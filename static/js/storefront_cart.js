@@ -141,7 +141,10 @@
     if (dialog) {
         document.getElementById('local-cart-close').addEventListener('click', () => dialog.close());
         dialog.addEventListener('click', event => { if (event.target === dialog) dialog.close(); });
-        document.getElementById('local-cart-clear').addEventListener('click', () => { items = []; save(); render(); });
+        document.getElementById('local-cart-clear').addEventListener('click', () => {
+            items = []; save(); render();
+            if (storageOK) dialog.close();
+        });
     }
     document.querySelectorAll('.add-to-cart-form').forEach(form => form.addEventListener('submit', event => {
         event.preventDefault(); change(form.closest('[data-product-id]').dataset.productId, 1);

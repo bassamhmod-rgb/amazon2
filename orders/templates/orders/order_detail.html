@@ -1,4 +1,4 @@
-{% load static %}
+{% load static display_numbers %}
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
@@ -188,7 +188,7 @@
                         {% for item in items %}
                         <tr>
                             <td>{{ item.product.name }}</td>
-                            <td>{{ item.quantity }}</td>
+                            <td><bdi dir="ltr">{{ item.quantity|display_number }}</bdi></td>
                             <td>
                                 {% if store.pricing_currency == "USD" %}
                                     {{ item.price|floatformat:2 }} $
