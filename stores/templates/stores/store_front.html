@@ -575,9 +575,9 @@ button.btn-primary {
 {% endif %}
                     </div>
                     {% if p.show_price %}
-                    <form class="add-to-cart-form">
+                    <form class="add-to-cart-form" onsubmit="return false;">
                         <div class="local-product-quantity"></div>
-                        <button type="submit" class="btn btn-primary product-add-btn">إضافة</button>
+                        <button type="submit" class="btn btn-primary product-add-btn" disabled>إضافة</button>
                     </form>
                     {% else %}
                     <p class="text-muted">الشراء من المركز مباشرة</p>

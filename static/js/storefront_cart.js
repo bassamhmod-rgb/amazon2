@@ -267,4 +267,9 @@
     });
     render();
     if (storageOK) save();
+    // Enable add buttons only after all cart initialization has succeeded.
+    // The form also blocks native submission if this script fails to load.
+    document.querySelectorAll('.add-to-cart-form button[type=submit]').forEach(button => {
+        button.disabled = false;
+    });
 })();
