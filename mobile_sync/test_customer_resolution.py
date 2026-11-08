@@ -142,6 +142,18 @@ class CustomerResolutionTests(TestCase):
         self.first.refresh_from_db()
         self.assertEqual(self.first.name, "Local buyer")
 
+    def test_general_customer_always_reuses_reserved_identity_without_suffix(self):
+        general = Customer.objects.create(store=self.store, name="زبون عام", phone="")
+        for index in range(2):
+            obj, _ = _apply_customer_change(self.store, {"name": "زبون عام", "phone": "",
+                "sync_origin": "general-device-%s" % index, "independent_customer": True,
+                "resolve_name_conflict": True})
+            self.assertEqual(obj.pk, general.pk)
+        self.assertEqual(Customer.objects.filter(store=self.store, name="زبون عام").count(), 1)
+        self.assertFalse(Customer.objects.filter(store=self.store, name__startswith="زبون عام —").exists())
+        with self.assertRaises(ValueError):
+            _apply_customer_change(self.store, {"name": "Renamed general", "phone": ""}, general.pk)
+
     def test_merge_preserves_both_notes_and_audits_original_cards(self):
         self.first.note = "First note"; self.first.save()
         self.second.note = "Second note"; self.second.save()

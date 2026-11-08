@@ -1101,7 +1101,16 @@ def _apply_customer_change(store, payload, server_id=None):
     if obj and access_id not in (None, 0) and Customer.objects.filter(
             store=store, access_id=access_id).exclude(pk=obj.pk).exists():
         raise ValueError(f"تعارض معرّف العملاء {access_id}: مرتبط بعميل آخر. يجب تصحيح المعرّف قبل المزامنة.")
-    if resolve_name and not _to_bool(payload.get("interactive_conflicts")):
+    if name == GENERAL_CUSTOMER_NAME:
+        general = Customer.objects.filter(store=store, name=GENERAL_CUSTOMER_NAME).first()
+        if general:
+            if obj and obj.pk != general.pk:
+                raise ValueError("لا يمكن تحويل عميل آخر إلى بطاقة الزبون العام.")
+            obj = general
+        phone = ""
+    elif obj and obj.name == GENERAL_CUSTOMER_NAME:
+        raise ValueError("لا يمكن تغيير اسم بطاقة الزبون العام.")
+    if resolve_name and name != GENERAL_CUSTOMER_NAME and not _to_bool(payload.get("interactive_conflicts")):
         identifier = obj.pk if obj else f"app-{origin[:12]}-{payload.get('source_local_id', '')}"
         name = _unique_customer_sync_name(store, name, phone, identifier, obj.pk if obj else None)
     if Customer.objects.filter(store=store, name=name).exclude(pk=obj.pk if obj else None).exists():
