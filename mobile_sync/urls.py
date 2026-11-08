@@ -24,6 +24,7 @@ urlpatterns = [
     path("license/check/", views.check_permanent_license, name="check_permanent_license"),
     path("categories/", views.categories_pull, name="categories_pull"),
     path("customers/", views.customers_pull, name="customers_pull"),
+    path("customers/resolve/", views.customers_resolve, name="customers_resolve"),
     path("suppliers/", views.suppliers_pull, name="suppliers_pull"),
     path("expense-types/", views.expense_types_pull, name="expense_types_pull"),
     path("expense-reasons/", views.expense_reasons_pull, name="expense_reasons_pull"),

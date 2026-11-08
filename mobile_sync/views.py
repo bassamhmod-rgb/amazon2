@@ -1,4 +1,5 @@
 from .input_money import validate_input_data
+from .customer_resolution import CustomerIdentityCollision
 import hashlib
 import base64
 import time
@@ -23,7 +24,7 @@ from rest_framework.response import Response
 from rest_framework import status
 
 from mobile_sync.models import MobileDeleteSync, CustomerSyncOrigin
-from accounts.models import Customer, Supplier, normalize_phone_number, PointsTransaction
+from accounts.models import Customer, Supplier, normalize_phone_number, PointsTransaction, customers_with_phone
 from accounts.models import StoreUser
 from products.models import Category
 from products.models import Product
@@ -49,7 +50,7 @@ from stores.models import (
     WarehouseTransferItem,
 )
 from django.db import IntegrityError, transaction
-from django.db.models import Prefetch, Q
+from django.db.models import Prefetch, Q, Count
 
 
 STORE_WEB_LOGIN_SIGNER_SALT = "mobile_sync.store_web_login"
@@ -360,6 +361,7 @@ def _serialize_barcode(barcode):
 
 
 def _serialize_customer(customer):
+    from .customer_resolution import snapshot_token
     return {
         "id": customer.id,
         "name": customer.name,
@@ -373,6 +375,9 @@ def _serialize_customer(customer):
         "is_subscription_active": customer.is_subscription_active,
         "access_id": customer.access_id,
         "update_time": _mobile_time(customer),
+        "conflict_token": snapshot_token(customer),
+        "order_count": getattr(customer, "conflict_order_count", None)
+        if hasattr(customer, "conflict_order_count") else customer.orders.count(),
     }
 
 
@@ -1050,6 +1055,11 @@ def _unique_customer_sync_name(store, name, phone, identifier, exclude_id=None):
 
 @transaction.atomic
 def _apply_customer_change(store, payload, server_id=None):
+    from .customer_resolution import resolve_customer_id
+    if server_id:
+        canonical_id = resolve_customer_id(store.pk, server_id)
+        if canonical_id != server_id:
+            raise CustomerIdentityCollision("تم توحيد هذا العميل. استقبل ربط الحساب المعتمد قبل رفع التعديلات.")
     name = _to_str(payload.get("name")).strip()
     phone = normalize_phone_number(_to_str(payload.get("phone")).strip())
     address = _to_str(payload.get("address")).strip()
@@ -1091,13 +1101,13 @@ def _apply_customer_change(store, payload, server_id=None):
     if obj and access_id not in (None, 0) and Customer.objects.filter(
             store=store, access_id=access_id).exclude(pk=obj.pk).exists():
         raise ValueError(f"تعارض معرّف العملاء {access_id}: مرتبط بعميل آخر. يجب تصحيح المعرّف قبل المزامنة.")
-    if resolve_name:
+    if resolve_name and not _to_bool(payload.get("interactive_conflicts")):
         identifier = obj.pk if obj else f"app-{origin[:12]}-{payload.get('source_local_id', '')}"
         name = _unique_customer_sync_name(store, name, phone, identifier, obj.pk if obj else None)
     if Customer.objects.filter(store=store, name=name).exclude(pk=obj.pk if obj else None).exists():
-        raise ValueError("اسم العميل مرتبط بمعرف آخر. يرجى تصحيح التعارض قبل المزامنة.")
-    if phone and Customer.objects.filter(store=store, phone=phone).exclude(pk=obj.pk if obj else None).exists():
-        raise ValueError("رقم الموبايل مسجل لعميل آخر. يرجى تصحيح الرقم قبل المزامنة.")
+        raise CustomerIdentityCollision("اسم العميل مرتبط بمعرف آخر. يرجى تصحيح التعارض قبل المزامنة.")
+    if customers_with_phone(Customer.objects.filter(store=store).exclude(pk=obj.pk if obj else None), phone).exists():
+        raise CustomerIdentityCollision("رقم الموبايل مسجل لعميل آخر. يرجى تصحيح الرقم قبل المزامنة.")
 
     update_fields = {
         "name": name,
@@ -1881,7 +1891,7 @@ def customers_pull(request):
         return device_error
     _ensure_mobile_default_records(store)
 
-    qs = Customer.objects.filter(store_id=merchant_id_int).order_by("id")
+    qs = Customer.objects.filter(store_id=merchant_id_int).annotate(conflict_order_count=Count("orders")).order_by("id")
     if since not in (None, "", "0"):
         try:
             since_int = int(since)
@@ -1889,29 +1899,16 @@ def customers_pull(request):
             return Response({"detail": "since must be an integer"}, status=status.HTTP_400_BAD_REQUEST)
         qs = qs.filter(_mobile_since_q(since_int))
 
-    data = [
-        _serialize_customer(customer)
-        for customer in qs.only(
-            "id",
-            "name",
-            "phone",
-            "address",
-            "note",
-            "private_note",
-            "balance",
-            "opening_balance",
-            "preferred_price_level",
-            "is_subscription_active",
-            "access_id",
-            "update_time",
-            "mobile_update_time",
-        )
-    ]
+    data = [_serialize_customer(customer) for customer in qs]
+    from .models import CustomerSyncAlias
 
     return Response(
         {
             "merchant_id": merchant_id_int,
             "items": data,
+            "customer_resolution_version": 1,
+            "aliases": list(CustomerSyncAlias.objects.filter(merchant_id=merchant_id_int)
+                            .values("source_id", "customer_id")),
             "max_update_time": max((x["update_time"] for x in data), default=0),
         }
     )
@@ -3050,6 +3047,32 @@ def store_web_login_open(request):
 
 @api_view(["POST"])
 @permission_classes([AllowAny])
+def customers_resolve(request):
+    from .customer_resolution import resolve_customers
+    payload = request.data
+    if not isinstance(payload, dict):
+        return Response({"detail": "Invalid payload"}, status=400)
+    merchant_id = _to_int(payload.get("merchant_id"))
+    store = Store.objects.filter(pk=merchant_id).first()
+    if not store:
+        return Response({"detail": "Store not found"}, status=404)
+    actor, error = _ensure_store_user_sync_device(request, merchant_id)
+    if error:
+        return error
+    permissions = ["customers.edit", "customers.balances"]
+    if payload.get("keep_index") is not None:
+        permissions.append("customers.delete")
+    if not all(_can_product_enrichment(actor, permission) for permission in permissions):
+        return Response({"detail": "تحتاج صلاحية تعديل العملاء والأرصدة، والحذف عند التوحيد."}, status=403)
+    try:
+        return Response(resolve_customers(store, payload, _serialize_customer))
+    except (ValueError, IntegrityError) as exc:
+        detail = str(exc) if isinstance(exc, ValueError) else "تغيرت بيانات العملاء أو بقي تعارض. أعد المزامنة."
+        return Response({"detail": detail}, status=409)
+
+
+@api_view(["POST"])
+@permission_classes([AllowAny])
 def sync_push(request):
     if request.method != "POST":
         return Response({"detail": "POST only"}, status=status.HTTP_405_METHOD_NOT_ALLOWED)
@@ -3249,7 +3272,8 @@ def sync_push(request):
                             obj, action = _apply_customer_change(
                                 store, payload_item, server_id=_to_int(server_id))
                     except (ValueError, IntegrityError) as exc:
-                        errors.append({"entity": "customer", "local_id": local_id, "detail": str(exc)})
+                        errors.append({"entity": "customer", "local_id": local_id, "detail": str(exc),
+                                       "code": "customer_conflict" if isinstance(exc, CustomerIdentityCollision) else "customer_error"})
                         continue
                     if local_id not in (None, ""):
                         customer_local_to_server[int(local_id)] = obj
@@ -3822,8 +3846,11 @@ def orders_push(request):
     errors = []
 
     def resolve_customer(order_payload):
+        from .customer_resolution import resolve_customer_id
         server_id = _to_int(order_payload.get("customer_server_id"))
-        customer_phone = _to_str(order_payload.get("customer_phone")).strip()
+        if server_id is not None:
+            server_id = resolve_customer_id(store.pk, server_id)
+        customer_phone = normalize_phone_number(order_payload.get("customer_phone"))
         customer_name = _to_str(order_payload.get("customer_name")).strip()
 
         if server_id is not None:
@@ -3832,7 +3859,10 @@ def orders_push(request):
                 return customer
 
         if customer_phone:
-            customer = Customer.objects.filter(store=store, phone=customer_phone).first()
+            matches = list(customers_with_phone(Customer.objects.filter(store=store), customer_phone)[:2])
+            if len(matches) > 1:
+                raise ValueError("رقم الموبايل مرتبط بأكثر من عميل. يجب حل تعارض العملاء قبل مزامنة الطلب.")
+            customer = matches[0] if matches else None
             if customer:
                 return customer
 

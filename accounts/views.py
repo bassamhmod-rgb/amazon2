@@ -4,7 +4,7 @@ from django.db import models, IntegrityError, transaction
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth import authenticate, login
 from stores.models import Store
-from accounts.models import Customer, normalize_phone_number
+from accounts.models import Customer, normalize_phone_number, customers_with_phone
 from accounts.models import PointsTransaction
 from django.db.models import Sum
 from django.urls import reverse
@@ -29,8 +29,7 @@ def customer_register(request, store_slug):
             return redirect("accounts:customer_register", store_slug=store.slug)
 
         # 🔥 منع تكرار رقم الهاتف فقط عند نفس المتجر
-        phone_candidates = [p for p in dict.fromkeys([phone_raw, phone, f"0{phone}" if phone else ""]) if p]
-        exists = Customer.objects.filter(store=store, phone__in=phone_candidates).exists()
+        exists = customers_with_phone(Customer.objects.filter(store=store), phone).exists()
 
         if exists:
             messages.error(request, "⚠️ رقم الهاتف مسجّل مسبقاً عند هذا المتجر.")
@@ -65,8 +64,13 @@ def _customer_phone_login(request, store_slug, next_page):
         elif not phone or phone == "0":
             message = "\u064a\u0631\u062c\u0649 \u0625\u062f\u062e\u0627\u0644 \u0631\u0642\u0645 \u0627\u0644\u0645\u0648\u0628\u0627\u064a\u0644."
         else:
-            candidates = list(dict.fromkeys([phone_raw, phone, f"0{phone}"]))
-            customer = Customer.objects.filter(store=store, phone__in=candidates).first()
+            matches = list(customers_with_phone(Customer.objects.filter(store=store), phone)[:2])
+            if len(matches) > 1:
+                return render(request, "accounts/customer_login.html", {
+                    "next": next_page, "store": store, "phone": phone_raw,
+                    "message": "رقم الموبايل مرتبط بأكثر من حساب. يرجى مراجعة المتجر لتوحيد الحسابات.",
+                })
+            customer = matches[0] if matches else None
             expected = {"store_id": store.pk, "phone": phone, "next": next_page,
                         "customer_id": customer.pk if customer else None,
                         "name": customer.name if customer else ""}
@@ -218,10 +222,21 @@ def customer_logout(request):
     return redirect(next_page)
 
 def quick_register(request, store_slug):
-    if request.method != "POST":
-        return redirect("accounts:customer_login", store_slug=store_slug)
-
     store = get_object_or_404(Store, slug=store_slug)
+    if request.method != "POST":
+        notice = request.session.get("customer_added_notice")
+        if (request.method == "GET" and isinstance(notice, dict) and
+                notice.get("store_id") == store.pk and
+                notice.get("customer_id") == request.session.get("customer_id")):
+            if request.GET.get("continue") == "1":
+                request.session.pop("customer_added_notice", None)
+                request.session.pop("temp_phone", None)
+                request.session.pop("next_after_register", None)
+                return redirect(notice["next_page"])
+            return render(request, "accounts/customer_confirm_new.html", {
+                "store": store, "customer_added": True, "name": notice["name"],
+            })
+        return redirect("accounts:customer_login", store_slug=store_slug)
 
     phone = normalize_phone_number(request.session.get("temp_phone"))
     next_page = request.session.get("next_after_register") or f"/orders/{store_slug}/checkout/"
@@ -229,8 +244,14 @@ def quick_register(request, store_slug):
     if not phone:
         return redirect("accounts:customer_login", store_slug=store_slug)
 
-    candidates = [phone, f"0{phone}"]
-    customer = Customer.objects.filter(store=store, phone__in=candidates).first()
+    matches = list(customers_with_phone(Customer.objects.filter(store=store), phone)[:2])
+    if len(matches) > 1:
+        return render(request, "accounts/customer_confirm_new.html", {
+            "store": store, "phone": phone,
+            "error_message": "رقم الموبايل مرتبط بأكثر من حساب. يرجى مراجعة المتجر لتوحيد الحسابات.",
+        })
+    customer = matches[0] if matches else None
+    created = False
     if not customer:
         name = request.POST.get("name", "").strip()
         error = None
@@ -245,8 +266,10 @@ def quick_register(request, store_slug):
         try:
             with transaction.atomic():
                 customer = Customer.objects.create(store=store, phone=phone, name=name)
+                created = True
         except IntegrityError:
-            customer = Customer.objects.filter(store=store, phone__in=candidates).first()
+            matches = list(customers_with_phone(Customer.objects.filter(store=store), phone)[:2])
+            customer = matches[0] if len(matches) == 1 else None
             if not customer:
                 return render(request, "accounts/customer_confirm_new.html", {
                     "store": store, "phone": phone, "name": name,
@@ -257,6 +280,12 @@ def quick_register(request, store_slug):
         customer.save(update_fields=["phone"])
 
     request.session["customer_id"] = customer.id
+    if created:
+        request.session["customer_added_notice"] = {
+            "store_id": store.pk, "customer_id": customer.pk,
+            "name": customer.name, "next_page": next_page,
+        }
+        return redirect("accounts:quick_register", store_slug=store.slug)
     return redirect(next_page)
 #دخول الزبون الى رصيده
 

@@ -88,6 +88,9 @@ class Store(models.Model):
     allow_full_payment = models.BooleanField(default=True)   # تحويل كامل
     allow_partial_payment = models.BooleanField(default=False)  # دفعة مسبقة + باقي عند التسليم
     allow_cash_on_delivery = models.BooleanField(default=False)  # الدفع عند الاستلام
+    auto_confirm_customer_orders = models.BooleanField(
+        default=False, verbose_name="تأكيد طلبات الزبون بشكل فوري",
+    )
  # ⭐ نسبة الدفع المطلوبة لجميع طرق الدفع
     payment_required_percentage = models.PositiveIntegerField(default=0)
     # للتحكم بابعاد مساحة الصورة

@@ -177,6 +177,14 @@
                         </div>
 
                         <div class="mb-3">
+                            <label class="form-label" for="auto_confirm_customer_orders">تأكيد طلبات الزبون بشكل فوري</label>
+                            <select class="form-select" id="auto_confirm_customer_orders" name="auto_confirm_customer_orders">
+                                <option value="0" {% if not store.auto_confirm_customer_orders %}selected{% endif %}>لا</option>
+                                <option value="1" {% if store.auto_confirm_customer_orders %}selected{% endif %}>نعم</option>
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
                             <label class="form-label">طرق الدفع المسموحة</label>
                             <div class="form-check">
                                 <input class="form-check-input" type="checkbox" name="allow_full_payment" {% if store.allow_full_payment %}checked{% endif %}>

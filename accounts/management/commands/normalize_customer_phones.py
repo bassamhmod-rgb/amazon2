@@ -2,13 +2,14 @@ from collections import defaultdict
 
 from django.core.management.base import BaseCommand
 from django.db import transaction
+import time
 
 from accounts.models import Customer, normalize_phone_number
 
 
 class Command(BaseCommand):
     help = (
-        "Normalize existing customer phone numbers by removing leading zeros. "
+        "Normalize existing customer phone numbers by removing all whitespace and leading zeros. "
         "Runs as dry-run by default."
     )
 
@@ -46,7 +47,7 @@ class Command(BaseCommand):
                 continue
 
             same_target_ids = key_to_ids[(customer.store_id, new_phone)]
-            if len(same_target_ids) > 1:
+            if new_phone and len(same_target_ids) > 1:
                 conflicts.append(
                     {
                         "customer_id": customer.id,
@@ -84,7 +85,8 @@ class Command(BaseCommand):
 
         updated_count = 0
         with transaction.atomic():
-            for customer_id, _old_phone, new_phone in updatable:
-                updated_count += Customer.objects.filter(id=customer_id).update(phone=new_phone)
+            for customer_id, old_phone, new_phone in updatable:
+                updated_count += Customer.objects.filter(id=customer_id, phone=old_phone).update(
+                    phone=new_phone, mobile_update_time=int(time.time() // 60))
 
         self.stdout.write(self.style.SUCCESS(f"Applied updates: {updated_count}"))

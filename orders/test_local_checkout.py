@@ -39,6 +39,41 @@ class LocalCheckoutTests(TestCase):
             "checkout_token": token, "local_cart": json.dumps(rows),
         })
 
+    def test_customer_orders_wait_for_confirmation_by_default(self):
+        self.assertFalse(self.store.auto_confirm_customer_orders)
+        self.confirm()
+        self.assertEqual(Order.objects.get().status, "pending")
+
+    def test_owner_can_enable_and_disable_auto_confirmation_in_store_settings(self):
+        self.client.force_login(self.store.owner)
+        for value, expected in [("1", True), ("0", False)]:
+            response = self.client.post(reverse("dashboard:store_settings", args=[self.store.slug]), {
+                "slug": self.store.slug, "storefront_warehouses": [self.store.warehouses.first().pk],
+                "pricing_currency": "SYP", "display_currency": "SYP",
+                "auto_confirm_customer_orders": value,
+            })
+            self.assertEqual(response.status_code, 302)
+            self.store.refresh_from_db()
+            self.assertEqual(self.store.auto_confirm_customer_orders, expected)
+
+    def test_auto_confirmation_keeps_unpaid_cod_and_is_idempotent(self):
+        self.store.auto_confirm_customer_orders = True
+        self.store.save(update_fields=["auto_confirm_customer_orders"])
+        token = self.prepare()
+        self.confirm(token=token)
+        order = Order.objects.get()
+        self.assertEqual(order.status, "confirmed")
+        self.assertEqual(order.created_by_id, self.store.owner_id)
+        self.assertEqual(order.created_by_store_user.auth_user_id, self.store.owner_id)
+        self.assertEqual(order.amount, Decimal("20"))
+        self.assertEqual(order.payment, Decimal("0"))
+        self.store.auto_confirm_customer_orders = False
+        self.store.save(update_fields=["auto_confirm_customer_orders"])
+        self.confirm(token=token)
+        self.assertEqual(Order.objects.count(), 1)
+        order.refresh_from_db()
+        self.assertEqual(order.status, "confirmed")
+
     def test_cart_is_not_uploaded_or_created_during_checkout_and_review(self):
         response = self.client.get(reverse("orders:checkout", args=[self.store.slug]) + "?local=1")
         self.assertContains(response, 'id="local-cart-config"')

@@ -21,3 +21,26 @@ class MobileDeleteSync(models.Model):
 
     def __str__(self):
         return f"{self.merchant_id}:{self.store_model_name}:{self.store_record_id}"
+
+
+class CustomerSyncAlias(models.Model):
+    """Retired customer IDs remain resolvable on devices which were offline."""
+    merchant_id = models.IntegerField()
+    source_id = models.BigIntegerField()
+    customer = models.ForeignKey("accounts.Customer", on_delete=models.CASCADE)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(
+            fields=["merchant_id", "source_id"], name="unique_customer_sync_alias")]
+
+
+class CustomerResolutionReceipt(models.Model):
+    merchant_id = models.IntegerField()
+    operation_id = models.CharField(max_length=100)
+    request_hash = models.CharField(max_length=64)
+    result = models.JSONField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(
+            fields=["merchant_id", "operation_id"], name="unique_customer_resolution")]

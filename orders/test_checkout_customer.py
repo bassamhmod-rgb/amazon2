@@ -49,6 +49,19 @@ class CheckoutCustomerTests(TestCase):
                 self.assertEqual(order.remaining, Decimal("20") - expected)
                 CartItem.objects.create(cart=self.cart, product=order.items.first().product, quantity=2)
 
+    def test_server_cart_orders_respect_auto_confirmation_setting(self):
+        self.store.auto_confirm_customer_orders = True
+        self.store.save(update_fields=["auto_confirm_customer_orders"])
+        request = self.request(session={"customer_id": self.customer.pk,
+            "checkout_data": {"payment_type": "cod"}})
+        with patch("orders.views.get_cart", return_value=self.cart):
+            response = confirm_order(request, self.store.slug)
+        self.assertEqual(response.status_code, 302)
+        order = Order.objects.get()
+        self.assertEqual(order.status, "confirmed")
+        self.assertEqual(order.payment, 0)
+        self.assertEqual(order.customer_id, self.customer.pk)
+
     def test_phone_login_ignores_leading_zero_and_keeps_existing_name(self):
         # Simulate a legacy phone saved with its leading zero.
         Customer.objects.filter(pk=self.customer.pk).update(phone="0933645564")
@@ -102,7 +115,8 @@ class CheckoutCustomerTests(TestCase):
         self.assertEqual(response.url, destination)
 
     def test_new_customer_requires_name_without_creating_phone_named_record(self):
-        session = {"temp_phone": "0944556677"}
+        destination = f"/orders/{self.store.slug}/checkout/?local=1"
+        session = {"temp_phone": "0944556677", "next_after_register": destination}
         response = quick_register(self.request(session=session), self.store.slug)
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'name="name"')
@@ -111,12 +125,24 @@ class CheckoutCustomerTests(TestCase):
         self.assertEqual(response.status_code, 302)
         customer = Customer.objects.get(pk=session["customer_id"])
         self.assertEqual((customer.name, customer.phone), ("New buyer", "944556677"))
+        self.assertTrue(response.url.endswith("/customer/quick-register/"))
+        for _ in range(2):
+            notice = quick_register(self.request(session=session, method="get"), self.store.slug)
+            self.assertContains(notice, 'id="customerAddedDialog"')
+            self.assertContains(notice, "إلى قائمة العملاء")
+            self.assertNotContains(notice, 'id="newCustomerName"')
+        self.assertEqual(Customer.objects.filter(store=self.store, phone="944556677").count(), 1)
+        continued = quick_register(self.request({"continue": "1"}, session=session, method="get"), self.store.slug)
+        self.assertEqual(continued.url, destination)
+        self.assertNotIn("customer_added_notice", session)
+        self.assertNotIn("temp_phone", session)
 
     def test_new_registration_reuses_phone_found_after_login_without_renaming(self):
         session = {"temp_phone": "0933645564"}
         response = quick_register(self.request({"name": "Changed"}, session=session), self.store.slug)
         self.assertEqual(response.status_code, 302)
         self.assertEqual(session["customer_id"], self.customer.pk)
+        self.assertNotIn("customer_added_notice", session)
         self.customer.refresh_from_db()
         self.assertEqual(self.customer.name, "Buyer")
 

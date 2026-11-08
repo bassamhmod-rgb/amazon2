@@ -2,7 +2,7 @@ from django.http import JsonResponse
 
 from django.views.decorators.csrf import csrf_exempt
 
-from accounts.models import Customer
+from accounts.models import Customer, normalize_phone_number, customers_with_phone
 
 from stores.models import Store, Warehouse
 
@@ -426,7 +426,7 @@ def create_customer_from_access(request):
         merchant_id = data.get("store")
         access_id = data.get("access_id")
         name = (data.get("name") or "").strip()
-        phone = (data.get("phone") or "").strip()
+        phone = normalize_phone_number(data.get("phone"))
 
         if not merchant_id or not name:
             return JsonResponse({"error": "ÈíÇäÇÊ äÇÞÕÉ"}, status=400)
@@ -444,9 +444,14 @@ def create_customer_from_access(request):
         if access_id is not None:
             by_access = Customer.objects.filter(store=store, access_id=access_id).first()
             if by_access:
+                duplicate = customers_with_phone(Customer.objects.filter(store=store).exclude(pk=by_access.pk), phone).first()
+                if duplicate:
+                    return JsonResponse({"status": "exists", "message": "رقم الموبايل مسجل لعميل آخر.",
+                                         "existing_name": duplicate.name, "customer_id": duplicate.pk, "id": duplicate.pk})
                 Customer.objects.filter(id=by_access.id, store=store).update(
                     name=name,
                     phone=phone,
+                    mobile_update_time=int(time.time() // 60),
                     update_time=None
                 )
                 _clear_store_reset_marker(store.id)
@@ -457,15 +462,21 @@ def create_customer_from_access(request):
                 })
 
         # fallback: ÇÈÍË ÈÇáÇÓã Ãæ ÇáåÇÊÝ
+        phone_matches = customers_with_phone(Customer.objects.filter(store=store), phone)
+        phone_conflict = phone_matches.exclude(name=name).first()
+        if phone_conflict:
+            return JsonResponse({"status": "exists", "message": "رقم الموبايل مسجل باسم آخر.",
+                                 "existing_name": phone_conflict.name,
+                                 "id": phone_conflict.pk, "customer_id": phone_conflict.pk})
         existing = Customer.objects.filter(
             store=store
         ).filter(
-            Q(name=name) | Q(phone=phone)
+            Q(name=name) | Q(pk__in=phone_matches.values_list("pk", flat=True))
         ).only("id", "name", "phone", "access_id").first()
 
         if existing:
             # äÝÓ ÇáÑÞã æÇÓã ãÎÊáÝ -> äÝÓ ÇáÑÓÇáÉ ÇáÞÏíãÉ
-            if existing.phone == phone and existing.name != name:
+            if phone and normalize_phone_number(existing.phone) == phone and existing.name != name:
                 return JsonResponse({
                     "status": "exists",
                     "message": "ÑÞã ÇáãæÈÇíá ãÓÌá ÈÇÓã ÂÎÑ áä íÊã ÅßãÇá ãÒÇãäÉ ÇáÝæÇÊíÑ ÇáÇ ÈÚÏ Íá ÇáãÔßáÉ . íÝÖá ÇáÊÃßÏ ãä äÞá ÇáÚãáÇÁ ãä ÝæÑã ÇáÚãáÇÁ ÇæáÇ",
@@ -483,6 +494,7 @@ def create_customer_from_access(request):
                 update_data["phone"] = phone
             if update_data:
                 update_data["update_time"] = None
+                update_data["mobile_update_time"] = int(time.time() // 60)
                 Customer.objects.filter(id=existing.id, store=store).update(**update_data)
 
             _clear_store_reset_marker(store.id)

@@ -8,7 +8,7 @@ from stores.models import Store
 from cart.models import Cart, CartItem
 from .models import Order, OrderItem
 from products.models import Product
-from accounts.models import Customer, normalize_phone_number
+from accounts.models import Customer, normalize_phone_number, customers_with_phone, ensure_owner_store_user
 from stores.models import StorePaymentMethod
 from django.urls import reverse
 from decimal import Decimal
@@ -19,6 +19,7 @@ from django.views.decorators.http import require_POST
 
 
 import uuid
+import time
 from django.core.files.storage import default_storage
 #دالة مساعدة
 def get_cart(request, store):
@@ -109,6 +110,8 @@ def checkout(request, store_slug):
             checkout_error = "يرجى إدخال اسم العميل."
         elif Customer.objects.filter(store=store, name=new_name).exclude(pk=customer.pk).exists():
             checkout_error = "اسم العميل مسجل مسبقاً. يرجى مراجعة المتجر."
+        elif customers_with_phone(Customer.objects.filter(store=store).exclude(pk=customer.pk), new_phone).exists():
+            checkout_error = "رقم الموبايل مرتبط بأكثر من عميل. يرجى مراجعة المتجر لتوحيد الحسابات."
         elif not allowed_payments.get(payment_type, False):
             checkout_error = "يرجى اختيار طريقة دفع متاحة."
         if checkout_error:
@@ -377,7 +380,10 @@ def confirm_order(request, store_slug):
         storefront_checkout_token=token if local_checkout else None,
         store=store,
         customer=customer,
-        status="pending",
+        status="confirmed" if store.auto_confirm_customer_orders else "pending",
+        created_by=store.owner if store.auto_confirm_customer_orders else None,
+        created_by_store_user=ensure_owner_store_user(store) if store.auto_confirm_customer_orders else None,
+        update_time=int(time.time() // 60) if store.auto_confirm_customer_orders else None,
         shipping_address=data.get("customer_address", ""),
         note=apply_customer_private_note(data.get("customer_note", ""), customer.private_note),
         payment_type=data.get("payment_type"),

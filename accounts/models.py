@@ -7,6 +7,7 @@ from django.contrib.auth.hashers import check_password as django_check_password,
 from django.contrib.auth.models import User
 from django.db import IntegrityError, transaction
 import time
+import re
 
 
 def _touch_update_time(instance, kwargs):
@@ -30,10 +31,20 @@ def _touch_mobile_update_time(instance, kwargs):
 
 
 def normalize_phone_number(value):
-    phone = str(value or "").strip()
+    phone = re.sub(r"[\s\u0085\u200b\ufeff]+", "", str(value or ""))
     if not phone:
         return ""
     return phone.lstrip("0") or "0"
+
+
+def customers_with_phone(queryset, value):
+    """Match legacy spaced numbers too, without merging customer identities."""
+    phone = normalize_phone_number(value)
+    if not phone:
+        return queryset.none()
+    ids = [pk for pk, stored in queryset.values_list("pk", "phone")
+           if normalize_phone_number(stored) == phone]
+    return queryset.filter(pk__in=ids)
 
 
 def default_store_user_permissions():
@@ -359,7 +370,13 @@ class Customer(models.Model):
         _touch_update_time(self, kwargs)
         _touch_mobile_update_time(self, kwargs)
         self.name = self.name.strip()
-        self.phone = normalize_phone_number(self.phone)
+        original_phone = self.phone
+        self.phone = normalize_phone_number(original_phone)
+        if kwargs.get("update_fields") and original_phone != self.phone:
+            kwargs["update_fields"] = set(kwargs["update_fields"]) | {"phone"}
+        if self.phone and customers_with_phone(
+                Customer.objects.filter(store_id=self.store_id).exclude(pk=self.pk), self.phone).exists():
+            raise IntegrityError("رقم الموبايل مسجل لعميل آخر ضمن المتجر نفسه.")
         if not self.name and self.phone:
             self.name = self.phone
         super().save(*args, **kwargs)

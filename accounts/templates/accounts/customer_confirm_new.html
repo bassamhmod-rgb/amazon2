@@ -81,11 +81,38 @@
             margin-top: .7rem;
         }
 
+        .customer-added-dialog {
+            width:calc(100% - 32px);
+            margin:auto;
+            max-height:90vh;
+            overflow:auto;
+        }
+        .customer-added-dialog::backdrop { background:#0006; }
+        .customer-added-dialog .primary-btn { display:block; text-decoration:none; }
+
     </style>
 </head>
 
 <body>
 
+{% if customer_added %}
+<dialog id="customerAddedDialog" class="confirm-container customer-added-dialog" open
+        aria-labelledby="customerAddedTitle" aria-describedby="customerAddedMessage">
+    <h2 id="customerAddedTitle" class="title">تمت إضافة العميل</h2>
+    <p id="customerAddedMessage" class="msg-box">تمت إضافة العميل <strong>{{ name }}</strong> إلى قائمة العملاء.</p>
+    <a href="{% url 'accounts:quick_register' store.slug %}?continue=1" class="primary-btn" autofocus>متابعة</a>
+</dialog>
+<script>
+(() => {
+    const dialog = document.getElementById('customerAddedDialog');
+    if (typeof dialog.showModal === 'function') {
+        dialog.removeAttribute('open');
+        dialog.showModal();
+        dialog.addEventListener('cancel', event => event.preventDefault());
+    }
+})();
+</script>
+{% else %}
 <div class="container">
     <div class="confirm-container">
 
@@ -110,6 +137,7 @@
 
     </div>
 </div>
+{% endif %}
 
 </body>
 </html>

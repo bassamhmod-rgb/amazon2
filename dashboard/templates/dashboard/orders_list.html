@@ -148,6 +148,46 @@
             .orders-card{
                 padding:8px !important;
             }
+
+            .orders-card .table-responsive{ overflow:visible; }
+            .orders-table, .orders-table tbody{ display:block; width:100%; }
+            .orders-table thead{ display:none; }
+            .orders-table tbody tr{
+                display:grid;
+                grid-template-columns:repeat(2, minmax(0, 1fr));
+                border:1px solid #e0e0e0;
+                border-radius:8px;
+                margin-bottom:10px;
+                padding:8px;
+            }
+            .orders-table tbody td{
+                display:flex;
+                flex-direction:column;
+                border:0;
+                padding:6px;
+                overflow-wrap:anywhere;
+                box-shadow:none;
+            }
+            .orders-table td[data-label]::before{
+                content:attr(data-label);
+                font-size:.8rem;
+                color:#666;
+                margin-bottom:3px;
+            }
+            .orders-table td.order-actions{
+                grid-column:1 / -1;
+                display:flex;
+                flex-direction:row;
+                flex-wrap:wrap;
+                justify-content:flex-start;
+                direction:rtl;
+                gap:6px;
+                border-top:1px solid #e0e0e0;
+                margin-top:6px;
+                padding-top:10px;
+            }
+            .order-actions form{ margin:0; }
+            .orders-table td[colspan]{ grid-column:1 / -1; }
         }
     </style>
 </head>
@@ -287,16 +327,15 @@
     <!-- جدول الطلبات -->
     <div class="orders-card card p-3 shadow-sm">
         <div class="table-responsive">
-            <table class="table table-striped align-middle mb-0">
+            <table class="orders-table table table-striped align-middle mb-0">
                 <thead>
                     <tr>
                         <th>رقم الطلب</th>
                         <th>رقم نقطة البيع</th>
+                        <th>اسم العميل</th>
                         <th>المجموع</th>
                         <th>الحالة</th>
                         <th>التاريخ</th>
-                        <th>الخصم</th>
-                        <th>المدفوع</th>
                         <th>نوع المعاملة</th>
                         <th class="text-center">الإجراءات</th>
                     </tr>
@@ -305,7 +344,7 @@
                 <tbody>
                 {% for order in orders %}
                     <tr>
-                        <td>
+                        <td data-label="رقم الطلب">
                             {{ order.id }}
                             {% if order.alert_state == "confirmation" %}
                                 <span class="badge bg-danger ms-2">بانتظار التأكيد</span>
@@ -314,11 +353,13 @@
                             {% endif %}
                         </td>
 
-                        <td>{{ order.mobile_local_order_id|default:"-" }}</td>
+                        <td data-label="رقم نقطة البيع">{{ order.mobile_local_order_id|default:"-" }}</td>
 
-                        <td>{{ order.display_items_total|floatformat:2 }} $</td>
+                        <td data-label="اسم العميل">{{ order.customer.name|default:"-" }}</td>
 
-                        <td>
+                        <td data-label="المجموع">{{ order.display_items_total|floatformat:2 }} $</td>
+
+                        <td data-label="الحالة">
                             {% if order.status == "pending" %}
                                 <span class="status-pending">قيد الانتظار</span>
                             {% elif order.status == "confirmed" %}
@@ -328,12 +369,10 @@
                             {% endif %}
                         </td>
 
-                        <td>{{ order.created_at|date:"Y-m-d h:i" }} {% if order.created_at|date:"A" == "AM" %}ص{% else %}م{% endif %}</td>
-                        <td>{{ order.discount|floatformat:2 }} $</td>
-                        <td>{{ order.payment|floatformat:2 }} $</td>
-                        <td>{{ order.transaction_type }}</td>
+                        <td data-label="التاريخ">{{ order.created_at|date:"Y-m-d h:i" }} {% if order.created_at|date:"A" == "AM" %}ص{% else %}م{% endif %}</td>
+                        <td data-label="نوع المعاملة">{{ order.transaction_type }}</td>
 
-                        <td class="text-center">
+                        <td class="order-actions text-center">
 
                             <a href="{% url 'dashboard:order_detail_dashboard' store.slug order.id %}"
                                class="btn btn-info btn-sm" title="تفاصيل">
@@ -350,7 +389,7 @@
                                   style="display:inline;"
                                   onsubmit="return confirm('هل أنت متأكد من حذف الطلب؟');">
                                 {% csrf_token %}
-                                <button type="submit" class="btn btn-danger js-confirm-delete">
+                                <button type="submit" class="btn btn-danger btn-sm js-confirm-delete">
                                     حذف
                                 </button>
                             </form>
@@ -359,7 +398,7 @@
                     </tr>
                 {% empty %}
                     <tr>
-                        <td colspan="9" class="text-center text-muted">
+                        <td colspan="8" class="text-center text-muted">
                             لا يوجد طلبات
                         </td>
                     </tr>

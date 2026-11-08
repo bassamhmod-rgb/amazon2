@@ -1,6 +1,6 @@
 from .input_money import prepare_order_input
 from accounts.customer_notes import apply_customer_private_note
-from accounts.models import normalize_phone_number
+from accounts.models import normalize_phone_number, customers_with_phone
 # -*- coding: utf-8 -*-
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
@@ -2772,7 +2772,7 @@ def customer_create(request, store_slug):
             })
 
         duplicate_name = Customer.objects.filter(store=store, name=name).exists()
-        duplicate_phone = bool(phone) and Customer.objects.filter(store=store, phone=phone).exists()
+        duplicate_phone = customers_with_phone(Customer.objects.filter(store=store), phone).exists()
 
         if duplicate_name or duplicate_phone:
             if duplicate_name and duplicate_phone:
@@ -2839,10 +2839,8 @@ def customer_update(request, store_slug, customer_id):
             store=store,
             name=name
         ).exclude(id=customer.id).exists()
-        duplicate_phone = bool(phone) and Customer.objects.filter(
-            store=store,
-            phone=phone
-        ).exclude(id=customer.id).exists()
+        duplicate_phone = customers_with_phone(
+            Customer.objects.filter(store=store).exclude(id=customer.id), phone).exists()
 
         if duplicate_name or duplicate_phone:
             if duplicate_name and duplicate_phone:
@@ -3155,6 +3153,7 @@ def store_settings(request, store_slug):
         store.allow_full_payment = "allow_full_payment" in request.POST
         store.allow_partial_payment = "allow_partial_payment" in request.POST
         store.allow_cash_on_delivery = "allow_cash_on_delivery" in request.POST
+        store.auto_confirm_customer_orders = request.POST.get("auto_confirm_customer_orders") == "1"
 
         cashback = request.POST.get("cashback_percentage", "").strip()
         try:
