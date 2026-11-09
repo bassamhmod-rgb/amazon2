@@ -3,6 +3,7 @@ from django.urls import path
 from . import views
 
 urlpatterns = [
+    path("party-fx/sync/", views.party_fx_sync, name="party_fx_sync"),
     path("ping/", views.ping, name="ping"),
     path("app-update/", views.app_update_check, name="app_update_check"),
     path("app-update/<int:update_id>/download/", views.app_update_download, name="app_update_download"),

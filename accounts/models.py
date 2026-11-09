@@ -332,6 +332,8 @@ class Customer(models.Model):
     )
 
     # ًں”¥ ط§ظ„ط±طµظٹط¯ ط§ظ„ط³ط§ط¨ظ‚ (ط§ط®طھظٹط§ط±ظٹ â€“ ط¥ظ† ظƒظ†طھ طھط³طھط®ط¯ظ…ظ‡)
+    opening_balance_syp = models.DecimalField(max_digits=20, decimal_places=6, null=True, blank=True)
+    opening_balance_usd = models.DecimalField(max_digits=20, decimal_places=6, null=True, blank=True)
     opening_balance = models.DecimalField(
         max_digits=12,
         decimal_places=2,
@@ -433,6 +435,8 @@ class Supplier(models.Model):
     email = models.EmailField(blank=True, null=True)
 
     # الرصيد السابق بين التاجر والمورّد
+    opening_balance_syp = models.DecimalField(max_digits=20, decimal_places=6, null=True, blank=True)
+    opening_balance_usd = models.DecimalField(max_digits=20, decimal_places=6, null=True, blank=True)
     opening_balance = models.DecimalField(
         max_digits=12,
         decimal_places=2,
@@ -609,3 +613,16 @@ class DeleteSync(models.Model):
     store_model_name = models.CharField(max_length=100, blank=True, null=True)
     access_record_id = models.BigIntegerField(blank=True, null=True)
     access_table_name = models.CharField(max_length=100, blank=True, null=True)
+
+
+class PartyFxState(models.Model):
+    store = models.ForeignKey('stores.Store', on_delete=models.CASCADE)
+    party_kind = models.CharField(max_length=8)
+    party_id = models.BigIntegerField()
+    dirty = models.BooleanField(default=True)
+    revision = models.PositiveBigIntegerField(default=0)
+    fingerprint = models.CharField(max_length=64, blank=True, default='')
+    snapshot = models.JSONField(default=dict)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=['store', 'party_kind', 'party_id'], name='unique_party_fx_state')]

@@ -56,7 +56,16 @@ def _validate(record):
         raise ValueError("الاسم مطلوب (حتى 150 حرفاً) ورقم الموبايل حتى 20 حرفاً.")
     if name == "زبون عام":
         raise ValueError("لا يمكن استخدام العميل العام لحل تعارض حسابات العملاء.")
-    return dict(name=name, phone=phone,
+    currencies = {}
+    for currency in ("syp", "usd"):
+        key = "opening_balance_" + currency
+        if key in record:
+            raw = record[key]
+            value = None if raw is None else Decimal(str(raw))
+            if value is not None and (not value.is_finite() or abs(value) >= Decimal("100000000000000") or value != value.quantize(Decimal("0.000001"))):
+                raise ValueError("Invalid currency opening balance")
+            currencies[key] = value
+    return dict(name=name, phone=phone, **currencies,
                 opening_balance=_amount(record.get("opening_balance", 0)),
                 balance=_amount(record.get("balance", 0)))
 

@@ -7,3 +7,4 @@ class AccountsConfig(AppConfig):
     def ready(self):
         # Register cross-app sync delete logging signals.
         from . import signals  # noqa: F401
+        from . import party_fx_signals  # noqa: F401

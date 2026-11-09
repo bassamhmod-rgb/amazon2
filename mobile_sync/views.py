@@ -1,4 +1,4 @@
-from .input_money import validate_input_data
+﻿from .input_money import validate_input_data
 from .customer_resolution import CustomerIdentityCollision
 import hashlib
 import base64
@@ -371,6 +371,8 @@ def _serialize_customer(customer):
         "private_note": customer.private_note or "",
         "balance": float(customer.balance),
         "opening_balance": float(customer.opening_balance),
+        "opening_balance_syp": float(customer.opening_balance_syp) if customer.opening_balance_syp is not None else None,
+        "opening_balance_usd": float(customer.opening_balance_usd) if customer.opening_balance_usd is not None else None,
         "preferred_price_level": getattr(customer, "preferred_price_level", 0) or 0,
         "is_subscription_active": customer.is_subscription_active,
         "access_id": customer.access_id,
@@ -390,6 +392,8 @@ def _serialize_supplier(supplier):
         "email": supplier.email or "",
         "balance": float(supplier.balance),
         "opening_balance": float(supplier.opening_balance),
+        "opening_balance_syp": float(supplier.opening_balance_syp) if supplier.opening_balance_syp is not None else None,
+        "opening_balance_usd": float(supplier.opening_balance_usd) if supplier.opening_balance_usd is not None else None,
         "access_id": supplier.access_id,
         "update_time": _mobile_time(supplier),
     }
@@ -1131,11 +1135,21 @@ def _apply_customer_change(store, payload, server_id=None):
     }
     if "private_note" in payload:
         update_fields["private_note"] = _to_str(payload.get("private_note")).strip()
+    for currency in ("syp", "usd"):
+        key = "opening_balance_" + currency
+        if key in payload:
+            value = payload[key]
+            amount = None if value is None else Decimal(str(value))
+            if amount is not None and (not amount.is_finite() or abs(amount) >= Decimal("100000000000000") or amount != amount.quantize(Decimal("0.000001"))):
+                raise ValueError("Invalid currency opening balance")
+            update_fields[key] = amount
     if access_id is not None:
         update_fields["access_id"] = access_id
 
     if obj:
         Customer.objects.filter(id=obj.id, store=store).update(**update_fields)
+        from accounts.party_fx import mark_dirty
+        mark_dirty(store.pk, 'customer', obj.pk)
         obj.refresh_from_db()
         if origin and not origin_link:
             CustomerSyncOrigin.objects.create(merchant_id=store.pk, origin_key=origin, customer=obj)
@@ -1151,6 +1165,8 @@ def _apply_customer_change(store, payload, server_id=None):
         private_note=update_fields.get("private_note", ""),
         balance=update_fields["balance"],
         opening_balance=update_fields["opening_balance"],
+        opening_balance_syp=update_fields.get("opening_balance_syp"),
+        opening_balance_usd=update_fields.get("opening_balance_usd"),
         preferred_price_level=preferred_price_level,
         is_subscription_active=update_fields["is_subscription_active"],
         mobile_update_time=now_minute,
@@ -1277,11 +1293,21 @@ def _apply_supplier_change(store, payload, server_id=None):
         "opening_balance": Decimal(str(_to_float(payload.get("opening_balance"), 0.0))),
         "mobile_update_time": now_minute,
     }
+    for currency in ("syp", "usd"):
+        key = "opening_balance_" + currency
+        if key in payload:
+            value = payload[key]
+            amount = None if value is None else Decimal(str(value))
+            if amount is not None and (not amount.is_finite() or abs(amount) >= Decimal("100000000000000") or amount != amount.quantize(Decimal("0.000001"))):
+                raise ValueError("Invalid currency opening balance")
+            update_fields[key] = amount
     if access_id is not None:
         update_fields["access_id"] = access_id
 
     if obj:
         Supplier.objects.filter(id=obj.id, store=store).update(**update_fields)
+        from accounts.party_fx import mark_dirty
+        mark_dirty(store.pk, 'supplier', obj.pk)
         obj.refresh_from_db()
         return obj, "updated"
 
@@ -1294,6 +1320,8 @@ def _apply_supplier_change(store, payload, server_id=None):
         email=email,
         balance=update_fields["balance"],
         opening_balance=update_fields["opening_balance"],
+        opening_balance_syp=update_fields.get("opening_balance_syp"),
+        opening_balance_usd=update_fields.get("opening_balance_usd"),
         mobile_update_time=now_minute,
     )
     return obj, "created"
@@ -3195,6 +3223,7 @@ def sync_push(request):
 
     try:
         with transaction.atomic():
+            Store.objects.select_for_update().get(pk=store.pk)
             for item in upserts:
                 entity = str(item.get("entity", "")).lower()
                 local_id = item.get("local_id")
@@ -3785,6 +3814,9 @@ def sync_push(request):
                             "server_id": server_id,
                         })
 
+            from accounts.party_fx import refresh_dirty
+            refresh_dirty(store)
+
         return Response({"status": "ok", "applied": applied, "errors": errors})
     except ValueError as exc:
         return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
@@ -3965,6 +3997,7 @@ def orders_push(request):
 
     try:
         with transaction.atomic():
+            Store.objects.select_for_update().get(pk=store.pk)
             for order_payload in orders_payload:
                 if not isinstance(order_payload, dict):
                     errors.append({"detail": "Invalid order payload"})
@@ -4195,6 +4228,9 @@ def orders_push(request):
                     "cashback_amount": float(cashback_entry["cashback_amount"] or 0),
                     "items": created_items,
                 })
+
+            from accounts.party_fx import refresh_dirty
+            refresh_dirty(store)
 
         return Response({"status": "ok", "applied": applied, "errors": errors})
     except Exception as exc:
@@ -4481,3 +4517,30 @@ def barcodes_pull(request):
             "max_update_time": max((x["update_time"] for x in data), default=0),
         }
     )
+
+
+@api_view(["POST"])
+@permission_classes([AllowAny])
+def party_fx_sync(request):
+    payload = request.data if isinstance(request.data, dict) else {}
+    merchant_id = _to_int(payload.get("merchant_id"))
+    store = Store.objects.filter(pk=merchant_id).first()
+    if not store:
+        return Response({"detail": "Merchant not found"}, status=404)
+    _, device_error = _ensure_store_user_sync_device(request, merchant_id)
+    if device_error:
+        return device_error
+    known = payload.get("known_revisions", {})
+    if not isinstance(known, dict) or len(known) > 100000:
+        return Response({"detail": "Invalid revision map"}, status=400)
+    from accounts.party_fx import refresh_dirty
+    from accounts.models import PartyFxState
+    with transaction.atomic():
+        Store.objects.select_for_update().get(pk=store.pk)
+        refresh_dirty(store)
+        items = []
+        for state in PartyFxState.objects.filter(store=store).order_by('party_kind', 'party_id'):
+            key = f'{state.party_kind}:{state.party_id}'
+            if known.get(key) != state.revision:
+                items.append({**state.snapshot, 'revision': state.revision})
+        return Response({'version': 1, 'items': items})

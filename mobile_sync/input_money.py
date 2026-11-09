@@ -26,6 +26,15 @@ def validate_input_data(raw, previous=None):
                 raise ValueError("أرقام الإدخال غير صالحة.")
         except InvalidOperation as exc:
             raise ValueError("أرقام الإدخال غير صالحة.") from exc
+    values = data["values"]
+    settlement = [key for key in ("settlement_syp", "settlement_usd") if key in values]
+    if settlement and (len(settlement) != 1 or Decimal(values[settlement[0]]) <= 0
+                       or Decimal(values.get("payment", "0")) <= 0):
+        raise ValueError("Invalid cross-currency settlement")
+    if "settlement_invoice_server_id" in values:
+        invoice_id = Decimal(values["settlement_invoice_server_id"])
+        if invoice_id <= 0 or invoice_id != invoice_id.to_integral_value():
+            raise ValueError("Invalid settlement invoice reference")
     return raw
 
 
