@@ -2473,6 +2473,16 @@ def store_currency_settings(request):
             except (ValueError, TypeError, ArithmeticError):
                 return Response({"detail": "سعر الصرف أو وقت تعديله غير صالح."},
                                 status=status.HTTP_400_BAD_REQUEST)
+            places_raw = _request_value(request, "currency_decimal_places")
+            if places_raw is not None:
+                try:
+                    places = int(str(places_raw))
+                    if not 0 <= places <= 6:
+                        raise ValueError()
+                except (ValueError, TypeError):
+                    return Response({"detail": "Invalid currency decimal places"}, status=400)
+                Store.objects.filter(pk=store.pk).update(currency_decimal_places=places)
+                store.currency_decimal_places = places
             # Equal/unknown timestamps use the store value, making retries stable.
             if updated_at > store.exchange_rate_updated_at:
                 Store.objects.filter(pk=store.pk).update(
@@ -2481,6 +2491,7 @@ def store_currency_settings(request):
                 store.exchange_rate = rate
                 store.exchange_rate_updated_at = updated_at
         return Response({
+            "currency_decimal_places": store.currency_decimal_places,
             "base_currency": store.pricing_currency,
             "exchange_rate": float(store.exchange_rate or 0),
             "exchange_rate_updated_at": store.exchange_rate_updated_at,
@@ -4296,6 +4307,12 @@ def _serialize_order_for_mobile(order):
         sync_amount = source_base_value(order, "subtotal", items_total)
     else:
         sync_amount = getattr(order, "amount", 0)
+    def money(value):
+        if getattr(order, "input_data", None):
+            return value
+        return Decimal(str(value or 0)).quantize(
+            Decimal(1).scaleb(-getattr(order.store, "currency_decimal_places", 2)), rounding=ROUND_HALF_UP)
+
     return {
         "input_data": getattr(order, "input_data", None),
         "id": order.id,
@@ -4309,10 +4326,10 @@ def _serialize_order_for_mobile(order):
         ),
         "transaction_type": getattr(order, "transaction_type", ""),
         "status": "completed" if getattr(order, "status", "") == "confirmed" else getattr(order, "status", ""),
-        "discount": _to_float(getattr(order, "discount", 0)),
+        "discount": _to_float(money(getattr(order, "discount", 0))),
         "shipping_cost": _to_float(getattr(order, "shipping_cost", 0)),
-        "payment": _to_float(getattr(order, "payment", 0)),
-        "amount": _to_float(sync_amount),
+        "payment": _to_float(money(getattr(order, "payment", 0))),
+        "amount": _to_float(money(sync_amount)),
         "base_currency": _mobile_currency_value(order, "base_currency", getattr(order.store, "pricing_currency", "SYP") or "SYP"),
         "payment_currency": _mobile_currency_value(order, "payment_currency", getattr(order.store, "pricing_currency", "SYP") or "SYP"),
         "exchange_rate": _mobile_currency_value(order, "exchange_rate", _to_float(getattr(order.store, "exchange_rate", 1))),

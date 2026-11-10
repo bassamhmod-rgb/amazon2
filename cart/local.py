@@ -10,6 +10,7 @@ def local_checkout_config(request, store):
     return {
         "key": f"storefront-cart:v1:{store.pk}:{request.user.pk if request.user.is_authenticated else 'guest'}",
         "currency": store.pricing_currency,
+        "decimalPlaces": store.currency_decimal_places,
         "displayCurrency": store.display_currency,
         "rate": str(store.exchange_rate or 0),
         "requiredPercent": store.payment_required_percentage or 0,

@@ -76,3 +76,31 @@ class StoreExchangeRateSyncTests(TestCase):
         self.store.save(update_fields=["exchange_rate"])
         self.store.refresh_from_db()
         self.assertGreater(self.store.exchange_rate_updated_at, 2000)
+
+    def test_currency_precision_sync_and_validation(self):
+        for places in (0, 2, 6):
+            response = self.sync(currency_decimal_places=places)
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response.data["currency_decimal_places"], places)
+            self.store.refresh_from_db()
+            self.assertEqual(self.store.currency_decimal_places, places)
+        for invalid in (-1, 7, "2.5", True):
+            self.assertEqual(self.sync(currency_decimal_places=invalid).status_code, 400)
+
+    def test_legacy_totals_are_rounded_before_mobile_sync(self):
+        from types import SimpleNamespace
+        from .views import _serialize_order_for_mobile
+        order = SimpleNamespace(
+            id=1, store=self.store, document_kind=2, input_data=None,
+            prefetched_mobile_items=[], customer_id=None, supplier_id=None,
+            warehouse_id=None, created_by_store_user_id=None,
+            amount=21.369999999999994, payment=21.369999999999994,
+            discount=0.004,
+        )
+        for places, expected in ((0, 21), (2, 21.37), (6, 21.37)):
+            self.store.currency_decimal_places = places
+            payload = _serialize_order_for_mobile(order)
+            self.assertEqual(payload["amount"], expected)
+            self.assertEqual(payload["payment"], expected)
+        order.input_data = '{"version":1,"currency":"SYP","values":{"subtotal":"21.369999999999994"}}'
+        self.assertEqual(_serialize_order_for_mobile(order)["amount"], order.amount)

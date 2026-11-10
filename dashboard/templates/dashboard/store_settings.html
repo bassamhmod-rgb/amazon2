@@ -228,6 +228,10 @@
                         </div>
 
                         <div class="mb-3">
+                            <label class="form-label">المنازل العشرية للعملة الرئيسية</label>
+                            <input type="number" name="currency_decimal_places" value="{{ store.currency_decimal_places }}" min="0" max="6" step="1" required class="form-control">
+                        </div>
+                        <div class="mb-3">
                             <label class="form-label">سعر الصرف (1 دولار = ؟ ل.س)</label>
                             <input type="number" name="exchange_rate" value="{{ store.exchange_rate }}" min="0" step="0.01" class="form-control">
                             <div class="text-muted mt-1" style="font-size:13px;">

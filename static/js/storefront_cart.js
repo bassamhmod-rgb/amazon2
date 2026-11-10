@@ -32,12 +32,13 @@
     }
     function money(amount) {
         const rate = Number(config.rate);
+        const places = Number.isInteger(config.decimalPlaces) ? Math.max(0, Math.min(6, config.decimalPlaces)) : 2;
         const usd = config.currency === 'USD' ? amount : rate > 0 ? amount / rate : null;
         const syp = config.currency === 'USD' ? rate > 0 ? amount * rate : null : amount;
         const parts = [];
-        if (config.displayCurrency !== 'SYP' && usd !== null) parts.push(usd.toLocaleString('en-US', {maximumFractionDigits: 2, minimumFractionDigits: 2}) + ' $');
-        if (config.displayCurrency !== 'USD' && syp !== null) parts.push(syp.toLocaleString('en-US', {maximumFractionDigits: 0}) + ' ل.س');
-        return parts.join(' / ') || amount.toFixed(2) + (config.currency === 'USD' ? ' $' : ' ل.س');
+        if (config.displayCurrency !== 'SYP' && usd !== null) parts.push(usd.toLocaleString('en-US', {maximumFractionDigits: config.currency === 'USD' ? places : 2, minimumFractionDigits: 0}) + ' $');
+        if (config.displayCurrency !== 'USD' && syp !== null) parts.push(syp.toLocaleString('en-US', {maximumFractionDigits: config.currency === 'SYP' ? places : 0}) + ' ل.س');
+        return parts.join(' / ') || amount.toFixed(places) + (config.currency === 'USD' ? ' $' : ' ل.س');
     }
     const total = () => items.reduce((sum, row) => sum + Number(row.price || 0) * row.quantity, 0);
     function node(tag, text, className) {

@@ -115,6 +115,9 @@ class Store(models.Model):
         choices=PRICING_CURRENCIES,
         default="SYP",
     )
+    currency_decimal_places = models.PositiveSmallIntegerField(
+        default=2, validators=[MinValueValidator(0), MaxValueValidator(6)],
+    )
     exchange_rate = models.DecimalField(
         max_digits=12,
         decimal_places=2,

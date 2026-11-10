@@ -3183,6 +3183,14 @@ def store_settings(request, store_slug):
             messages.error(request, "طريقة التسعير غير صحيحة.")
             return redirect(f"/dashboard/{store.slug}/settings/")
 
+        try:
+            places = int(request.POST.get("currency_decimal_places", store.currency_decimal_places))
+            if not 0 <= places <= 6:
+                raise ValueError()
+        except (ValueError, TypeError):
+            messages.error(request, "عدد المنازل العشرية يجب أن يكون بين 0 و6.")
+            return redirect(f"/dashboard/{store.slug}/settings/")
+        store.currency_decimal_places = places
         exchange_rate_raw = (request.POST.get("exchange_rate") or "").strip()
         if exchange_rate_raw != "":
             try:

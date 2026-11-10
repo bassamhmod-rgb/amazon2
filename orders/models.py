@@ -1,6 +1,6 @@
 ﻿from django.db import models
 from django.contrib.auth.models import User
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 
 from stores.models import Store, StorePaymentMethod, Warehouse
 from accounts.models import Customer, StoreUser
@@ -299,7 +299,11 @@ class Order(models.Model):
     @property
     def items_total(self):
         from mobile_sync.input_money import source_base_value
-        return source_base_value(self, "subtotal", sum(item.subtotal for item in self.items.all()))
+        value = source_base_value(self, "subtotal", sum(item.subtotal for item in self.items.all()))
+        if self.input_data:
+            return value
+        return Decimal(str(value)).quantize(
+            Decimal(1).scaleb(-self.store.currency_decimal_places), rounding=ROUND_HALF_UP)
 
     @property
     def net_total(self):
