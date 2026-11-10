@@ -1,5 +1,6 @@
 ﻿from django.db import models
 from django.contrib.auth.models import User
+from django.db import transaction
 from decimal import Decimal, ROUND_HALF_UP
 
 from stores.models import Store, StorePaymentMethod, Warehouse
@@ -409,4 +410,12 @@ class OrderItem(models.Model):
     def save(self, *args, **kwargs):
         _touch_update_time(self, kwargs)
         _touch_mobile_update_time(self, kwargs)
-        return super().save(*args, **kwargs)
+        with transaction.atomic():
+            result = super().save(*args, **kwargs)
+            # Incremental mobile pulls select headers. A central line-only edit
+            # must make its parent visible even after the header's minute passed.
+            Order.objects.filter(pk=self.order_id).filter(
+                models.Q(mobile_update_time__isnull=True)
+                | models.Q(mobile_update_time__lt=self.mobile_update_time)
+            ).update(mobile_update_time=self.mobile_update_time)
+            return result

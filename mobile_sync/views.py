@@ -4098,6 +4098,12 @@ def orders_push(request):
                         order_qs = order_qs.filter(created_by_store_user=store_user)
                 order = order_qs.first()
 
+                # A known server ID that disappeared is a deletion, not a new invoice.
+                if order is None and server_order_id is not None and action != "delete":
+                    errors.append({"local_order_id": local_order_id,
+                                   "detail": "المستند محذوف من المتجر ولا يمكن تعديله."})
+                    continue
+
                 if action == "delete":
                     if order is not None:
                         deleted_order_id = order.id
@@ -4125,7 +4131,7 @@ def orders_push(request):
                 order.supplier = supplier if uses_supplier else None
                 order.created_by = created_by_user
                 order.created_by_store_user = store_user
-                if sync_client_id:
+                if sync_client_id and not order.mobile_sync_client_id:
                     order.mobile_sync_client_id = sync_client_id
                     order.mobile_local_order_id = local_order_id
                 order.warehouse = warehouse
@@ -4164,6 +4170,9 @@ def orders_push(request):
                         if key in original_values:
                             setattr(order, field, source_base_value(order, key, getattr(order, field)))
                 order._skip_update_time_touch = True
+                if order.accounting_invoice_number not in (None, 0, ""):
+                    # Notices have no item deletion signal to mark their header dirty.
+                    order.update_time = _now_minute()
                 order.save()
 
                 previous_line_notes = dict(order.items.values_list("id", "line_note"))
@@ -4223,7 +4232,10 @@ def orders_push(request):
                 # Snapshot the accepted version so its source need not download it again.
                 order.refresh_from_db()
                 Order.objects.filter(pk=order.pk).update(
-                    mobile_uploaded_digest=_order_mobile_digest(_serialize_order_for_mobile(order))
+                    mobile_uploaded_digest=(
+                        _order_mobile_digest(_serialize_order_for_mobile(order))
+                        if order.mobile_sync_client_id == sync_client_id else ""
+                    ),
                 )
 
                 applied.append({
