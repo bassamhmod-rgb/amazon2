@@ -139,6 +139,8 @@ class Store(models.Model):
         choices=[("USD", "دولار"), ("SYP", "ليرة سورية"), ("BOTH", "العملتان معاً")],
         default="BOTH",
     )
+    show_product_description = models.BooleanField(default=False)
+    show_product_categories = models.BooleanField(default=False)
     product_layout = models.CharField(
         max_length=10,
         choices=[("vertical", "عمودي"), ("horizontal", "أفقي")],

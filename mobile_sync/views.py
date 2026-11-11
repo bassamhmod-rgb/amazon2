@@ -4070,6 +4070,12 @@ def orders_push(request):
                         prepared_items = None
                         break
 
+                    line_warehouse = item_payload.get("warehouse_server_id")
+                    if line_warehouse is not None and not Warehouse.objects.filter(
+                            pk=_to_int(line_warehouse), store=store).exists():
+                        errors.append({"detail": "Invalid item warehouse", "local_order_id": local_order_id})
+                        prepared_items = None
+                        break
                     prepared_items.append((item_payload, product))
 
                 if prepared_items is None:
@@ -4176,6 +4182,7 @@ def orders_push(request):
                 order.save()
 
                 previous_line_notes = dict(order.items.values_list("id", "line_note"))
+                previous_line_warehouses = dict(order.items.values_list("id", "warehouse_id"))
                 order.items.all().delete()
                 created_items = []
                 purchase_subtotal = sum(
@@ -4215,7 +4222,10 @@ def orders_push(request):
                         input_data=validate_input_data(item_payload.get("input_data")),
                         direction=direction if direction is not None else -1,
                         buy_price=None if buy_price in (None, "") else Decimal(str(_to_float(buy_price))),
-                        warehouse=warehouse,
+                        warehouse=_resolve_mobile_warehouse(store, item_payload.get("warehouse_server_id"))
+                            if item_payload.get("warehouse_server_id") is not None
+                            else _resolve_mobile_warehouse(store, previous_line_warehouses[_to_int(item_payload.get("server_item_id"))])
+                            if previous_line_warehouses.get(_to_int(item_payload.get("server_item_id"))) is not None else warehouse,
                         access_id=None,
                     )
                     order_item.mobile_update_time = order.mobile_update_time

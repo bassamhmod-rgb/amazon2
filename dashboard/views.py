@@ -3112,6 +3112,8 @@ def store_settings(request, store_slug):
         if product_image_size not in dict(Store._meta.get_field("product_image_size").choices):
             messages.error(request, "حجم صور المنتجات غير صحيح.")
             return redirect(f"/dashboard/{store.slug}/settings/")
+        store.show_product_description = "show_product_description" in request.POST
+        store.show_product_categories = "show_product_categories" in request.POST
         store.product_layout = product_layout
         store.product_image_size = product_image_size
         display_currency = request.POST.get("display_currency", store.display_currency)

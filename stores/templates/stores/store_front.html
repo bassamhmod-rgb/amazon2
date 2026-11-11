@@ -233,6 +233,13 @@ button.btn-primary {
     width: min(var(--product-image-size), 100%);
 }
 .products-grid .product-info { min-width: 0; }
+.catalog-category { background: #fff; border-radius: 24px; padding: 1.25rem; }
+.catalog-category[hidden], .product-column[hidden] { display: none !important; }
+.product-description {
+    color: #6c757d; font-size: .9rem; white-space: pre-line;
+    overflow-wrap: anywhere; margin: .35rem 0 .65rem;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
 .products-grid.image-small .store-card { padding: .6rem .4rem; }
 .products-grid.image-medium .store-card { padding: .8rem .6rem; }
 .products-grid.image-small .product-name,
@@ -543,52 +550,30 @@ button.btn-primary {
         <h2 class="section-title">{{ store.description3 }}</h2>
         <p class="section-subtitle">{{ store.description4 }}</p>
 
+        {% if store.show_product_categories %}
+        {% regroup products by category as product_groups %}
+        {% for group in product_groups %}
+        <section class="catalog-category mt-4 text-start">
+            <h3 class="h5 fw-bold">{{ group.grouper.name|default:"بدون فئة" }}</h3>
+            <div class="row g-3 products-grid layout-{{ store.product_layout }} image-{{ store.product_image_size }}">
+                {% for p in group.list %}
+                {% include "stores/storefront_product_card.html" %}
+                {% endfor %}
+            </div>
+        </section>
+        {% empty %}
+        <p class="text-muted mt-3">?? ???? ?????? ?????.</p>
+        {% endfor %}
+        {% else %}
         <div class="row g-3 mt-3 products-grid layout-{{ store.product_layout }} image-{{ store.product_image_size }}">
             {% for p in products %}
-            <div class="col-6 col-md-3 product-column" data-product-id="{{ p.id }}">
-                {% include "stores/local_product_template.html" with product=p %}
-                <div class="store-card">
-                    <a href="{% url 'stores:product_public' store.slug p.id %}" class="product-image-link" aria-label="{{ p.name }}">
-                        {% if p.main_image %}
-                            <div class="product-image-square">
-                                <img src="{{ p.main_image.url }}" alt="{{ p.name }}">
-                            </div>
-                        {% else %}
-                            <div class="store-logo-circle">
-                                {{ p.name|slice:":2" }}
-                            </div>
-                        {% endif %}
-                    </a>
-
-                    <div class="product-info">
-                    <div class="product-heading">
-                    <div class="product-name">{{ p.name }}</div>
-{% if p.show_price %}
-    <div class="product-prices">
-    {% if store.display_currency == "USD" or store.display_currency == "BOTH" %}
-        {% if p.price_usd != None %}<div class="product-price">{{ p.price_usd|floatformat:2 }} $</div>{% endif %}
-    {% endif %}
-    {% if store.display_currency == "SYP" or store.display_currency == "BOTH" %}
-        {% if p.price_syp != None %}<div class="product-price">{{ p.price_syp|floatformat:0 }} ل.س</div>{% endif %}
-    {% endif %}
-    </div>
-{% endif %}
-                    </div>
-                    {% if p.show_price %}
-                    <form class="add-to-cart-form" onsubmit="return false;">
-                        <div class="local-product-quantity"></div>
-                        <button type="submit" class="btn btn-primary product-add-btn" disabled>إضافة</button>
-                    </form>
-                    {% else %}
-                    <p class="text-muted">الشراء من المركز مباشرة</p>
-                    {% endif %}
-                    </div>
-                </div>
-            </div>
+            {% include "stores/storefront_product_card.html" %}
             {% empty %}
                 <p class="text-muted mt-3">لا توجد منتجات متاحة.</p>
             {% endfor %}
         </div>
+
+        {% endif %}
 
         <p id="local-catalog-empty" class="text-muted mt-3" hidden>لا توجد منتجات مطابقة.</p>
         <div class="notice-box mt-4">

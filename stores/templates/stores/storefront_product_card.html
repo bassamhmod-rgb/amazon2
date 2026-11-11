@@ -1,0 +1,43 @@
+            <div class="col-6 col-md-3 product-column" data-product-id="{{ p.id }}">
+                {% include "stores/local_product_template.html" with product=p %}
+                <div class="store-card">
+                    <a href="{% url 'stores:product_public' store.slug p.id %}" class="product-image-link" aria-label="{{ p.name }}">
+                        {% if p.main_image %}
+                            <div class="product-image-square">
+                                <img src="{{ p.main_image.url }}" alt="{{ p.name }}">
+                            </div>
+                        {% else %}
+                            <div class="store-logo-circle">
+                                {{ p.name|slice:":2" }}
+                            </div>
+                        {% endif %}
+                    </a>
+
+                    <div class="product-info">
+                    <div class="product-heading">
+                    <div class="product-name">{{ p.name }}</div>
+{% if p.show_price %}
+    <div class="product-prices">
+    {% if store.display_currency == "USD" or store.display_currency == "BOTH" %}
+        {% if p.price_usd != None %}<div class="product-price">{{ p.price_usd|floatformat:2 }} $</div>{% endif %}
+    {% endif %}
+    {% if store.display_currency == "SYP" or store.display_currency == "BOTH" %}
+        {% if p.price_syp != None %}<div class="product-price">{{ p.price_syp|floatformat:0 }} ل.س</div>{% endif %}
+    {% endif %}
+    </div>
+{% endif %}
+                    </div>
+                    {% if store.show_product_description and p.description %}
+                    <p class="product-description">{{ p.description }}</p>
+                    {% endif %}
+                    {% if p.show_price %}
+                    <form class="add-to-cart-form" onsubmit="return false;">
+                        <div class="local-product-quantity"></div>
+                        <button type="submit" class="btn btn-primary product-add-btn" disabled>إضافة</button>
+                    </form>
+                    {% else %}
+                    <p class="text-muted">الشراء من المركز مباشرة</p>
+                    {% endif %}
+                    </div>
+                </div>
+            </div>

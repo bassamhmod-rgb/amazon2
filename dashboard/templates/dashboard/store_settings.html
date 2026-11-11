@@ -279,6 +279,16 @@
                             <div class="text-muted mt-1" style="font-size:13px;">الحجم الصغير يقلل مساحة البطاقة، ويعرض 3 منتجات بكل صف على الموبايل في العرض العمودي. العرض الأفقي يعرض منتجاً بكل صف.</div>
                         </div>
 
+                        <div class="col-md-12">
+                            <label class="d-block mb-2">
+                                <input type="checkbox" name="show_product_description" {% if store.show_product_description %}checked{% endif %}>
+                                إظهار الوصف الأساسي على كرت المنتج
+                            </label>
+                            <label class="d-block mb-2">
+                                <input type="checkbox" name="show_product_categories" {% if store.show_product_categories %}checked{% endif %}>
+                                عرض الفئات وتجميع المنتجات تحت اسم كل فئة
+                            </label>
+                        </div>
                         {% if store.accounting_clients.exists %}
                             <div class="alert alert-warning py-2" style="font-size:13px;">
                                 ملاحظة: المتجر مرتبط ببرنامج الأمان للمحاسبة، وطريقة التسعير تُحدد من البرنامج.

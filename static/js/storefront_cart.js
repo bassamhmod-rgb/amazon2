@@ -239,6 +239,9 @@
                 const show = p.name.toLocaleLowerCase().includes(q) && (!category || category === p.category) && (!category2 || category2 === p.category2);
                 card.hidden = !show; if (show) visible++;
             });
+            document.querySelectorAll('.catalog-category').forEach(section => {
+                section.hidden = !section.querySelector('.product-column:not([hidden])');
+            });
             const empty = document.getElementById('local-catalog-empty');
             if (empty) empty.hidden = visible > 0;
             if (push) {
