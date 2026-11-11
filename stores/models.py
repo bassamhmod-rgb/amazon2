@@ -295,6 +295,9 @@ class Warehouse(models.Model):
         help_text="تمييز هذا السجل كمندوب",
     )
 
+    linked_customer = models.ForeignKey("accounts.Customer", null=True, blank=True,
+        on_delete=models.SET_NULL, related_name="representative_warehouses")
+
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
 

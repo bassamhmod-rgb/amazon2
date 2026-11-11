@@ -75,3 +75,32 @@ class RepresentativeCommissionSyncTests(TestCase):
                 {"mode": "sales", "rate": 5, "amount": float("nan"), "currency": "SYP"}]:
             with self.assertRaises((ValueError, KeyError)):
                 _validate_commission_data(json.dumps(data))
+
+    def test_fixed_commission_allows_an_amount_over_one_hundred(self):
+        snapshot = {"warehouse_id": self.rep.pk, "mode": "fixed", "scope": "line",
+            "rate": 150, "amount": 150, "currency": "USD"}
+        self.assertEqual(json.loads(_validate_commission_data(json.dumps(snapshot))), snapshot)
+
+    def test_fixed_invoice_and_line_terms_survive_order_roundtrip(self):
+        terms = {"warehouse_id": self.rep.pk, "mode": "fixed", "scope": "invoice",
+            "rate": 75, "currency": "USD"}
+        source = {"version": 1, "currency": "SYP", "values": {
+            "subtotal": "20", "payment": "0", "discount": "0", "total": "20"},
+            "representative_commission": terms,
+            "representative_commission_result": dict(terms, amount=75, decimal_places=2)}
+        line = {"local_item_id": 1, "product_server_id": self.product.pk,
+            "warehouse_server_id": self.rep.pk, "quantity": 2, "price": 10, "direction": -1,
+            "commission_data": json.dumps(dict(terms, scope="line", rate=25, amount=25))}
+        request = APIRequestFactory().post("/", {"merchant_id": self.store.pk, "orders": [{
+            "local_order_id": 1, "sync_client_id": "fixed-commission-test",
+            "customer_server_id": self.customer.pk, "warehouse_server_id": self.rep.pk,
+            "transaction_type": "sale", "status": "completed", "amount": 20,
+            "payment": 0, "input_data": json.dumps(source), "items": [line]}]}, format="json")
+        with patch("mobile_sync.views._ensure_store_user_sync_device", return_value=(None, None)):
+            response = orders_push(request)
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertFalse(response.data.get("errors"), response.data)
+        item = OrderItem.objects.get(order__store=self.store)
+        pulled = _serialize_order_for_mobile(item.order)
+        self.assertEqual(json.loads(pulled["input_data"]), source)
+        self.assertEqual(json.loads(pulled["items"][0]["commission_data"])["amount"], 25)

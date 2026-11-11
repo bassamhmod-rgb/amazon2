@@ -408,6 +408,7 @@ def _serialize_warehouse(warehouse):
         "address": warehouse.address or "",
         "phone": warehouse.phone or "",
         "percentage": float(warehouse.percentage or 0),
+        "linked_customer_id": warehouse.linked_customer_id,
         "commission_mode": warehouse.commission_mode,
         "commission_currency": warehouse.commission_currency,
         "is_representative": warehouse.is_representative,
@@ -1493,6 +1494,31 @@ def _apply_warehouse_change(store, payload, server_id=None):
         "is_active": _to_bool(payload.get("is_active"), True),
         "mobile_update_time": now_minute,
     }
+
+    if "linked_customer_id" in payload:
+        customer_id = _to_int(payload.get("linked_customer_id"))
+        customer_name = _to_str(payload.get("linked_customer_name")).strip()
+        customer = None
+        if customer_id:
+            customer = Customer.objects.filter(store=store, pk=customer_id).first()
+        elif customer_name:
+            matches = Customer.objects.filter(store=store, name=customer_name)
+            if matches.count() == 1:
+                customer = matches.first()
+        if (customer_id or customer_name) and not customer:
+            raise ValueError("Linked customer is unavailable in this store")
+        if not update_fields["is_representative"] or is_main:
+            customer = None
+        if customer:
+            conflicts = Warehouse.objects.filter(store=store, linked_customer=customer,
+                is_representative=True, is_active=True)
+            if obj:
+                conflicts = conflicts.exclude(pk=obj.pk)
+            if conflicts.exists():
+                raise ValueError("Customer already has a representative")
+        update_fields["linked_customer_id"] = customer.pk if customer else None
+    elif not update_fields["is_representative"]:
+        update_fields["linked_customer_id"] = None
 
     if obj:
         Warehouse.objects.filter(id=obj.id, store=store).update(**update_fields)
@@ -2739,6 +2765,7 @@ def warehouses_pull(request):
             "percentage",
             "commission_mode",
             "commission_currency",
+            "linked_customer_id",
             "is_representative",
             "is_main",
             "is_active",
@@ -3232,7 +3259,7 @@ def sync_push(request):
             "category": 0,
             "customer": 0,
             "supplier": 0,
-            "warehouse": 0,
+            "warehouse": 1,
             "expense_type": 0,
             "expense_reason": 0,
             "employee_department": 0,
@@ -3375,6 +3402,9 @@ def sync_push(request):
                         "update_time": _mobile_time(obj),
                     })
                 elif entity == "warehouse":
+                    linked_local_id = _to_int(payload_item.get("linked_customer_local_id"))
+                    if not payload_item.get("linked_customer_id") and linked_local_id in customer_local_to_server:
+                        payload_item = dict(payload_item, linked_customer_id=customer_local_to_server[linked_local_id].pk)
                     obj, action = _apply_warehouse_change(
                         store,
                         payload_item,
@@ -4300,13 +4330,13 @@ def _validate_commission_data(value):
         return None
     import json
     data = json.loads(value)
-    if not isinstance(data, dict) or data.get("mode") not in ("sales", "profit", "piece") or data.get("currency") not in ("SYP", "USD"):
+    if not isinstance(data, dict) or data.get("mode") not in ("sales", "profit", "piece", "fixed") or data.get("currency") not in ("SYP", "USD"):
         raise ValueError("Invalid commission data")
     for name in ("rate", "amount"):
         number = float(data[name])
         if not math.isfinite(number) or number < 0:
             raise ValueError("Invalid commission amount")
-    if data["mode"] != "piece" and float(data["rate"]) > 100:
+    if data["mode"] in ("sales", "profit") and float(data["rate"]) > 100:
         raise ValueError("Invalid commission rate")
     return json.dumps(data, ensure_ascii=False)
 
