@@ -315,6 +315,7 @@ class Order(models.Model):
         return self.net_total - self.payment
 
 class OrderItem(models.Model):
+    commission_data = models.TextField(blank=True, null=True)
     @property
     def input_price(self):
         from mobile_sync.input_money import source_values

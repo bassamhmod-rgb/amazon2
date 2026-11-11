@@ -408,6 +408,8 @@ def _serialize_warehouse(warehouse):
         "address": warehouse.address or "",
         "phone": warehouse.phone or "",
         "percentage": float(warehouse.percentage or 0),
+        "commission_mode": warehouse.commission_mode,
+        "commission_currency": warehouse.commission_currency,
         "is_representative": warehouse.is_representative,
         "is_main": warehouse.is_main,
         "is_active": warehouse.is_active,
@@ -530,6 +532,7 @@ def _serialize_expense(expense):
     payment_currency = _mobile_currency_value(expense, "payment_currency", getattr(store, "pricing_currency", "SYP") or "SYP")
     return {
         "input_data": getattr(expense, "input_data", None),
+        "representative_warehouse_server_id": getattr(expense, "representative_warehouse_id", None),
         "id": expense.id,
         "amount": float(expense.amount or 0),
         "payment_currency": payment_currency,
@@ -1466,6 +1469,13 @@ def _apply_warehouse_change(store, payload, server_id=None):
     if not obj:
         obj = Warehouse.objects.filter(store=store, name=name).first()
 
+    commission_mode = payload.get("commission_mode", obj.commission_mode if obj else "sales")
+    commission_currency = payload.get("commission_currency", obj.commission_currency if obj else "SYP")
+    percentage = _to_float(payload.get("percentage"), 0.0)
+    if commission_mode not in ("sales", "profit", "piece") or commission_currency not in ("SYP", "USD"):
+        raise ValueError("Invalid commission settings")
+    if not math.isfinite(percentage) or percentage < 0 or (commission_mode != "piece" and percentage > 100):
+        raise ValueError("Invalid commission rate")
     is_main = bool(obj.is_main) if obj else _to_bool(payload.get("is_main"), False)
     if is_main:
         name = Warehouse.MAIN_WAREHOUSE_NAME
@@ -1475,7 +1485,9 @@ def _apply_warehouse_change(store, payload, server_id=None):
         "name": name,
         "address": _to_str(payload.get("address")).strip(),
         "phone": _to_str(payload.get("phone")).strip(),
-        "percentage": Decimal(str(_to_float(payload.get("percentage"), 0.0))),
+        "percentage": Decimal(str(percentage)),
+        "commission_mode": commission_mode,
+        "commission_currency": commission_currency,
         "is_representative": _to_bool(payload.get("is_representative"), False),
         "is_main": is_main,
         "is_active": _to_bool(payload.get("is_active"), True),
@@ -1793,6 +1805,15 @@ def _apply_expense_change(store, payload, server_id=None, mobile_sync_key=None):
         "notes": _to_str(payload.get("notes")),
         "mobile_update_time": now_minute,
     }
+    if "representative_warehouse_server_id" in payload:
+        rep_id = _to_int(payload.get("representative_warehouse_server_id"))
+        representative = Warehouse.objects.filter(store=store, id=rep_id).first() if rep_id else None
+        if rep_id and rep_id < 0 and representative is None:
+            representative = Warehouse.objects.filter(store=store,
+                identifier=_to_str(payload.get("representative_warehouse_identifier"))).first()
+        if rep_id and representative is None:
+            raise ValueError("Invalid representative warehouse")
+        update_fields["representative_warehouse"] = representative
     update_fields.update(_currency_sync_fields(payload, ("payment_currency", "exchange_rate", "amount_payment_currency")))
     obj = Expense.objects.filter(id=server_id, store=store).first() if server_id else None
     if not obj and mobile_sync_key:
@@ -2716,6 +2737,8 @@ def warehouses_pull(request):
             "address",
             "phone",
             "percentage",
+            "commission_mode",
+            "commission_currency",
             "is_representative",
             "is_main",
             "is_active",
@@ -4182,6 +4205,7 @@ def orders_push(request):
                 order.save()
 
                 previous_line_notes = dict(order.items.values_list("id", "line_note"))
+                previous_line_commissions = dict(order.items.values_list("id", "commission_data"))
                 previous_line_warehouses = dict(order.items.values_list("id", "warehouse_id"))
                 order.items.all().delete()
                 created_items = []
@@ -4220,6 +4244,7 @@ def orders_push(request):
                         bonus_quantity=Decimal(str(max(0, _to_float(item_payload.get("bonus_quantity"), 0)))),
                         price=Decimal(str(price)),
                         input_data=validate_input_data(item_payload.get("input_data")),
+                        commission_data=_validate_commission_data(item_payload.get("commission_data")) if "commission_data" in item_payload else previous_line_commissions.get(_to_int(item_payload.get("server_item_id"))),
                         direction=direction if direction is not None else -1,
                         buy_price=None if buy_price in (None, "") else Decimal(str(_to_float(buy_price))),
                         warehouse=_resolve_mobile_warehouse(store, item_payload.get("warehouse_server_id"))
@@ -4270,6 +4295,22 @@ def orders_push(request):
         return Response({"detail": str(exc)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+def _validate_commission_data(value):
+    if value is None:
+        return None
+    import json
+    data = json.loads(value)
+    if not isinstance(data, dict) or data.get("mode") not in ("sales", "profit", "piece") or data.get("currency") not in ("SYP", "USD"):
+        raise ValueError("Invalid commission data")
+    for name in ("rate", "amount"):
+        number = float(data[name])
+        if not math.isfinite(number) or number < 0:
+            raise ValueError("Invalid commission amount")
+    if data["mode"] != "piece" and float(data["rate"]) > 100:
+        raise ValueError("Invalid commission rate")
+    return json.dumps(data, ensure_ascii=False)
+
+
 def _serialize_order_item_for_mobile(item):
     buy_price = getattr(item, "buy_price", None)
     price_alt = total_alt = 0
@@ -4296,6 +4337,7 @@ def _serialize_order_item_for_mobile(item):
         "total_alt": float(total_alt),
         "direction": getattr(item, "direction", -1),
         "buy_price": None if buy_price is None else _to_float(buy_price),
+        "commission_data": item.commission_data,
         "item_note": getattr(item, "item_note", "") or "",
         "line_note": getattr(item, "line_note", "") or "",
         "update_time": _mobile_time(item),

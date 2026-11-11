@@ -282,12 +282,14 @@ class Warehouse(models.Model):
     phone = models.CharField(max_length=30, blank=True, null=True)
 
     percentage = models.DecimalField(
-        max_digits=6,
-        decimal_places=2,
+        max_digits=28,
+        decimal_places=12,
         default=Decimal("0.00"),
-        validators=[MinValueValidator(Decimal("0.00")), MaxValueValidator(Decimal("100.00"))],
+        validators=[MinValueValidator(Decimal("0.00"))],
         help_text="نسبة (مثال: 5 = 5%)",
     )
+    commission_mode = models.CharField(max_length=10, default="sales", choices=[("sales", "نسبة من المبيعات"), ("profit", "نسبة من الأرباح"), ("piece", "مبلغ على القطعة")])
+    commission_currency = models.CharField(max_length=3, default="SYP")
     is_representative = models.BooleanField(
         default=False,
         help_text="تمييز هذا السجل كمندوب",
@@ -319,6 +321,10 @@ class Warehouse(models.Model):
         ordering = ["store_id", "name"]
 
     def clean(self):
+        if self.commission_currency not in ("SYP", "USD"):
+            raise ValidationError({"commission_currency": "العملة يجب أن تكون SYP أو USD."})
+        if self.commission_mode != "piece" and self.percentage is not None and self.percentage > 100:
+            raise ValidationError({"percentage": "النسبة يجب أن تكون بين 0 و100."})
         if self.is_main and self.name and self.name != self.MAIN_WAREHOUSE_NAME:
             raise ValidationError({"name": f'اسم المستودع الرئيسي يجب أن يكون "{self.MAIN_WAREHOUSE_NAME}".'})
 

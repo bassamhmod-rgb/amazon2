@@ -65,6 +65,8 @@ class ExpenseReason(models.Model):
         _touch_mobile_update_time(self, kwargs)
         return super().save(*args, **kwargs)
 class Expense(models.Model):
+    representative_warehouse = models.ForeignKey("stores.Warehouse", on_delete=models.PROTECT,
+        null=True, blank=True, related_name="commission_payments")
     @property
     def input_amount(self):
         import json

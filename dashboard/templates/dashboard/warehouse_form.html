@@ -129,9 +129,23 @@
                         {% for error in form.phone.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
                     </div>
                     <div class="col-md-6">
-                        <label class="form-label">النسبة (1 - 100)</label>
+                        <label class="form-label">قيمة العمولة (نسبة 0–100 أو مبلغ لكل قطعة)</label>
                         {{ form.percentage }}
                         {% for error in form.percentage.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">طريقة احتساب العمولة</label>
+                        {{ form.commission_mode }}
+                        {% for error in form.commission_mode.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">عملة مبلغ القطعة (SYP أو USD)</label>
+                        {{ form.commission_currency }}
+                        {% for error in form.commission_currency.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+                    </div>
+                    <div class="col-12 form-check">
+                        {{ form.is_representative }}
+                        <label class="form-check-label">مندوب</label>
                     </div>
 
                     <div class="col-12">

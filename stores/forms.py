@@ -12,6 +12,8 @@ class WarehouseForm(forms.ModelForm):
             "address",
             "phone",
             "percentage",
+            "commission_mode",
+            "commission_currency",
             "is_representative",
             "is_active",
         ]
