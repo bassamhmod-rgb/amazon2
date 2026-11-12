@@ -15,6 +15,7 @@ class WarehouseForm(forms.ModelForm):
             "commission_mode",
             "commission_currency",
             "is_representative",
+            "sales_from_main",
             "is_active",
         ]
 

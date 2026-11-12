@@ -373,6 +373,7 @@ def _serialize_customer(customer):
         "opening_balance": float(customer.opening_balance),
         "opening_balance_syp": float(customer.opening_balance_syp) if customer.opening_balance_syp is not None else None,
         "opening_balance_usd": float(customer.opening_balance_usd) if customer.opening_balance_usd is not None else None,
+        "representative_warehouse_id": customer.representative_warehouse_id,
         "preferred_price_level": getattr(customer, "preferred_price_level", 0) or 0,
         "is_subscription_active": customer.is_subscription_active,
         "access_id": customer.access_id,
@@ -408,10 +409,10 @@ def _serialize_warehouse(warehouse):
         "address": warehouse.address or "",
         "phone": warehouse.phone or "",
         "percentage": float(warehouse.percentage or 0),
-        "linked_customer_id": warehouse.linked_customer_id,
         "commission_mode": warehouse.commission_mode,
         "commission_currency": warehouse.commission_currency,
         "is_representative": warehouse.is_representative,
+        "sales_from_main": warehouse.sales_from_main,
         "is_main": warehouse.is_main,
         "is_active": warehouse.is_active,
         "access_id": warehouse.access_id,
@@ -1126,6 +1127,23 @@ def _apply_customer_change(store, payload, server_id=None):
     if customers_with_phone(Customer.objects.filter(store=store).exclude(pk=obj.pk if obj else None), phone).exists():
         raise CustomerIdentityCollision("رقم الموبايل مسجل لعميل آخر. يرجى تصحيح الرقم قبل المزامنة.")
 
+    representative_provided = "representative_warehouse_id" in payload or "representative_warehouse_identifier" in payload
+    representative = None
+    if representative_provided:
+        representative_id = _to_int(payload.get("representative_warehouse_id"))
+        identifier = _to_str(payload.get("representative_warehouse_identifier")).strip()
+        candidates = Warehouse.objects.filter(store=store, is_representative=True)
+        if representative_id and representative_id > 0:
+            representative = candidates.filter(pk=representative_id).first()
+        elif identifier:
+            representative = candidates.filter(identifier=identifier).first()
+        if (representative_id or identifier) and representative is None:
+            raise ValueError("Selected representative is unavailable in this store")
+        if representative and not representative.is_active and (not obj or obj.representative_warehouse_id != representative.pk):
+            raise ValueError("Selected representative is inactive")
+        if name == GENERAL_CUSTOMER_NAME:
+            representative = None
+
     update_fields = {
         "name": name,
         "phone": phone,
@@ -1137,6 +1155,8 @@ def _apply_customer_change(store, payload, server_id=None):
         "is_subscription_active": _to_bool(payload.get("is_subscription_active")),
         "mobile_update_time": now_minute,
     }
+    if representative_provided:
+        update_fields["representative_warehouse_id"] = representative.pk if representative else None
     if "private_note" in payload:
         update_fields["private_note"] = _to_str(payload.get("private_note")).strip()
     for currency in ("syp", "usd"):
@@ -1172,6 +1192,7 @@ def _apply_customer_change(store, payload, server_id=None):
         opening_balance_syp=update_fields.get("opening_balance_syp"),
         opening_balance_usd=update_fields.get("opening_balance_usd"),
         preferred_price_level=preferred_price_level,
+        representative_warehouse_id=update_fields.get("representative_warehouse_id"),
         is_subscription_active=update_fields["is_subscription_active"],
         mobile_update_time=now_minute,
     )
@@ -1495,30 +1516,12 @@ def _apply_warehouse_change(store, payload, server_id=None):
         "mobile_update_time": now_minute,
     }
 
-    if "linked_customer_id" in payload:
-        customer_id = _to_int(payload.get("linked_customer_id"))
-        customer_name = _to_str(payload.get("linked_customer_name")).strip()
-        customer = None
-        if customer_id:
-            customer = Customer.objects.filter(store=store, pk=customer_id).first()
-        elif customer_name:
-            matches = Customer.objects.filter(store=store, name=customer_name)
-            if matches.count() == 1:
-                customer = matches.first()
-        if (customer_id or customer_name) and not customer:
-            raise ValueError("Linked customer is unavailable in this store")
-        if not update_fields["is_representative"] or is_main:
-            customer = None
-        if customer:
-            conflicts = Warehouse.objects.filter(store=store, linked_customer=customer,
-                is_representative=True, is_active=True)
-            if obj:
-                conflicts = conflicts.exclude(pk=obj.pk)
-            if conflicts.exists():
-                raise ValueError("Customer already has a representative")
-        update_fields["linked_customer_id"] = customer.pk if customer else None
+    if "sales_from_main" in payload:
+        update_fields["sales_from_main"] = update_fields["is_representative"] and not is_main and _to_bool(payload.get("sales_from_main"), False)
     elif not update_fields["is_representative"]:
-        update_fields["linked_customer_id"] = None
+        update_fields["sales_from_main"] = False
+
+    update_fields["linked_customer_id"] = None
 
     if obj:
         Warehouse.objects.filter(id=obj.id, store=store).update(**update_fields)
@@ -1544,6 +1547,8 @@ def _apply_warehouse_transfer_change(store, payload, server_id=None, product_res
             to_warehouse = Warehouse.objects.filter(store=store, identifier=to_identifier).first()
     if not from_warehouse or not to_warehouse:
         raise ValueError("Transfer warehouses are required")
+    if to_warehouse.is_representative and to_warehouse.sales_from_main:
+        raise ValueError("هذا المندوب يبيع من المستودع الرئيسي مباشرة ولا يستقبل مخزوناً بمناقلة.")
     if from_warehouse.id == to_warehouse.id:
         raise ValueError("Transfer source and target must be different")
 
@@ -2767,6 +2772,7 @@ def warehouses_pull(request):
             "commission_currency",
             "linked_customer_id",
             "is_representative",
+            "sales_from_main",
             "is_main",
             "is_active",
             "access_id",
@@ -3257,9 +3263,9 @@ def sync_push(request):
     def entity_priority(item):
         return {
             "category": 0,
-            "customer": 0,
+            "customer": 1,
             "supplier": 0,
-            "warehouse": 1,
+            "warehouse": 0,
             "expense_type": 0,
             "expense_reason": 0,
             "employee_department": 0,
@@ -3402,9 +3408,6 @@ def sync_push(request):
                         "update_time": _mobile_time(obj),
                     })
                 elif entity == "warehouse":
-                    linked_local_id = _to_int(payload_item.get("linked_customer_local_id"))
-                    if not payload_item.get("linked_customer_id") and linked_local_id in customer_local_to_server:
-                        payload_item = dict(payload_item, linked_customer_id=customer_local_to_server[linked_local_id].pk)
                     obj, action = _apply_warehouse_change(
                         store,
                         payload_item,
@@ -4129,6 +4132,11 @@ def orders_push(request):
                         errors.append({"detail": "Invalid item warehouse", "local_order_id": local_order_id})
                         prepared_items = None
                         break
+                    rep_id = item_payload.get("representative_warehouse_server_id")
+                    if rep_id is not None and not Warehouse.objects.filter(pk=_to_int(rep_id), store=store).exists():
+                        errors.append({"detail": "Invalid representative warehouse", "local_order_id": local_order_id})
+                        prepared_items = None
+                        break
                     prepared_items.append((item_payload, product))
 
                 if prepared_items is None:
@@ -4236,6 +4244,7 @@ def orders_push(request):
 
                 previous_line_notes = dict(order.items.values_list("id", "line_note"))
                 previous_line_commissions = dict(order.items.values_list("id", "commission_data"))
+                previous_line_representatives = dict(order.items.values_list("id", "representative_warehouse_id"))
                 previous_line_warehouses = dict(order.items.values_list("id", "warehouse_id"))
                 order.items.all().delete()
                 created_items = []
@@ -4274,6 +4283,9 @@ def orders_push(request):
                         bonus_quantity=Decimal(str(max(0, _to_float(item_payload.get("bonus_quantity"), 0)))),
                         price=Decimal(str(price)),
                         input_data=validate_input_data(item_payload.get("input_data")),
+                        representative_warehouse=Warehouse.objects.filter(store=store, pk=_to_int(item_payload.get("representative_warehouse_server_id"))).first()
+                            if "representative_warehouse_server_id" in item_payload
+                            else Warehouse.objects.filter(store=store, pk=previous_line_representatives.get(_to_int(item_payload.get("server_item_id")))).first(),
                         commission_data=_validate_commission_data(item_payload.get("commission_data")) if "commission_data" in item_payload else previous_line_commissions.get(_to_int(item_payload.get("server_item_id"))),
                         direction=direction if direction is not None else -1,
                         buy_price=None if buy_price in (None, "") else Decimal(str(_to_float(buy_price))),
@@ -4359,6 +4371,7 @@ def _serialize_order_item_for_mobile(item):
         "input_data": getattr(item, "input_data", None),
         "id": item.id,
         "product_id": getattr(item, "product_id", None),
+        "representative_warehouse_id": item.representative_warehouse_id,
         "warehouse_id": getattr(item, "warehouse_id", None),
         "quantity": _to_float(getattr(item, "quantity", 0)),
         "bonus_quantity": _to_float(getattr(item, "bonus_quantity", 0)),

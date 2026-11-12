@@ -10,7 +10,7 @@ from django.db import transaction
 
 from accounts.models import Customer, PointsTransaction, normalize_phone_number
 from orders.models import Order
-from stores.models import Store
+from stores.models import Store, Warehouse
 from .models import CustomerSyncAlias, CustomerSyncOrigin, CustomerResolutionReceipt
 
 
@@ -156,10 +156,13 @@ def resolve_customers(store, payload, serialize):
                 canonical.access_id = duplicate.access_id
             # Only these models reference Customer. Fail closed if a new relation
             # is introduced, instead of cascading away financial history.
-            supported = {Order, PointsTransaction, CustomerSyncOrigin, CustomerSyncAlias}
+            supported = {Order, PointsTransaction, CustomerSyncOrigin, CustomerSyncAlias, Warehouse}
             if any(relation.related_model not in supported for relation in Customer._meta.related_objects):
                 raise ValueError("توجد حركات عملاء جديدة تحتاج دعماً قبل الدمج.")
             now = int(time.time() // 60)
+            # The retired warehouse-side customer link is no longer used.
+            Warehouse.objects.filter(linked_customer=duplicate).update(
+                linked_customer=None, mobile_update_time=now, update_time=now)
             Order.objects.filter(customer=duplicate).update(customer=canonical, mobile_update_time=now, update_time=now)
             PointsTransaction.objects.filter(customer=duplicate).update(customer=canonical,
                 customer_name=validated[keep]["name"], mobile_update_time=now, update_time=now)

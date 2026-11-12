@@ -295,6 +295,7 @@ class Warehouse(models.Model):
         help_text="تمييز هذا السجل كمندوب",
     )
 
+    sales_from_main = models.BooleanField(default=False)
     linked_customer = models.ForeignKey("accounts.Customer", null=True, blank=True,
         on_delete=models.SET_NULL, related_name="representative_warehouses")
 
@@ -377,6 +378,9 @@ class WarehouseTransfer(models.Model):
 
     def clean(self):
         if self.from_warehouse_id and self.to_warehouse_id:
+            if Warehouse.objects.filter(pk=self.to_warehouse_id,
+                    is_representative=True, sales_from_main=True).exists():
+                raise ValidationError("هذا المندوب يبيع من المستودع الرئيسي مباشرة ولا يستقبل مخزوناً بمناقلة.")
             if self.from_warehouse_id == self.to_warehouse_id:
                 raise ValidationError("لا يمكن المناقلة لنفس المستودع.")
             if self.from_warehouse.store_id != self.store_id or self.to_warehouse.store_id != self.store_id:

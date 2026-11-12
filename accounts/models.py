@@ -342,6 +342,9 @@ class Customer(models.Model):
     )
 
     is_subscription_active = models.BooleanField(default=False)
+    representative_warehouse = models.ForeignKey(
+        "stores.Warehouse", null=True, blank=True, on_delete=models.SET_NULL,
+        related_name="assigned_customers")
     preferred_price_level = models.PositiveSmallIntegerField(
         default=0,
         choices=[
@@ -369,6 +372,11 @@ class Customer(models.Model):
             ),
         ]
     def save(self, *args, **kwargs):
+        if self.representative_warehouse_id:
+            from stores.models import Warehouse
+            if not Warehouse.objects.filter(pk=self.representative_warehouse_id,
+                    store_id=self.store_id, is_representative=True).exists():
+                raise ValidationError("المندوب المحدد غير متاح لهذا المتجر.")
         _touch_update_time(self, kwargs)
         _touch_mobile_update_time(self, kwargs)
         self.name = self.name.strip()

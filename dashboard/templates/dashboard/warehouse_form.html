@@ -147,6 +147,11 @@
                         {{ form.is_representative }}
                         <label class="form-check-label">مندوب</label>
                     </div>
+                    <div class="col-12 form-check">
+                        {{ form.sales_from_main }}
+                        <label class="form-check-label">البيع مباشرة من المستودع الرئيسي (مسوّق بالعمولة، بدون مناقلة)</label>
+                        {% for error in form.sales_from_main.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+                    </div>
 
                     <div class="col-12">
                         <div class="form-check">

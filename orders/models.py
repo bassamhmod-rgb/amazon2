@@ -342,6 +342,8 @@ class OrderItem(models.Model):
         blank=True,
         related_name="order_items",
     )
+    representative_warehouse = models.ForeignKey("stores.Warehouse", on_delete=models.PROTECT,
+        null=True, blank=True, related_name="commission_order_items")
     order = models.ForeignKey(
         Order,
         on_delete=models.CASCADE,
@@ -409,6 +411,18 @@ class OrderItem(models.Model):
         return self.subtotal - self.buy_price * self.stock_quantity
 
     def save(self, *args, **kwargs):
+        if not self.pk and self.representative_warehouse_id is None and self.order_id:
+            selected = self.warehouse or self.order.warehouse
+            if (self.order.transaction_type in ("sale", "sale_return") and selected
+                    and selected.is_representative and selected.sales_from_main):
+                from stores.models import Warehouse
+                main = Warehouse.objects.filter(store_id=self.order.store_id, is_main=True, is_active=True).first()
+                if main is None:
+                    raise ValueError("Main warehouse unavailable for direct representative sale")
+                self.representative_warehouse = selected
+                self.warehouse = main
+        if self.representative_warehouse_id and self.representative_warehouse.store_id != self.order.store_id:
+            raise ValueError("Representative warehouse belongs to another store")
         _touch_update_time(self, kwargs)
         _touch_mobile_update_time(self, kwargs)
         with transaction.atomic():
