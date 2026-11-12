@@ -4422,6 +4422,7 @@ def _serialize_order_for_mobile(order):
 
     return {
         "input_data": getattr(order, "input_data", None),
+        "currency_decimal_places": getattr(order.store, "currency_decimal_places", 2),
         "id": order.id,
         "update_time": _mobile_time(order),
         "customer_id": order.customer_id,

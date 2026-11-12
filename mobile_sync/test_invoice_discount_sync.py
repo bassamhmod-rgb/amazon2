@@ -10,19 +10,23 @@ from .views import _serialize_order_for_mobile, orders_pull
 
 
 class InvoiceDiscountSerializationTests(TestCase):
-    def serialize(self, transaction_type, discount, document_kind=1):
+    def serialize(self, transaction_type, discount, document_kind=1,
+                  decimal_places=2, price="60"):
         order = SimpleNamespace(
             id=1, customer_id=None, supplier_id=None, warehouse_id=None,
             created_by_store_user_id=None, transaction_type=transaction_type,
-            store=SimpleNamespace(pricing_currency="USD", exchange_rate=144),
+            store=SimpleNamespace(pricing_currency="USD", exchange_rate=144,
+                                  currency_decimal_places=decimal_places),
             document_kind=document_kind, discount=Decimal(discount),
             amount=Decimal("999"), payment=Decimal("200"),
             shipping_cost=Decimal("50"),
             prefetched_mobile_items=[SimpleNamespace(
                 id=1, quantity=Decimal("10"), bonus_quantity=Decimal("2"),
-                price=Decimal("60"), buy_price=Decimal("47.5")),
+                price=Decimal(price), buy_price=Decimal("47.5"),
+                representative_warehouse_id=None, commission_data=None),
                 SimpleNamespace(id=2, quantity=Decimal("20"),
-                                price=Decimal("20"))],
+                                price=Decimal("20"), representative_warehouse_id=None,
+                                commission_data=None)],
         )
         return _serialize_order_for_mobile(order)
 
@@ -31,6 +35,7 @@ class InvoiceDiscountSerializationTests(TestCase):
             with self.subTest(transaction_type=kind):
                 payload = self.serialize(kind, "100")
                 self.assertEqual(payload["amount"], 1000)
+                self.assertEqual(payload["currency_decimal_places"], 2)
                 self.assertEqual(payload["discount"], 100)
                 self.assertEqual(payload["payment"], 200)
                 # Same expression used by the mobile party balance queries.
@@ -38,6 +43,15 @@ class InvoiceDiscountSerializationTests(TestCase):
 
     def test_no_discount_keeps_subtotal(self):
         self.assertEqual(self.serialize("sale", "0")["amount"], 1000)
+
+    def test_store_precision_travels_with_rounded_total_and_exact_item_prices(self):
+        for places, expected in ((0, 401), (2, 401.23), (4, 401.2346)):
+            with self.subTest(decimal_places=places):
+                payload = self.serialize("sale", "0", decimal_places=places,
+                                         price="0.123456")
+                self.assertEqual(payload["currency_decimal_places"], places)
+                self.assertEqual(payload["amount"], expected)
+                self.assertEqual(payload["items"][0]["price"], 0.123456)
 
     def test_notice_retains_its_stored_amount(self):
         self.assertEqual(self.serialize("sale", "0", document_kind=2)["amount"], 999)
