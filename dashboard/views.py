@@ -71,6 +71,7 @@ from decimal import Decimal, InvalidOperation
 @contextmanager
 def _store_reset_delete_logging_disabled():
     from django.db.models.signals import pre_delete
+    from accounts.party_fx_signals import suspend_party_fx_for_store_reset
     from accounts import signals as account_signals
     from mobile_sync import signals as mobile_signals
 
@@ -102,7 +103,8 @@ def _store_reset_delete_logging_disabled():
     for receiver, sender in receivers:
         pre_delete.disconnect(receiver=receiver, sender=sender)
     try:
-        yield
+        with suspend_party_fx_for_store_reset():
+            yield
     finally:
         for receiver, sender in receivers:
             pre_delete.connect(receiver, sender=sender)

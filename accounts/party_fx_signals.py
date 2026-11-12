@@ -1,9 +1,25 @@
+from contextlib import contextmanager
+from contextvars import ContextVar
+
 from django.db.models.signals import pre_save, post_save, pre_delete
 from django.dispatch import receiver
 from accounts.models import Customer, Supplier, PartyFxState
 from orders.models import Order, OrderItem
 from stores.models import Store
 from .party_fx import mark_dirty
+
+
+_reset_in_progress = ContextVar('party_fx_store_reset', default=False)
+
+
+@contextmanager
+def suspend_party_fx_for_store_reset():
+    """Skip obsolete party updates while the store's parties are being removed."""
+    token = _reset_in_progress.set(True)
+    try:
+        yield
+    finally:
+        _reset_in_progress.reset(token)
 
 
 @receiver(pre_save, sender=Order)
@@ -18,6 +34,8 @@ def old_order_party(sender, instance, **kwargs):
 @receiver(post_save, sender=Order)
 @receiver(pre_delete, sender=Order)
 def order_party(sender, instance, **kwargs):
+    if _reset_in_progress.get():
+        return
     mark_dirty(instance.store_id, 'customer', instance.customer_id)
     mark_dirty(instance.store_id, 'supplier', instance.supplier_id)
 
@@ -25,6 +43,8 @@ def order_party(sender, instance, **kwargs):
 @receiver(post_save, sender=OrderItem)
 @receiver(pre_delete, sender=OrderItem)
 def line_party(sender, instance, **kwargs):
+    if _reset_in_progress.get():
+        return
     order = Order.objects.filter(pk=instance.order_id).first()
     if order:
         order_party(Order, order)
@@ -35,6 +55,8 @@ def line_party(sender, instance, **kwargs):
 @receiver(post_save, sender=Supplier)
 @receiver(pre_delete, sender=Supplier)
 def opening_party(sender, instance, **kwargs):
+    if _reset_in_progress.get():
+        return
     mark_dirty(instance.store_id, 'supplier' if sender is Supplier else 'customer', instance.pk)
 
 
