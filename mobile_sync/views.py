@@ -1,4 +1,5 @@
-﻿from .input_money import validate_input_data
+from .movement_attribution import serialize_attributed, apply_attributed, repair_attribution
+from .input_money import validate_input_data
 from .customer_resolution import CustomerIdentityCollision
 import hashlib
 import base64
@@ -420,6 +421,7 @@ def _serialize_warehouse(warehouse):
     }
 
 
+@serialize_attributed('warehouse_transfer')
 def _serialize_warehouse_transfer(transfer):
     return {
         "id": transfer.id,
@@ -446,6 +448,7 @@ def _serialize_warehouse_transfer(transfer):
     }
 
 
+@serialize_attributed('inventory_adjustment')
 def _serialize_inventory_adjustment(adjustment):
     return {
         "id": adjustment.id,
@@ -468,6 +471,7 @@ def _serialize_inventory_adjustment(adjustment):
     }
 
 
+@serialize_attributed('stock_movement')
 def _serialize_stock_movement(movement):
     return {
         "id": movement.id,
@@ -529,6 +533,7 @@ def _currency_sync_fields(payload, names):
     return result
 
 
+@serialize_attributed('expense')
 def _serialize_expense(expense):
     store = expense.store
     payment_currency = _mobile_currency_value(expense, "payment_currency", getattr(store, "pricing_currency", "SYP") or "SYP")
@@ -551,6 +556,7 @@ def _serialize_expense(expense):
     }
 
 
+@serialize_attributed('fixed_asset')
 def _serialize_fixed_asset(asset):
     return {
         "id": asset.id,
@@ -1415,6 +1421,7 @@ def _apply_employee_change(store, payload, server_id=None):
     return Employee.objects.create(store=store, **fields), "created"
 
 
+@apply_attributed('salary_voucher')
 def _apply_salary_voucher_change(store, payload, server_id=None):
     description = _to_str(payload.get("description")).strip()
     if not description:
@@ -1441,6 +1448,7 @@ def _apply_salary_voucher_change(store, payload, server_id=None):
     return SalaryPaymentVoucher.objects.create(store=store, **fields), "created"
 
 
+@apply_attributed('salary_payment')
 def _apply_salary_payment_change(store, payload, server_id=None):
     voucher_id = _to_int(payload.get("voucher_id"))
     employee_id = _to_int(payload.get("employee_id"))
@@ -1532,6 +1540,7 @@ def _apply_warehouse_change(store, payload, server_id=None):
     return obj, "created"
 
 
+@apply_attributed('warehouse_transfer')
 def _apply_warehouse_transfer_change(store, payload, server_id=None, product_resolver=None):
     from_warehouse_id = _to_int(payload.get("from_warehouse_id"))
     to_warehouse_id = _to_int(payload.get("to_warehouse_id"))
@@ -1605,6 +1614,7 @@ def _apply_warehouse_transfer_change(store, payload, server_id=None, product_res
     return obj, action
 
 
+@apply_attributed('inventory_adjustment')
 def _apply_inventory_adjustment_change(
     store,
     payload,
@@ -1680,6 +1690,7 @@ def _apply_inventory_adjustment_change(
     return obj, "created"
 
 
+@apply_attributed('stock_movement')
 def _apply_stock_movement_change(store, payload, server_id=None, product_resolver=None):
     qty_quant = Decimal("0.001")
     money_quant = Decimal("0.01")
@@ -1804,6 +1815,7 @@ def _apply_expense_reason_change(store, payload, server_id=None):
     return ExpenseReason.objects.create(store=store, name=name, mobile_update_time=now_minute), "created"
 
 
+@apply_attributed('expense')
 def _apply_expense_change(store, payload, server_id=None, mobile_sync_key=None):
     expense_type = None
     expense_reason = None
@@ -1871,6 +1883,7 @@ def _apply_expense_change(store, payload, server_id=None, mobile_sync_key=None):
     return obj, "created"
 
 
+@apply_attributed('fixed_asset')
 def _apply_fixed_asset_change(store, payload, server_id=None):
     name = _to_str(payload.get("name")).strip()
     if not name:
@@ -2224,6 +2237,7 @@ def _serialize_employee(row):
     }
 
 
+@serialize_attributed('salary_voucher')
 def _serialize_salary_voucher(row):
     return {
         "id": row.id,
@@ -2236,6 +2250,7 @@ def _serialize_salary_voucher(row):
     }
 
 
+@serialize_attributed('salary_payment')
 def _serialize_salary_payment(row):
     return {
         "id": row.id,
@@ -3302,7 +3317,13 @@ def sync_push(request):
                                    "detail": party_conflicts[id(item)]})
                     continue
 
-                if entity == "category":
+                if entity == "movement_attribution":
+                    obj = repair_attribution(store, payload_item, sync_actor)
+                    applied.append({"entity": entity, "action": "updated",
+                        "local_id": local_id, "server_id": obj.pk,
+                        "target_entity": payload_item.get("target_entity"),
+                        "revision": payload_item.get("revision")})
+                elif entity == "category":
                     obj, action = _apply_category_change(
                         store,
                         payload_item,
@@ -3505,6 +3526,7 @@ def sync_push(request):
                     obj, action = _apply_salary_voucher_change(
                         store,
                         payload_item,
+                        sync_actor=sync_actor,
                         server_id=_to_int(server_id),
                     )
                     applied.append({
@@ -3518,6 +3540,7 @@ def sync_push(request):
                     obj, action = _apply_salary_payment_change(
                         store,
                         payload_item,
+                        sync_actor=sync_actor,
                         server_id=_to_int(server_id),
                     )
                     applied.append({
@@ -3531,6 +3554,7 @@ def sync_push(request):
                     obj, action = _apply_warehouse_transfer_change(
                         store,
                         payload_item,
+                        sync_actor=sync_actor,
                         server_id=_to_int(server_id),
                         product_resolver=resolve_product,
                     )
@@ -3547,6 +3571,7 @@ def sync_push(request):
                     obj, action = _apply_inventory_adjustment_change(
                         store,
                         payload_item,
+                        sync_actor=sync_actor,
                         server_id=_to_int(server_id),
                         product_resolver=resolve_product,
                     )
@@ -3561,6 +3586,7 @@ def sync_push(request):
                     obj, action = _apply_stock_movement_change(
                         store,
                         payload_item,
+                        sync_actor=sync_actor,
                         server_id=_to_int(server_id),
                         product_resolver=resolve_product,
                     )
@@ -3575,6 +3601,7 @@ def sync_push(request):
                     obj, action = _apply_expense_change(
                         store,
                         payload_item,
+                        sync_actor=sync_actor,
                         server_id=_to_int(server_id),
                         mobile_sync_key=_mobile_sync_key(device_id, "expense", local_id),
                     )
@@ -3589,6 +3616,7 @@ def sync_push(request):
                     obj, action = _apply_fixed_asset_change(
                         store,
                         payload_item,
+                        sync_actor=sync_actor,
                         server_id=_to_int(server_id),
                     )
                     applied.append({

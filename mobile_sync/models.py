@@ -1,6 +1,21 @@
 from django.db import models
 
 
+class MovementAttribution(models.Model):
+    store = models.ForeignKey('stores.Store', on_delete=models.CASCADE)
+    entity = models.CharField(max_length=40)
+    document_id = models.BigIntegerField()
+    creator = models.ForeignKey('accounts.StoreUser', null=True, blank=True,
+        on_delete=models.SET_NULL, related_name='+')
+    receiver = models.ForeignKey('accounts.StoreUser', null=True, blank=True,
+        on_delete=models.SET_NULL, related_name='+')
+    received_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=['store', 'entity', 'document_id'],
+            name='unique_movement_attribution')]
+
+
 class CustomerSyncOrigin(models.Model):
     """A stable app record key makes creation retries independent of its name."""
     merchant_id = models.IntegerField()
