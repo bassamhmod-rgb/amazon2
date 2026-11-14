@@ -98,6 +98,13 @@ def _store_reset_delete_logging_disabled():
         (mobile_signals.log_expense_delete, Expense),
         (mobile_signals.log_expense_type_delete, ExpenseType),
         (mobile_signals.log_expense_reason_delete, ExpenseReason),
+        (mobile_signals.log_fixed_asset_delete, FixedAsset),
+        (mobile_signals.log_employee_department_delete, EmployeeDepartment),
+        (mobile_signals.log_employee_job_title_delete, EmployeeJobTitle),
+        (mobile_signals.log_employee_pay_period_delete, EmployeePayPeriod),
+        (mobile_signals.log_employee_delete, Employee),
+        (mobile_signals.log_salary_payment_voucher_delete, SalaryPaymentVoucher),
+        (mobile_signals.log_salary_payment_delete, SalaryPayment),
     ]
 
     for receiver, sender in receivers:
@@ -3395,6 +3402,15 @@ def _perform_store_reset(request, store):
         _delete_reset_sync_rows(store, main_warehouse_id)
 
         with _store_reset_delete_logging_disabled():
+            # Payroll payments protect their employee; delete children first.
+            SalaryPayment.objects.filter(store=store).delete()
+            SalaryPaymentVoucher.objects.filter(store=store).delete()
+            Employee.objects.filter(store=store).delete()
+            EmployeeDepartment.objects.filter(store=store).delete()
+            EmployeeJobTitle.objects.filter(store=store).delete()
+            EmployeePayPeriod.objects.filter(store=store).delete()
+            FixedAsset.objects.filter(store=store).delete()
+
             StockMovement.objects.filter(store=store).delete()
             InventoryAdjustment.objects.filter(store=store).delete()
             WarehouseTransferItem.objects.filter(store=store).delete()
@@ -3422,6 +3438,19 @@ def _perform_store_reset(request, store):
 
             AccountingClient.objects.filter(store=store).delete()
             SystemNotification.objects.filter(target_store=store).delete()
+
+            # These records have logical document IDs or integer merchant IDs,
+            # so deleting their business parents does not cascade to them.
+            from accounts.models import PartyFxState
+            from mobile_sync.models import (
+                MovementAttribution, CustomerSyncOrigin, CustomerSyncAlias,
+                CustomerResolutionReceipt,
+            )
+            PartyFxState.objects.filter(store=store).delete()
+            MovementAttribution.objects.filter(store=store).delete()
+            CustomerSyncOrigin.objects.filter(merchant_id=store.pk).delete()
+            CustomerSyncAlias.objects.filter(merchant_id=store.pk).delete()
+            CustomerResolutionReceipt.objects.filter(merchant_id=store.pk).delete()
 
         # Mark that this store was fully reset, so sync clients can warn
         # the user to enable full re-send from Access settings.
