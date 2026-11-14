@@ -2,6 +2,11 @@
 (() => {
     const frontUrl = new URL("{% url 'stores:store_front' store.slug %}", location.origin);
     const storageKey = 'storefront-position:' + frontUrl.pathname;
+    const startAtTop = location.pathname === frontUrl.pathname &&
+        location.hash === '#catalog-start';
+    if (startAtTop) {
+        try { sessionStorage.removeItem(storageKey); } catch (_) {}
+    }
     let saved;
     try {
         saved = JSON.parse(sessionStorage.getItem(storageKey) || 'null');
@@ -46,6 +51,10 @@
     }
 
     function restorePosition() {
+        if (startAtTop && !interacted) {
+            window.scrollTo({top: 0, left: 0, behavior: 'instant'});
+            return;
+        }
         if (!saved || interacted || saved.url !== location.pathname + location.search) return;
         const product = Array.from(document.querySelectorAll('[data-product-id]'))
             .find(item => item.dataset.productId === saved.productId);

@@ -112,7 +112,7 @@
             {% endif %}
         </div>
 
-        <a href="/store/{{ store.slug }}/" class="btn btn-primary w-100 py-2">
+        <a href="{% url 'stores:store_front' store.slug %}#catalog-start" class="btn btn-primary w-100 py-2">
             🏪 العودة للمتجر
         </a>
 
