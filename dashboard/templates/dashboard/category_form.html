@@ -94,6 +94,11 @@
             <input type="number" name="display_order" id="display_order" class="form-control" min="0" max="2147483647" step="1" value="{% if request.method == 'POST' %}{{ request.POST.display_order|default:'0' }}{% elif category %}{{ category.display_order }}{% else %}0{% endif %}" required>
         </div>
 
+        <div class="form-check mb-3">
+            <input type="checkbox" name="show_in_storefront" id="show_in_storefront" value="1" class="form-check-input" {% if request.method == 'POST' %}{% if request.POST.show_in_storefront == '1' %}checked{% endif %}{% elif not category or category.show_in_storefront %}checked{% endif %}>
+            <label for="show_in_storefront" class="form-check-label">عرض منتجات الفئة بصفحة العرض</label>
+        </div>
+
         <div class="mb-3">
             <label for="image" class="form-label">صورة الفئة</label>
             {% if category and category.image %}

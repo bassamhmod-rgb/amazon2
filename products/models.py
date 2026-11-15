@@ -27,6 +27,8 @@ def _touch_mobile_update_time(instance, kwargs):
 
 
 class Category(models.Model):
+    show_in_storefront = models.BooleanField(default=True,
+        verbose_name="عرض منتجات الفئة بصفحة العرض")
     display_order = models.PositiveIntegerField(default=0, verbose_name="ترتيب العرض")
     update_time = models.BigIntegerField(blank=True, null=True)
     mobile_update_time = models.BigIntegerField(blank=True, null=True)
@@ -54,7 +56,24 @@ class Category(models.Model):
 
 
 
+class ProductQuerySet(models.QuerySet):
+    def storefront_visible(self):
+        return self.filter(active=True, show_in_storefront=True).exclude(
+            Q(category__show_in_storefront=False) |
+            Q(category2__show_in_storefront=False))
+
+
 class Product(models.Model):
+    objects = ProductQuerySet.as_manager()
+    show_in_storefront = models.BooleanField(default=True,
+        verbose_name="عرض المنتج بصفحة العرض")
+
+    @property
+    def is_storefront_visible(self):
+        return (self.active and self.show_in_storefront and
+                (self.category_id is None or self.category.show_in_storefront) and
+                (self.category2_id is None or self.category2.show_in_storefront))
+
     input_data = models.TextField(blank=True, null=True)
     display_order = models.PositiveIntegerField(default=0, verbose_name="ترتيب العرض")
     update_time = models.BigIntegerField(blank=True, null=True)

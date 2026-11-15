@@ -85,7 +85,7 @@ def store_front(request, slug):
         output_field=DecimalField(max_digits=12, decimal_places=2)
     )
     products = (
-        with_storefront_stock(Product.objects.filter(store=store, active=True), store)
+        with_storefront_stock(Product.objects.storefront_visible().filter(store=store), store)
         .annotate(sold_qty=sold_qty)
         .filter(Q(real_stock_calc__gt=0) | Q(allow_negative_stock_sale=True))
         .order_by(*product_display_order())
@@ -96,7 +96,7 @@ def store_front(request, slug):
     q = request.GET.get("q")
 
     # ============ 🟦 جلب الفئات ============
-    categories = Category.objects.filter(store=store).order_by(display_order(), "id")
+    categories = Category.objects.filter(store=store, show_in_storefront=True).order_by(display_order(), "id")
 
     # ============ 🟨 التصفية بالحقل category ============
     category_id = request.GET.get("category")
@@ -222,7 +222,7 @@ def store_app_icon(request, slug, size):
 # تفاصيل المنتج للزبون
 def product_public(request, store_slug, product_id):
     store = get_object_or_404(Store, slug=store_slug, is_active=True)
-    product = get_object_or_404(with_storefront_stock(Product.objects.filter(active=True), store), id=product_id, store=store)
+    product = get_object_or_404(with_storefront_stock(Product.objects.storefront_visible(), store), id=product_id, store=store)
     set_display_prices(product, store)
     config = local_checkout_config(request, store)
     config.update({
@@ -257,7 +257,7 @@ def store_list(request):
 
     if q:
         # 🔎 بحث في المنتجات
-        product_match = Product.objects.filter(
+        product_match = Product.objects.storefront_visible().filter(
             store=OuterRef("pk"),
             name__icontains=q
         )
@@ -265,11 +265,12 @@ def store_list(request):
         # 🔎 بحث في الفئة الأساسية
         category_match = Category.objects.filter(
             store=OuterRef("pk"),
+            show_in_storefront=True,
             name__icontains=q
         )
 
         # 🔎 بحث في الفئة الفرعية category2 (داخل جدول المنتجات)
-        subcategory_match = Product.objects.filter(
+        subcategory_match = Product.objects.storefront_visible().filter(
             store=OuterRef("pk"),
             category2__name__icontains=q
         )

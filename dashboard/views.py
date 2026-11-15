@@ -1230,6 +1230,7 @@ def add_category(request, store_slug):
         # إنشاء الفئة وربطها تلقائياً بالمتجر
         Category.objects.create(
             display_order=display_order,
+            show_in_storefront=request.POST.get("show_in_storefront") == "1",
             name=name,
             store=store,
             image=image,
@@ -1280,6 +1281,7 @@ def edit_category(request, store_slug, category_id):
             })
 
         category.display_order = display_order
+        category.show_in_storefront = request.POST.get("show_in_storefront") == "1"
         category.name = name
         if clear_image:
             category.image = None
@@ -1850,6 +1852,12 @@ def order_update(request, store_slug, order_id):
 @never_cache
 def orders_list(request, store_slug):
     store = _get_store_for_dashboard(request, store_slug)
+    from .forms import OrderDateRangeForm
+
+    date_range_form = OrderDateRangeForm(request.GET)
+    valid_date_range = date_range_form.is_valid()
+    filter_params = request.GET.copy()
+    filter_params.pop("page", None)
     status_filter = request.GET.get("status", "")
     order_id = request.GET.get("order_id", "")
     mobile_order_id = request.GET.get("mobile_order_id", "")
@@ -1891,6 +1899,16 @@ def orders_list(request, store_slug):
                 )
             )
         )
+
+        if valid_date_range:
+            if date_range_form.cleaned_data["date_from"]:
+                orders_qs = orders_qs.filter(
+                    created_at__date__gte=date_range_form.cleaned_data["date_from"])
+            if date_range_form.cleaned_data["date_to"]:
+                orders_qs = orders_qs.filter(
+                    created_at__date__lte=date_range_form.cleaned_data["date_to"])
+        else:
+            orders_qs = orders_qs.none()
 
         # فلترة حسب الحالة
         if status_filter:
@@ -1952,6 +1970,8 @@ def orders_list(request, store_slug):
         "new_orders_count": new_orders_count,  # مهم للـ sidebar
         "orders_page_error": orders_page_error,
         "order_load_errors": order_load_errors,
+        "date_range_form": date_range_form,
+        "orders_filter_query": filter_params.urlencode(),
     }
 
     # 🔴 انتبه: هون ما عم نغيّر is_seen_by_store

@@ -1,0 +1,28 @@
+{% extends "dashboard/handover_base.html" %}
+{% block title %}معاينة PDF — تسليم مستخدم{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+    <h3 class="mb-0">معاينة PDF — تسليم مستخدم</h3>
+    <a class="btn btn-outline-secondary" href="{% url 'dashboard:user_handover' store.slug %}?{{ filter_query }}">العودة للتسليم</a>
+</div>
+{% if form.errors %}
+    <div class="alert alert-danger" role="alert">{{ form.errors }}</div>
+{% else %}
+    <p class="small text-muted">{{ period }} • المستخدم: {{ user_name }} • {{ title }}</p>
+    <form method="get" class="d-flex gap-2 align-items-end flex-wrap mb-3">
+        <input type="hidden" name="date_from" value="{{ form.date_from.value }}">
+        <input type="hidden" name="date_to" value="{{ form.date_to.value }}">
+        <input type="hidden" name="user" value="{{ form.user.value|default:'' }}">
+        {{ form.metric }}{{ form.detail }}
+        <div><label for="{{ form.paper.id_for_label }}" class="form-label">الورق</label>{{ form.paper }}</div>
+        <div><label for="{{ form.orientation.id_for_label }}" class="form-label">الاتجاه</label>{{ form.orientation }}</div>
+        <button class="btn btn-primary">تطبيق القياس</button>
+        <button type="button" class="btn btn-outline-secondary" data-pdf-fit="FitH">ملاءمة العرض</button>
+        <button type="button" class="btn btn-outline-secondary" data-pdf-fit="Fit">إظهار الورقة كاملة</button>
+        <a class="btn btn-outline-primary" href="{% url 'dashboard:user_handover_pdf' store.slug %}?{{ filter_query }}&amp;download=1">تنزيل PDF</a>
+        <a class="btn btn-outline-primary" target="_blank" rel="noopener" href="{% url 'dashboard:user_handover_pdf' store.slug %}?{{ filter_query }}">فتح وطباعة PDF</a>
+    </form>
+    <iframe id="handoverPdfFrame" class="pdf-frame" title="معاينة تقرير تسليم المستخدم" src="{% url 'dashboard:user_handover_pdf' store.slug %}?{{ filter_query }}#view=FitH"></iframe>
+    <p class="small text-muted mt-2">إذا لم تظهر المعاينة في متصفحك، استخدم «فتح وطباعة PDF» أو «تنزيل PDF».</p>
+{% endif %}
+{% endblock %}

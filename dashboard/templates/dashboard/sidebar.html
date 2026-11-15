@@ -143,6 +143,7 @@
                     <summary class="sidebar-summary">💼 التقارير</summary>
                     <div class="sidebar-submenu">
                         <a href="{% url 'dashboard:profits_report' store.slug %}">الأرباح</a>
+                        <a href="{% url 'dashboard:user_handover' store.slug %}">تسليم مستخدم</a>
                         <a href="{% url 'dashboard:balances_report' store.slug %}">أرصدة العملاء والموردين</a>
                         <a href="{% url 'dashboard:notices_list' store.slug %}">إشعارات العملاء و الموردين</a>
                         <a href="{% url 'dashboard:points_page' store.slug %}">رصيد الكاش باك للزبائن</a>
@@ -158,6 +159,10 @@
                 </details>
 
                 {% else %}
+
+                {% if su.permissions.user_handover %}
+                    <a href="{% url 'dashboard:user_handover' store.slug %}">تسليم مستخدم</a>
+                {% endif %}
 
                 {% if su.permissions.products or su.permissions.stock_view or su.permissions.warehouse_transfer %}
                     <details class="sidebar-group">

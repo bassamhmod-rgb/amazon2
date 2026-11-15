@@ -30,7 +30,10 @@ def current_store(request):
             display_warehouse = Warehouse.objects.filter(store=store).order_by("-is_main", "id").first()
 
         if store_user:
+            from dashboard.user_handover import allowed_handover_kinds
+
             permissions = dict(store_user.permissions or {})
+            permissions["user_handover"] = bool(allowed_handover_kinds(permissions))
             permissions["stock_view"] = bool(permissions.get("stock.view"))
             permissions["warehouse_transfer"] = bool(permissions.get("warehouses.transfer"))
             store_user.permissions = permissions

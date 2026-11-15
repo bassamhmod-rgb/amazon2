@@ -3,6 +3,7 @@ from django.urls import path
 from . import views
 from . import views_api
 from . import warehouse_transfer_views
+from . import handover_views
 from .account_views import owner_account
 app_name = "dashboard"
 urlpatterns = [
@@ -12,6 +13,9 @@ urlpatterns = [
     path("<slug:store_slug>/account/", owner_account, name="owner_account"),
     path("<slug:store_slug>/", views.dashboard_home, name="home"),
     path("<slug:store_slug>/orders/", views.orders_list, name="orders_list"),
+    path("<slug:store_slug>/reports/user-handover/", handover_views.user_handover, name="user_handover"),
+    path("<slug:store_slug>/reports/user-handover/preview/", handover_views.user_handover_preview, name="user_handover_preview"),
+    path("<slug:store_slug>/reports/user-handover/pdf/", handover_views.user_handover_pdf, name="user_handover_pdf"),
 
     # ًں”¹ ط¥ط¯ط§ط±ط© ط§ظ„ظ…ظ†طھط¬ط§طھ
     path("<slug:store_slug>/products/", views.products_list, name="products_list"),

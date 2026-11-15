@@ -1,0 +1,65 @@
+{% extends "dashboard/handover_base.html" %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center gap-2 flex-wrap mb-3">
+    <h3 class="mb-0">تسليم مستخدم</h3>
+    <a class="btn btn-outline-secondary" href="{% url 'dashboard:orders_list' store.slug %}">قائمة الطلبات</a>
+</div>
+<form method="get" class="card p-3 mb-3">
+    <div class="row g-3 align-items-end">
+        {% for field in form.visible_fields %}
+            <div class="col-6 col-lg-2">
+                <label for="{{ field.id_for_label }}" class="form-label">{{ field.label }}</label>
+                {{ field }}
+                {% for error in field.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+            </div>
+        {% endfor %}
+        {% for field in form.hidden_fields %}{{ field }}{% endfor %}
+        <div class="col-6 col-lg-2"><button class="btn btn-primary w-100">عرض التسليم</button></div>
+    </div>
+    {% if form.non_field_errors %}<div class="text-danger mt-2" role="alert">{{ form.non_field_errors }}</div>{% endif %}
+    {% for field in form.hidden_fields %}{% if field.errors %}<div class="text-danger mt-2">{{ field.errors }}</div>{% endif %}{% endfor %}
+</form>
+<div class="alert alert-light border small">{{ report_note }}</div>
+{% if restricted_types %}<div class="alert alert-info small">{{ permissions_note }}</div>{% endif %}
+{% if load_error %}<div class="alert alert-danger" role="alert">{{ load_error }}</div>{% endif %}
+{% if report %}
+    <div class="d-flex flex-wrap gap-2 mb-3">
+        <a class="btn btn-primary" href="{% url 'dashboard:user_handover_preview' store.slug %}?{{ summary_query }}">معاينة PDF — الملخص</a>
+        <a class="btn btn-outline-primary" href="{% url 'dashboard:user_handover_preview' store.slug %}?{{ summary_query }}&amp;detail=items">معاينة PDF — مواد الفواتير</a>
+    </div>
+    <a class="handover-due d-block text-decoration-none mb-3" href="?{{ due_query }}#details">
+        <strong>المطلوب تسليمه</strong>
+        <div class="d-flex flex-wrap gap-4 mt-2">
+            {% for row in due_rows %}<span class="fs-3 fw-bold"><bdi>{{ row.value }}</bdi> {{ row.currency }}</span>{% endfor %}
+        </div>
+        <div class="small mt-2">عرض الحركات المؤثرة في التسليم</div>
+    </a>
+    <div class="handover-cards mb-3">
+        {% for card in cards %}
+            <a class="handover-card" href="{{ card.url }}">
+                <div>{{ card.label }}</div>
+                <div class="handover-value"><bdi>{{ card.value }}</bdi> {{ card.currency }}</div>
+                <div class="small text-muted">{{ card.count }} سجل — عرض التفاصيل</div>
+            </a>
+        {% endfor %}
+    </div>
+    <p class="small text-muted">{{ cash_note }}</p>
+    {% if not report.records %}<div class="alert alert-light border">لا توجد حركات ضمن الفترة والمستخدم المحددين.</div>{% endif %}
+    <section id="details" class="card p-3">
+        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+            <h5 class="mb-0">{{ title }}</h5>
+            <div class="d-flex gap-2 flex-wrap">
+                {% if selected_metric or detailed %}<a class="btn btn-sm btn-outline-secondary" href="?{{ summary_query }}#details">التقرير الكامل</a>{% endif %}
+                {% if detailed %}<a class="btn btn-sm btn-outline-secondary" href="?{{ records_query }}#details">مختصر</a>{% elif has_invoice_details %}<a class="btn btn-sm btn-outline-secondary" href="?{{ items_query }}#details">تفصيلي — المواد</a>{% endif %}
+                <a class="btn btn-sm btn-primary" href="{% url 'dashboard:user_handover_preview' store.slug %}?{{ filter_query }}">معاينة PDF</a>
+            </div>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-striped table-bordered mb-0">
+                <thead><tr>{% for header in headers %}<th scope="col">{{ header }}</th>{% endfor %}</tr></thead>
+                <tbody>{% for row in rows %}<tr>{% for cell in row %}<td>{{ cell }}</td>{% endfor %}</tr>{% empty %}<tr><td colspan="10" class="text-center text-muted">لا توجد سجلات لهذا البند.</td></tr>{% endfor %}</tbody>
+            </table>
+        </div>
+    </section>
+{% endif %}
+{% endblock %}

@@ -56,7 +56,7 @@ def add_to_cart(request, store_slug, product_id):
             return redirect(referer)
         return redirect("stores:store_front", slug=store.slug)
 
-    product = get_object_or_404(Product, id=product_id, store=store, active=True)
+    product = get_object_or_404(Product.objects.storefront_visible(), id=product_id, store=store)
     if not product.show_price:
         hidden_price_message = "هذا المنتج لا يُباع عبر المتجر الإلكتروني. البيع عن طريق المركز مباشرة."
         if request.headers.get("x-requested-with") == "XMLHttpRequest":

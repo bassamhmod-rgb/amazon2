@@ -8,7 +8,7 @@ class ProductForm(forms.ModelForm):
     input_currency = forms.ChoiceField(label="عملة الإدخال", choices=(("SYP", "ل.س"), ("USD", "دولار")), required=False)
     class Meta:
         model = Product
-        fields = ["name", "product_number", "display_order", "price", "buy_price", "show_price", "stock", "stock_alert_threshold", "allow_negative_stock_sale", "category", "category2", "main_image", "description", "active"]
+        fields = ["name", "product_number", "display_order", "price", "buy_price", "show_price", "show_in_storefront", "stock", "stock_alert_threshold", "allow_negative_stock_sale", "category", "category2", "main_image", "description", "active"]
         labels = {
             "display_order": "ترتيب عرض المنتج (الأصغر أولاً)",
             "name": "اسم المنتج",
