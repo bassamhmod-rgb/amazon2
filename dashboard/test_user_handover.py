@@ -161,6 +161,12 @@ class HandoverTests(TestCase):
         self.assertIn("no-store", response["Cache-Control"])
         preview = self.client.get(self.url("_preview"), self.params())
         self.assertContains(preview, 'id="handoverPdfFrame"')
+        from bs4 import BeautifulSoup
+        frame = BeautifulSoup(preview.content, "html.parser").find(id="handoverPdfFrame")
+        self.assertFalse(frame.has_attr("src"))
+        self.assertTrue(frame["data-pdf-url"].startswith(self.url("_pdf")))
+        self.assertContains(preview, 'id="handoverPdfStatus"')
+        self.assertContains(preview, 'id="handoverPdfRetry"')
         self.assertContains(preview, "ملاءمة العرض")
         self.assertContains(preview, "A5")
 
