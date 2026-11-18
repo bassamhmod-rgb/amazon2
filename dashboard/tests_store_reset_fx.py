@@ -67,6 +67,15 @@ class StoreResetBusinessDataTests(TestCase):
             main = Warehouse.objects.create(store=stores[0], identifier='main', name='Main', is_main=True)
         # Contacts are global reference data, not owned by the resetting store.
         contact = ContactInfo.objects.create(label='Global contact')
+        from orders.models import Order
+        from mobile_sync.models import OrderDocumentIdentity, OrderResetBoundary
+        reset_order = Order.objects.create(store=stores[0])
+        other_order = Order.objects.create(store=stores[1])
+        OrderDocumentIdentity.objects.create(store=stores[0], order=reset_order, original_order_id=reset_order.pk)
+        OrderDocumentIdentity.objects.create(store=stores[1], order=other_order, original_order_id=other_order.pk)
+        deleted_order = Order.objects.create(store=stores[0])
+        deleted_id = deleted_order.pk
+        deleted_order.delete()
         for store in stores:
             department = EmployeeDepartment.objects.create(store=store, name='Department')
             job = EmployeeJobTitle.objects.create(store=store, name='Job')
@@ -86,6 +95,10 @@ class StoreResetBusinessDataTests(TestCase):
         request._messages = FallbackStorage(request)
         response = _perform_store_reset(request, stores[0])
         self.assertEqual(response.status_code, 302)
+        self.assertEqual(OrderResetBoundary.objects.get(store=stores[0]).last_order_id, reset_order.pk)
+        self.assertFalse(OrderDocumentIdentity.objects.filter(store=stores[0], order__isnull=False).exists())
+        self.assertTrue(OrderDocumentIdentity.objects.filter(store=stores[0], original_order_id=deleted_id).exists())
+        self.assertTrue(OrderDocumentIdentity.objects.filter(store=stores[1], order=other_order).exists())
         for model in [EmployeeDepartment, EmployeeJobTitle, EmployeePayPeriod,
                       Employee, SalaryPaymentVoucher, SalaryPayment, FixedAsset,
                       MovementAttribution, PartyFxState]:

@@ -31,6 +31,7 @@ class InvoiceLineNoteSyncTests(TestCase):
         request = APIRequestFactory().post("/", {
             "merchant_id": self.store.id,
             "orders": [{
+                "server_order_id": previous.order_id if previous else None,
                 "local_order_id": 1, "sync_client_id": "line-note-client",
                 "accounting_invoice_number": 1,
                 "customer_server_id": self.customer.id,

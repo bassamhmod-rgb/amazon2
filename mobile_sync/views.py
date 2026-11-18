@@ -1,5 +1,6 @@
 from .movement_attribution import serialize_attributed, apply_attributed, repair_attribution
 from .input_money import validate_input_data
+from .order_identity import OrderIdentityCollision, resolve_document, bind_document, document_key, verify_legacy_retry
 from .customer_resolution import CustomerIdentityCollision
 import hashlib
 import base64
@@ -3919,6 +3920,18 @@ def sync_push(request):
         return Response({"detail": str(exc)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def orders_identity_capabilities(request):
+    merchant_id = _to_int(request.query_params.get('merchant_id'))
+    if merchant_id is None or not Store.objects.filter(pk=merchant_id).exists():
+        return Response({'detail': 'Invalid merchant'}, status=400)
+    _, error = _ensure_store_user_sync_device(request, merchant_id)
+    if error:
+        return error
+    return Response({'document_identity_version': 1})
+
+
 @api_view(["POST"])
 @permission_classes([AllowAny])
 def orders_received(request):
@@ -4124,6 +4137,8 @@ def orders_push(request):
                     created_at = parse_datetime(str(created_at_raw))
                 if created_at is None:
                     created_at = timezone.now()
+                elif timezone.is_naive(created_at):
+                    created_at = timezone.make_aware(created_at)
 
                 discount = _to_float(order_payload.get("discount"), 0.0)
                 shipping_cost = _to_float(order_payload.get("shipping_cost"), 0.0)
@@ -4170,6 +4185,7 @@ def orders_push(request):
                 if prepared_items is None:
                     continue
 
+                identity_handled, identity_order = resolve_document(store, order_payload)
                 if server_order_id is not None:
                     order_qs = Order.objects.filter(
                         store=store,
@@ -4191,7 +4207,9 @@ def orders_push(request):
                         order_qs = order_qs.filter(created_by_store_user__isnull=True)
                     else:
                         order_qs = order_qs.filter(created_by_store_user=store_user)
-                order = order_qs.first()
+                order = identity_order if identity_handled else order_qs.first()
+                if not identity_handled and order is not None and server_order_id is None:
+                    verify_legacy_retry(order, order_payload)
 
                 # A known server ID that disappeared is a deletion, not a new invoice.
                 if order is None and server_order_id is not None and action != "delete":
@@ -4206,6 +4224,10 @@ def orders_push(request):
                         order.delete()
                     else:
                         deleted_order_id = None
+                        if order_payload.get('document_key'):
+                            from .models import OrderDocumentIdentity
+                            OrderDocumentIdentity.objects.get_or_create(
+                                key=order_payload['document_key'], defaults={'store': store})
                     applied.append({
                         "local_order_id": local_order_id,
                         "server_order_id": deleted_order_id,
@@ -4269,6 +4291,9 @@ def orders_push(request):
                     # Notices have no item deletion signal to mark their header dirty.
                     order.update_time = _now_minute()
                 order.save()
+
+                bind_document(order, order_payload.get('document_key'),
+                              order_payload.get('legacy_identity', False), order_payload)
 
                 previous_line_notes = dict(order.items.values_list("id", "line_note"))
                 previous_line_commissions = dict(order.items.values_list("id", "commission_data"))
@@ -4346,6 +4371,7 @@ def orders_push(request):
                 applied.append({
                     "local_order_id": local_order_id,
                     "server_order_id": order.id,
+                    "document_key": document_key(order),
                     "server_update_time": _mobile_time(order),
                     "created_by_store_user_id": order.created_by_store_user_id,
                     "accounting_invoice_number": order.accounting_invoice_number,
@@ -4361,6 +4387,8 @@ def orders_push(request):
             refresh_dirty(store)
 
         return Response({"status": "ok", "applied": applied, "errors": errors})
+    except OrderIdentityCollision as exc:
+        return Response({"detail": str(exc), "code": "order_identity_collision"}, status=409)
     except Exception as exc:
         return Response({"detail": str(exc)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
@@ -4450,6 +4478,7 @@ def _serialize_order_for_mobile(order):
 
     return {
         "input_data": getattr(order, "input_data", None),
+        "document_key": document_key(order),
         "currency_decimal_places": getattr(order.store, "currency_decimal_places", 2),
         "id": order.id,
         "update_time": _mobile_time(order),
@@ -4523,7 +4552,7 @@ def orders_pull(request):
                 | Q(status="confirmed")
             )
             .select_related(
-                "store", "customer", "supplier", "warehouse", "created_by_store_user"
+                "store", "customer", "supplier", "warehouse", "created_by_store_user", "orderdocumentidentity"
             )
             .order_by("id")
         )

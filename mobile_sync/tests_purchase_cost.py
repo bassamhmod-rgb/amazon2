@@ -20,7 +20,7 @@ class PurchaseLandedCostTests(TestCase):
         self.first = Product.objects.create(store=self.store, name="First", price=80, stock=0)
         self.second = Product.objects.create(store=self.store, name="Second", price=30, stock=0)
 
-    def push(self, shipping=50):
+    def push(self, shipping=50, server_order_id=None):
         invoice = {
             "local_order_id": 1, "sync_client_id": "purchase-cost-client",
             "accounting_invoice_number": 1,
@@ -36,6 +36,8 @@ class PurchaseLandedCostTests(TestCase):
         }
         if shipping is not None:
             invoice["shipping_cost"] = shipping
+        if server_order_id is not None:
+            invoice["server_order_id"] = server_order_id
         request = APIRequestFactory().post("/", {
             "merchant_id": self.store.id, "orders": [invoice],
         }, format="json")
@@ -56,7 +58,7 @@ class PurchaseLandedCostTests(TestCase):
         self.assertEqual(_serialize_order_for_mobile(order)["shipping_cost"], 50)
 
     def test_legacy_client_update_preserves_shipping(self):
-        self.push()
-        order = self.push(shipping=None)
+        original = self.push()
+        order = self.push(shipping=None, server_order_id=original.pk)
         self.assertEqual(order.shipping_cost, Decimal("50"))
         self.assertEqual(self.first.get_avg_buy_price(), Decimal("47.5"))

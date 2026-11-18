@@ -44,6 +44,7 @@ class CurrencySyncTests(TestCase):
                       discount_alt=0, total_alt=45000)
         saved = _currency_sync_fields(values, values.keys())
         order = SimpleNamespace(
+            orderdocumentidentity=SimpleNamespace(key='a' * 32),
             id=1, store=SimpleNamespace(pricing_currency="USD", exchange_rate=16000),
             prefetched_mobile_items=[], document_kind=2, amount=2,
             customer_id=None, supplier_id=None, warehouse_id=None,

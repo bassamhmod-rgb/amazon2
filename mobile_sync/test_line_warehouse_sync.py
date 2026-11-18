@@ -15,10 +15,11 @@ class LineWarehouseSyncTests(_InvoiceTests):
             store=self.store, is_main=True, defaults={"name": "Main"})
         self.other = Warehouse.objects.create(store=self.store, name="Other")
 
-    def send(self, lines):
+    def send(self, lines, server_order_id=None):
         request = APIRequestFactory().post("/", {
             "merchant_id": self.store.pk,
             "orders": [{"local_order_id": 1, "sync_client_id": "warehouse-client",
+                        "server_order_id": server_order_id,
                         "customer_server_id": self.customer.pk,
                         "warehouse_server_id": self.main.pk,
                         "status": "completed", "transaction_type": "sale",
@@ -47,7 +48,8 @@ class LineWarehouseSyncTests(_InvoiceTests):
     def test_legacy_client_update_retains_existing_line_warehouse(self):
         self.assertFalse(self.send([self.line(warehouse_server_id=self.other.pk)])["errors"])
         previous = OrderItem.objects.get(order__store=self.store)
-        result = self.send([self.line(server_item_id=previous.pk, price=12)])
+        result = self.send([self.line(server_item_id=previous.pk, price=12)],
+                           server_order_id=previous.order_id)
         self.assertFalse(result["errors"], result)
         self.assertEqual(OrderItem.objects.get(order__store=self.store).warehouse_id, self.other.pk)
 
@@ -56,6 +58,7 @@ class LineWarehouseSyncTests(_InvoiceTests):
         previous = OrderItem.objects.get(order__store=self.store)
         foreign_store = Store.objects.create(owner=User.objects.create_user(username="foreign-owner"), name="Foreign", slug="foreign")
         foreign = Warehouse.objects.create(store=foreign_store, name="Foreign")
-        result = self.send([self.line(server_item_id=previous.pk, warehouse_server_id=foreign.pk)])
+        result = self.send([self.line(server_item_id=previous.pk, warehouse_server_id=foreign.pk)],
+                           server_order_id=previous.order_id)
         self.assertTrue(result["errors"])
         self.assertTrue(OrderItem.objects.filter(pk=previous.pk, warehouse=self.main).exists())

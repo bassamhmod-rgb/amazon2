@@ -7,3 +7,8 @@ class MobileSyncConfig(AppConfig):
 
     def ready(self):
         from . import signals  # noqa: F401
+        from django.db.models.signals import pre_delete
+        from orders.models import Order
+        from .order_identity import retain_deleted_document
+        pre_delete.connect(retain_deleted_document, sender=Order,
+                           dispatch_uid='retain_order_document_identity')

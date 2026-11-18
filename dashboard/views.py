@@ -74,6 +74,7 @@ def _store_reset_delete_logging_disabled():
     from accounts.party_fx_signals import suspend_party_fx_for_store_reset
     from accounts import signals as account_signals
     from mobile_sync import signals as mobile_signals
+    from mobile_sync.order_identity import document_identity_reset
 
     receivers = [
         (account_signals.log_supplier_delete, Supplier),
@@ -110,7 +111,7 @@ def _store_reset_delete_logging_disabled():
     for receiver, sender in receivers:
         pre_delete.disconnect(receiver=receiver, sender=sender)
     try:
-        with suspend_party_fx_for_store_reset():
+        with suspend_party_fx_for_store_reset(), document_identity_reset():
             yield
     finally:
         for receiver, sender in receivers:
@@ -3412,6 +3413,8 @@ def _perform_store_reset(request, store):
         return redirect(f"/dashboard/{store.slug}/settings/")
 
     with transaction.atomic():
+        # Serialize full reset with invoice pushes for this store.
+        Store.objects.select_for_update().get(pk=store.pk)
         main_warehouse_id = (
             Warehouse.objects.filter(store=store, is_main=True)
             .values_list("id", flat=True)
@@ -3436,6 +3439,15 @@ def _perform_store_reset(request, store):
             WarehouseTransferItem.objects.filter(store=store).delete()
             WarehouseTransfer.objects.filter(store=store).delete()
 
+            from django.db.models import Max
+            from mobile_sync.models import OrderDocumentIdentity, OrderResetBoundary
+            last_id = Order.objects.filter(store=store).aggregate(last=Max('pk'))['last'] or 0
+            boundary, _ = OrderResetBoundary.objects.get_or_create(store=store)
+            boundary.last_order_id = max(boundary.last_order_id, last_id)
+            boundary.save(update_fields=['last_order_id'])
+            # A full store reset explicitly permits restoring these documents.
+            # Ordinary deletion retains identity tombstones instead.
+            OrderDocumentIdentity.objects.filter(store=store, order__isnull=False).delete()
             Order.objects.filter(store=store).delete()
             Cart.objects.filter(store=store).delete()
 

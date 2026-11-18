@@ -13,6 +13,7 @@ class InvoiceDiscountSerializationTests(TestCase):
     def serialize(self, transaction_type, discount, document_kind=1,
                   decimal_places=2, price="60"):
         order = SimpleNamespace(
+            orderdocumentidentity=SimpleNamespace(key='a' * 32),
             id=1, customer_id=None, supplier_id=None, warehouse_id=None,
             created_by_store_user_id=None, transaction_type=transaction_type,
             store=SimpleNamespace(pricing_currency="USD", exchange_rate=144,

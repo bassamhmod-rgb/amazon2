@@ -1,4 +1,27 @@
 from django.db import models
+import uuid
+
+
+def new_order_document_key():
+    return uuid.uuid4().hex
+
+
+class OrderDocumentIdentity(models.Model):
+    store = models.ForeignKey('stores.Store', on_delete=models.CASCADE)
+    key = models.CharField(max_length=32, default=new_order_document_key, unique=True)
+    original_order_id = models.BigIntegerField(null=True)
+    legacy_upload_digest = models.CharField(max_length=64, blank=True, default='')
+    # Retain a tombstone after ordinary deletion, so delayed retries cannot revive it.
+    order = models.OneToOneField('orders.Order', null=True, on_delete=models.SET_NULL)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=['store', 'original_order_id'],
+                                                name='unique_order_document_origin')]
+
+
+class OrderResetBoundary(models.Model):
+    store = models.OneToOneField('stores.Store', on_delete=models.CASCADE)
+    last_order_id = models.BigIntegerField(default=0)
 
 
 class MovementAttribution(models.Model):
