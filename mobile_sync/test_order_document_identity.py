@@ -43,9 +43,79 @@ class OrderDocumentProtocolTests(OrderIdentityReuseTests):
 
     def test_uncertain_legacy_upload_requires_review(self):
         self.assert_ok(self.push())
-        response = self.push(document_key='c' * 32, legacy_identity=True)
+        response = self.push(document_key='c' * 32, legacy_identity=True, note='Changed locally')
         self.assertEqual(response.status_code, 409)
         self.assertEqual(Order.objects.count(), 1)
+
+    def test_identical_recorded_legacy_request_recovers_lost_acknowledgement(self):
+        first = self.assert_ok(self.push())
+        response = self.push(document_key='c' * 32, legacy_identity=True)
+        self.assertEqual(self.assert_ok(response), first)
+        self.assertEqual(Order.objects.count(), 1)
+
+    def review(self):
+        first = self.assert_ok(self.push())
+        changes = dict(document_key='c' * 32, legacy_identity=True, note='New local document')
+        conflict = self.push(**changes)
+        self.assertEqual(conflict.status_code, 409, conflict.data)
+        self.assertEqual(conflict.data['conflict']['candidates'][0]['id'], first)
+        return first, changes, conflict.data['conflict']['token']
+
+    def test_review_separate_preserves_old_document_and_retries_without_duplicates(self):
+        first, changes, token = self.review()
+        before = Order.objects.filter(pk=first).values().get()
+        changes['identity_resolution'] = dict(action='separate', token=token)
+        second = self.assert_ok(self.push(**changes))
+        self.assertNotEqual(first, second)
+        self.assertEqual(self.assert_ok(self.push(**changes)), second)
+        self.assertEqual(Order.objects.count(), 2)
+        self.assertEqual(Order.objects.filter(pk=first).values().get(), before)
+
+    def test_review_keep_server_never_overwrites_or_deletes_reviewed_invoice(self):
+        first, changes, token = self.review()
+        before = Order.objects.filter(pk=first).values().get()
+        changes['identity_resolution'] = dict(action='keep_server', token=token, server_order_id=first)
+        response = self.push(**changes)
+        self.assertEqual(self.assert_ok(response), first)
+        self.assertEqual(response.data['applied'][0]['action'], 'reconciled')
+        self.assertEqual(Order.objects.filter(pk=first).values().get(), before)
+        self.assertEqual(Order.objects.count(), 1)
+
+    def test_keep_server_does_not_create_a_supplier_from_the_discarded_local_copy(self):
+        from accounts.models import Supplier
+        first = self.assert_ok(self.push())
+        changes = dict(document_key='c' * 32, legacy_identity=True,
+                       transaction_type='purchase', supplier_name='Discarded local supplier')
+        conflict = self.push(**changes)
+        self.assertEqual(conflict.status_code, 409)
+        changes['identity_resolution'] = dict(action='keep_server', server_order_id=first,
+                                               token=conflict.data['conflict']['token'])
+        self.assertEqual(self.assert_ok(self.push(**changes)), first)
+        self.assertFalse(Supplier.objects.filter(store=self.store,
+                                                name='Discarded local supplier').exists())
+
+    def test_review_rejects_changed_server_and_changed_local_payload(self):
+        first, changes, token = self.review()
+        decision = dict(action='separate', token=token)
+        self.assertEqual(self.push(**dict(changes, note='Edited after review',
+            identity_resolution=decision)).status_code, 409)
+        Order.objects.filter(pk=first).update(note='Changed on server')
+        self.assertEqual(self.push(**dict(changes, identity_resolution=decision)).status_code, 409)
+        self.assertEqual(Order.objects.count(), 1)
+
+    def test_review_rejects_deleted_candidate_and_forged_token(self):
+        first, changes, token = self.review()
+        self.assertEqual(self.push(**dict(changes, identity_resolution=dict(
+            action='separate', token=token + 'x'))).status_code, 409)
+        Order.objects.get(pk=first).delete()
+        self.assertEqual(self.push(**dict(changes, identity_resolution=dict(
+            action='separate', token=token))).status_code, 409)
+        self.assertFalse(Order.objects.exists())
+
+    def test_server_edit_prevents_automatic_legacy_adoption(self):
+        first = self.assert_ok(self.push())
+        Order.objects.filter(pk=first).update(note='Edited centrally')
+        self.assertEqual(self.push(document_key='c' * 32, legacy_identity=True).status_code, 409)
 
     def test_explicit_server_key_mismatch_is_rejected(self):
         first = self.assert_ok(self.push(document_key='a' * 32))

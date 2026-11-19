@@ -4118,6 +4118,17 @@ def orders_push(request):
                 accounting_invoice_number = _to_int(order_payload.get("accounting_invoice_number"))
                 document_kind = _to_int(order_payload.get("document_kind"), 1)
 
+                identity_handled, identity_order = resolve_document(store, order_payload)
+                if identity_order is not None and getattr(identity_order, '_identity_review_adoption', False):
+                    # This is an explicit adoption, not an edit. Never overwrite
+                    # the reviewed server document with the pending snapshot.
+                    applied.append({"local_order_id": local_order_id,
+                                    "server_order_id": identity_order.pk,
+                                    "document_key": document_key(identity_order),
+                                    "reviewed_document": _serialize_order_for_mobile(identity_order),
+                                    "action": "reconciled"})
+                    continue
+
                 transaction_type = _to_str(order_payload.get("transaction_type"), "sale") or "sale"
                 uses_customer = transaction_type in ("sale", "sale_return")
                 uses_supplier = transaction_type in ("purchase", "purchase_return")
@@ -4185,7 +4196,6 @@ def orders_push(request):
                 if prepared_items is None:
                     continue
 
-                identity_handled, identity_order = resolve_document(store, order_payload)
                 if server_order_id is not None:
                     order_qs = Order.objects.filter(
                         store=store,
@@ -4388,7 +4398,8 @@ def orders_push(request):
 
         return Response({"status": "ok", "applied": applied, "errors": errors})
     except OrderIdentityCollision as exc:
-        return Response({"detail": str(exc), "code": "order_identity_collision"}, status=409)
+        return Response({"detail": str(exc), "code": "order_identity_collision",
+                         "conflict": exc.conflict}, status=409)
     except Exception as exc:
         return Response({"detail": str(exc)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
