@@ -3,7 +3,7 @@ import json
 from decimal import Decimal, InvalidOperation
 
 
-def validate_input_data(raw, previous=None):
+def validate_input_data(raw, previous=None, *, allow_currency_change=False):
     if raw in (None, ""):
         if previous:
             raise ValueError("لا يمكن حذف أرقام الإدخال الأصلية.")
@@ -13,7 +13,7 @@ def validate_input_data(raw, previous=None):
     data = json.loads(raw)
     if data.get("version") != 1 or data.get("currency") not in ("USD", "SYP"):
         raise ValueError("عملة الإدخال غير صالحة.")
-    if previous and json.loads(previous)["currency"] != data["currency"]:
+    if previous and not allow_currency_change and json.loads(previous)["currency"] != data["currency"]:
         raise ValueError("لا يمكن تغيير عملة الإدخال بعد الحفظ.")
     if not isinstance(data.get("values"), dict) or not data["values"]:
         raise ValueError("أرقام الإدخال غير صالحة.")

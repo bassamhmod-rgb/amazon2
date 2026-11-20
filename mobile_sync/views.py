@@ -956,7 +956,12 @@ def _apply_product_change(store, payload, server_id=None, category_resolver=None
         "mobile_update_time": now_minute,
     }
     if "input_data" in payload:
-        update_fields["input_data"] = validate_input_data(payload["input_data"], obj.input_data if obj else None)
+        # Product prices are editable, including their entry currency. Financial
+        # documents retain the validator's default immutable-currency rule.
+        update_fields["input_data"] = validate_input_data(
+            payload["input_data"], obj.input_data if obj else None,
+            allow_currency_change=True,
+        )
     if "product_number" in payload:
         product_number = _to_str(payload.get("product_number")).strip()
         if len(product_number) > 100:
