@@ -41,6 +41,8 @@
         return parts.join(' / ') || amount.toFixed(places) + (config.currency === 'USD' ? ' $' : ' ل.س');
     }
     const total = () => items.reduce((sum, row) => sum + Number(row.price || 0) * row.quantity, 0);
+    const hasHiddenPrice = () => items.some(row => row.price == null);
+    const totalLabel = () => hasHiddenPrice() ? 'يُحدّد عند تأكيد الطلب' : money(total());
     function node(tag, text, className) {
         const result = document.createElement(tag);
         if (text !== undefined) result.textContent = text;
@@ -84,7 +86,7 @@
         const badge = document.getElementById('cart-count');
         if (badge) { badge.textContent = count; badge.classList.toggle('is-hidden', !count); }
         const bar = document.getElementById('local-cart-bar');
-        if (bar) { bar.hidden = !count; bar.textContent = 'السلة (' + count + ') — ' + money(total()); }
+        if (bar) { bar.hidden = !count; bar.textContent = 'السلة (' + count + ') — ' + totalLabel(); }
         document.querySelectorAll('.add-to-cart-form').forEach(form => {
             const id = form.closest('[data-product-id]').dataset.productId;
             const row = items.find(item => item.id === id);
@@ -100,7 +102,7 @@
             items.forEach(row => {
                 const line = node('div', undefined, 'local-cart-line');
                 const info = node('div');
-                info.append(node('strong', row.name || 'منتج غير متاح'), node('div', money(Number(row.price || 0) * row.quantity)));
+                info.append(node('strong', row.name || 'منتج غير متاح'), node('div', row.price == null ? 'السعر غير معروض' : money(Number(row.price) * row.quantity)));
                 line.append(info, quantityControl(row), button('حذف', 'حذف ' + row.name, () => change(row.id, 0)));
                 const label = node('label', 'ملاحظة (لون، قياس..)', 'local-cart-note');
                 const note = node('textarea', undefined, 'form-control mt-1');
@@ -114,9 +116,9 @@
                 list.append(line);
             });
         }
-        document.querySelectorAll('[data-local-total]').forEach(el => { el.textContent = money(total()); });
+        document.querySelectorAll('[data-local-total]').forEach(el => { el.textContent = totalLabel(); });
         const required = document.getElementById('local-required-amount');
-        if (required) required.textContent = money(total() * Number(config.requiredPercent) / 100);
+        if (required) required.textContent = hasHiddenPrice() ? 'يُحدّد عند تأكيد الطلب' : money(total() * Number(config.requiredPercent) / 100);
         const checkout = document.getElementById('local-checkout-link');
         if (checkout) { checkout.setAttribute('aria-disabled', String(!count || !storageOK || config.paused)); }
     }

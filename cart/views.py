@@ -57,7 +57,7 @@ def add_to_cart(request, store_slug, product_id):
         return redirect("stores:store_front", slug=store.slug)
 
     product = get_object_or_404(Product.objects.storefront_visible(), id=product_id, store=store)
-    if not product.show_price:
+    if product.purchase_from_center_only:
         hidden_price_message = "هذا المنتج لا يُباع عبر المتجر الإلكتروني. البيع عن طريق المركز مباشرة."
         if request.headers.get("x-requested-with") == "XMLHttpRequest":
             return JsonResponse({"error": hidden_price_message}, status=403)
@@ -178,7 +178,7 @@ def update_cart_item_quantity(request, store_slug, item_id, action):
     item = get_object_or_404(CartItem, id=item_id, cart=cart)
 
     if action == "inc":
-        if (not item.product.active or not item.product.show_price or
+        if (not item.product.is_storefront_visible or item.product.purchase_from_center_only or
                 (not item.product.allow_negative_stock_sale and item.quantity + 1 > available_quantity(item.product, store))):
             messages.error(request, "الكمية المطلوبة غير متوفرة.")
             return redirect("cart:cart_detail", store_slug=store.slug)

@@ -120,7 +120,7 @@ def store_front(request, slug):
             "id": str(p.pk), "name": p.name, "price": str(p.price) if p.show_price else None,
             "category": str(p.category_id or ""), "category2": str(p.category2_id or ""),
             "available": max(0, int(p.real_stock_calc)),
-            "unlimited": p.allow_negative_stock_sale, "sellable": p.show_price,
+            "unlimited": p.allow_negative_stock_sale, "sellable": not p.purchase_from_center_only,
         } for p in products],
         "initialItems": [{"id": str(item.product_id), "quantity": item.quantity,
                           "note": item.item_note or ""}
@@ -231,7 +231,7 @@ def product_public(request, store_slug, product_id):
         "products": [{"id": str(product.pk), "name": product.name,
                       "price": str(product.price) if product.show_price else None,
                       "available": max(0, int(product.real_stock_calc)),
-                      "unlimited": product.allow_negative_stock_sale, "sellable": product.show_price}],
+                      "unlimited": product.allow_negative_stock_sale, "sellable": not product.purchase_from_center_only}],
     })
     return render(request, "stores/product_public.html", {
     "store": store,

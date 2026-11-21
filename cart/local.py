@@ -40,9 +40,10 @@ def validated_local_items(raw, store):
         items = []
         for row in rows:
             product = products[int(row["id"])]
-            price = Decimal(str(row.get("price", "")))
-            if not price.is_finite() or price != product.price:
-                raise ValueError(f"تغيّر سعر {product.name}. ارجع للمتجر لتحديث السلة قبل التأكيد.")
+            if product.show_price:
+                price = Decimal(str(row.get("price", "")))
+                if not price.is_finite() or price != product.price:
+                    raise ValueError(f"تغيّر سعر {product.name}. ارجع للمتجر لتحديث السلة قبل التأكيد.")
             note = row.get("note", "")
             if not isinstance(note, str) or len(note) > 2000:
                 raise ValueError

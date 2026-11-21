@@ -19,7 +19,7 @@
     {% if product.category2 %}<p>الفئة الفرعية: {{ product.category2.name }}</p>{% endif %}
     {{ product.description|linebreaks }}
     {% for detail in product.details.all %}<p><strong>{{ detail.title }}:</strong> {{ detail.value }}</p>{% endfor %}
-    {% if product.show_price %}
+    {% if not product.purchase_from_center_only %}
     <form data-product-editor data-product-id="{{ product.id }}">
         <label class="form-label">الكمية
             <input type="number" name="quantity" min="1" step="1" value="1" inputmode="numeric" class="form-control" required>
@@ -29,5 +29,5 @@
         </label>
         <button type="submit" class="btn btn-primary w-100">إضافة إلى السلة</button>
     </form>
-    {% else %}<p>الشراء من المركز مباشرة</p>{% endif %}
+    {% else %}<p>الشراء من المركز حصراً</p>{% endif %}
 </template>

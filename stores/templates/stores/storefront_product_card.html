@@ -30,13 +30,13 @@
                     {% if store.show_product_description and p.description %}
                     <p class="product-description">{{ p.description }}</p>
                     {% endif %}
-                    {% if p.show_price %}
+                    {% if not p.purchase_from_center_only %}
                     <form class="add-to-cart-form" onsubmit="return false;">
                         <div class="local-product-quantity"></div>
                         <button type="submit" class="btn btn-primary product-add-btn" disabled>إضافة</button>
                     </form>
                     {% else %}
-                    <p class="text-muted">الشراء من المركز مباشرة</p>
+                    <p class="text-muted">الشراء من المركز حصراً</p>
                     {% endif %}
                     </div>
                 </div>

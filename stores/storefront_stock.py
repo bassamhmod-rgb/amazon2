@@ -75,7 +75,7 @@ def allocate_cart_items(store, items):
     allocations = []
     for item in items:
         product = item.product
-        if not product.is_storefront_visible or not product.show_price or item.quantity <= 0:
+        if not product.is_storefront_visible or product.purchase_from_center_only or item.quantity <= 0:
             raise ValueError(f"المادة غير متاحة للطلب: {product.name}")
         if not active:
             raise ValueError("يجب تحديد مستودع فعال واحد على الأقل للطلب.")

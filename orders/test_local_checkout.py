@@ -121,12 +121,12 @@ class LocalCheckoutTests(TestCase):
         foreign = Product.objects.create(store=other, name="Foreign", price=10, stock=10)
         self.confirm([{"id": str(foreign.pk), "quantity": 1, "price": "10"}], token)
         self.assertFalse(Order.objects.exists())
-        for field in ["show_price", "active"]:
-            setattr(self.product, field, False)
+        for field, blocked in [("purchase_from_center_only", True), ("show_in_storefront", False), ("active", False)]:
+            setattr(self.product, field, blocked)
             self.product.save()
             self.confirm(token=token)
             self.assertFalse(Order.objects.exists())
-            setattr(self.product, field, True)
+            setattr(self.product, field, not blocked)
         self.product.save()
         self.store.sales_paused = True
         self.store.save()
@@ -173,3 +173,10 @@ class LocalCheckoutTests(TestCase):
         self.assertIsNone(response.context["storefront_data"]["products"][0]["price"])
         response = self.client.get(reverse("stores:product_public", args=[self.store.slug, self.product.pk]))
         self.assertIsNone(response.context["storefront_data"]["products"][0]["price"])
+
+    def test_hidden_price_checkout_uses_server_price(self):
+        self.product.show_price = False
+        self.product.save()
+        response = self.confirm(rows=[{"id": str(self.product.pk), "quantity": 2, "price": None}])
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(Order.objects.get().amount, Decimal("20"))

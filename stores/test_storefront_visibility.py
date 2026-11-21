@@ -27,6 +27,8 @@ class StorefrontVisibilityTests(TestCase):
 
     def test_defaults_and_unclassified_products_remain_visible(self):
         self.assertTrue(self.product.show_in_storefront)
+        self.assertFalse(self.product.purchase_from_center_only)
+        self.assertFalse(ProductForm(store=self.store)["purchase_from_center_only"].value())
         self.assertTrue(self.category.show_in_storefront)
         unclassified = Product.objects.create(store=self.store, name="Unclassified", price=1)
         self.assertCountEqual(Product.objects.storefront_visible(), [self.product, unclassified])
@@ -60,6 +62,7 @@ class StorefrontVisibilityTests(TestCase):
         from mobile_sync.views import _apply_category_change, _apply_product_change
 
         self.product.show_in_storefront = False
+        self.product.purchase_from_center_only = True
         self.product.save()
         self.category.show_in_storefront = False
         self.category.save()
@@ -70,7 +73,56 @@ class StorefrontVisibilityTests(TestCase):
         self.product.refresh_from_db()
         self.category.refresh_from_db()
         self.assertFalse(self.product.show_in_storefront)
+        self.assertTrue(self.product.purchase_from_center_only)
         self.assertFalse(self.category.show_in_storefront)
+
+    def test_center_only_product_keeps_price_but_blocks_all_purchase_paths(self):
+        self.product.purchase_from_center_only = True
+        self.product.save()
+        response = self.client.get(reverse("stores:store_front", args=[self.store.slug]))
+        row = response.context["storefront_data"]["products"][0]
+        self.assertIsNotNone(row["price"])
+        self.assertFalse(row["sellable"])
+        self.assertContains(response, "الشراء من المركز حصراً")
+        self.assertNotContains(response, 'class="add-to-cart-form"')
+        response = self.client.get(self.public_url())
+        self.assertContains(response, "الشراء من المركز حصراً")
+        self.assertNotContains(response, 'id="local-product-form"')
+        response = self.client.post(reverse("cart:add_to_cart", args=[self.store.slug, self.product.pk]),
+            {"quantity": "1"}, HTTP_X_REQUESTED_WITH="XMLHttpRequest")
+        self.assertEqual(response.status_code, 403)
+        self.assertFalse(CartItem.objects.exists())
+        with self.assertRaises(ValueError):
+            allocate_cart_items(self.store, [CartItem(product=self.product, quantity=1)])
+
+    def test_hidden_price_does_not_enable_center_only_purchase(self):
+        self.product.show_price = False
+        self.product.save()
+        response = self.client.get(reverse("stores:store_front", args=[self.store.slug]))
+        row = response.context["storefront_data"]["products"][0]
+        self.assertIsNone(row["price"])
+        self.assertTrue(row["sellable"])
+        self.assertContains(response, 'class="add-to-cart-form"')
+        self.assertNotContains(response, "الشراء من المركز حصراً")
+        self.assertContains(self.client.get(self.public_url()), 'id="local-product-form"')
+        response = self.client.post(reverse("cart:add_to_cart", args=[self.store.slug, self.product.pk]),
+            {"quantity": "1"}, HTTP_X_REQUESTED_WITH="XMLHttpRequest")
+        self.assertEqual(response.status_code, 200)
+
+    def test_product_editor_saves_center_only_independently(self):
+        self.client.force_login(self.owner)
+        for center_only in (True, False):
+            data = {"name": self.product.name, "display_order": "0", "price": "10",
+                "buy_price": "0", "stock": "10", "stock_alert_threshold": "0",
+                "active": "on", "show_price": "on", "show_in_storefront": "on"}
+            if center_only:
+                data["purchase_from_center_only"] = "on"
+            response = self.client.post(self.dashboard_url("product_update", product_id=self.product.pk), data)
+            self.assertEqual(response.status_code, 302)
+            self.product.refresh_from_db()
+            self.assertEqual(self.product.purchase_from_center_only, center_only)
+            self.assertTrue(self.product.show_price)
+            self.assertTrue(self.product.show_in_storefront)
 
     def test_either_category_can_hide_product_without_changing_product_toggle(self):
         for category in (self.category, self.secondary):

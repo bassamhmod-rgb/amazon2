@@ -229,6 +229,9 @@
                 </div>
                 {% endif %}
 
+{% if product.purchase_from_center_only %}
+                <p class="text-muted">الشراء من المركز حصراً</p>
+{% else %}
 <form id="local-product-form" data-product-id="{{ product.id }}">
                                  {% csrf_token %}  <div class="row g-2 mb-3"></div>
                             <div class="row g-2 mb-3">
@@ -247,6 +250,7 @@
                         🛒 إضافة الى السلة
                     </button>
                 </form>
+{% endif %}
                 <div class="text-center">
                               <a href="{% url 'stores:store_front' store.slug %}" class="back-link">← العودة للمتجر</a>
             </div>

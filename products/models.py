@@ -103,6 +103,8 @@ class Product(models.Model):
         help_text="عدد القطع ضمن الوحدة الثانية",
     )
     show_price = models.BooleanField(default=True)
+    purchase_from_center_only = models.BooleanField(
+        default=False, verbose_name="الشراء من المركز حصراً")
 
     buy_price = models.DecimalField(
         max_digits=28,
