@@ -6,11 +6,19 @@ from .models import SupportQuestion
 
 @admin.register(SupportQuestion)
 class SupportQuestionAdmin(admin.ModelAdmin):
+    change_list_template = 'admin/accounts/supportquestion/change_list.html'
     list_display = ('question', 'sort_order', 'is_active')
     list_editable = ('sort_order', 'is_active')
     list_filter = ('is_active',)
     search_fields = ('question', 'answer')
     fields = ('question', 'answer', 'sort_order', 'is_active')
+
+    def get_urls(self):
+        from django.urls import path
+        from .support_import_admin import import_support_docx
+        return [path('import-word/', self.admin_site.admin_view(
+            lambda request: import_support_docx(self, request)),
+            name='accounts_supportquestion_import_word')] + super().get_urls()
 
 
 @admin.register(AccountingClient)

@@ -28,6 +28,19 @@ class SupportQuestionTests(TestCase):
         SupportQuestion.objects.all().delete()
         self.assertEqual(self.client.get('/api/mobile/v1/stores/').json()['support_questions'], [])
 
+    def test_dedicated_refresh_excludes_disabled_and_deleted_questions(self):
+        url = '/api/mobile/v1/support-questions/'
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(set(response.json()), {'support_questions'})
+        self.assertEqual([q['id'] for q in response.json()['support_questions']],
+                         [self.first.pk, self.second.pk])
+        self.first.is_active = False
+        self.first.save()
+        self.second.delete()
+        self.assertEqual(self.client.get(url).json()['support_questions'], [])
+        self.assertEqual(self.client.post(url).status_code, 405)
+
     def test_admin_management_and_access(self):
         url = reverse('admin:accounts_supportquestion_changelist')
         self.assertEqual(self.client.get(url).status_code, 302)

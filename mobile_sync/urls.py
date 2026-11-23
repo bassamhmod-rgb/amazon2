@@ -1,8 +1,10 @@
 from django.urls import path
 
 from . import views
+from accounts.support import support_questions_pull
 
 urlpatterns = [
+    path('support-questions/', support_questions_pull, name='support_questions'),
     path("orders/identity/", views.orders_identity_capabilities, name="orders_identity"),
     path("party-fx/sync/", views.party_fx_sync, name="party_fx_sync"),
     path("ping/", views.ping, name="ping"),

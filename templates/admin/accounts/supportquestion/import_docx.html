@@ -1,0 +1,36 @@
+{% extends "admin/base_site.html" %}
+{% block content %}
+<div dir="rtl" style="max-width: 1100px; line-height: 1.9">
+  <p><a href="{{ list_url }}">العودة إلى الأسئلة الشائعة</a></p>
+  {% if error %}<p class="errornote">{{ error }}</p>{% endif %}
+  <p>اختر ملف Word (.docx). يبدأ السؤال برقم وينتهي بعلامة استفهام، وتأتي إجابته تحته حتى السؤال التالي. يُدعم ترقيم Word التلقائي وروابط الفيديو.</p>
+  <p>الأسئلة الجديدة تُضاف بترتيب الملف بعد الموجودة. يُحدّث جواب السؤال المطابق، وتبقى حالة تفعيله وترتيبه كما هما. لا يُحذف أي سؤال موجود.</p>
+  <form method="post" enctype="multipart/form-data">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <input type="submit" value="معاينة الملف" />
+  </form>
+  {% if preview %}
+  <h2>معاينة {{ rows|length }} سؤال — لم تُحفظ بعد</h2>
+  {% if preview.warnings %}
+  <div class="module" style="padding:16px">
+    <h3>ملاحظات للمراجعة</h3>
+    <ul>{% for warning in preview.warnings %}<li>{{ warning }}</li>{% endfor %}</ul>
+  </div>
+  {% endif %}
+  {% for row in rows %}
+  <div class="module" style="padding:16px; margin-bottom:12px; border:1px solid var(--border-color)">
+    <h3>{{ forloop.counter }}. {{ row.question }}</h3>
+    <p><strong>{{ row.status }}</strong>{% if row.inactive %} — سيبقى هذا السؤال غير مفعّل{% endif %}</p>
+    <div style="white-space:pre-wrap; overflow-wrap:anywhere">{{ row.answer }}</div>
+  </div>
+  {% endfor %}
+  <form method="post">
+    {% csrf_token %}
+    <input type="hidden" name="action" value="confirm" />
+    <input type="hidden" name="token" value="{{ preview.token }}" />
+    <input type="submit" class="default" value="تأكيد استيراد الأسئلة والأجوبة" />
+  </form>
+  {% endif %}
+</div>
+{% endblock %}
