@@ -1,6 +1,16 @@
 #للاشعارات
 from django.contrib import admin
 from .models import AccountingClient, SystemNotification, StoreUser
+from .models import SupportQuestion
+
+
+@admin.register(SupportQuestion)
+class SupportQuestionAdmin(admin.ModelAdmin):
+    list_display = ('question', 'sort_order', 'is_active')
+    list_editable = ('sort_order', 'is_active')
+    list_filter = ('is_active',)
+    search_fields = ('question', 'answer')
+    fields = ('question', 'answer', 'sort_order', 'is_active')
 
 
 @admin.register(AccountingClient)

@@ -1,3 +1,4 @@
+from accounts.support import support_questions_payload
 from .movement_attribution import serialize_attributed, apply_attributed, repair_attribution
 from .input_money import validate_input_data
 from .order_identity import OrderIdentityCollision, resolve_document, bind_document, document_key, verify_legacy_retry
@@ -2500,6 +2501,7 @@ def stores_pull(request):
     return Response(
         {
             "items": data,
+            "support_questions": support_questions_payload(),
             "max_update_time": max((x["update_time"] for x in data), default=0),
         }
     )
@@ -2745,6 +2747,7 @@ def store_users_pull(request):
         {
             "merchant_id": merchant_id_int,
             "items": data,
+            "support_questions": support_questions_payload(),
             "max_update_time": 0,
         }
     )

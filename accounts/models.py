@@ -623,6 +623,21 @@ class DeleteSync(models.Model):
     access_table_name = models.CharField(max_length=100, blank=True, null=True)
 
 
+class SupportQuestion(models.Model):
+    question = models.CharField('السؤال', max_length=500)
+    answer = models.TextField('الإجابة', help_text='يمكن تضمين روابط https لفيديوهات يوتيوب أو صفحات الشرح داخل الإجابة.')
+    sort_order = models.PositiveIntegerField('الترتيب', default=0)
+    is_active = models.BooleanField('ظاهر في التطبيق', default=True)
+
+    class Meta:
+        ordering = ('sort_order', 'pk')
+        verbose_name = 'سؤال شائع'
+        verbose_name_plural = 'المساعدة و الدعم — الأسئلة الشائعة'
+
+    def __str__(self):
+        return self.question
+
+
 class PartyFxState(models.Model):
     store = models.ForeignKey('stores.Store', on_delete=models.CASCADE)
     party_kind = models.CharField(max_length=8)

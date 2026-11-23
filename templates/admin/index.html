@@ -1,0 +1,11 @@
+{% extends "admin/index.html" %}
+{% block content %}
+{% if perms.accounts.view_supportquestion %}
+<div class="module" dir="rtl" style="padding: 16px; margin-bottom: 16px">
+  <h2>المساعدة و الدعم</h2>
+  <p><a href="{% url 'admin:accounts_supportquestion_changelist' %}">إدارة الأسئلة الشائعة وإجاباتها</a></p>
+  <p>تنتقل الأسئلة الظاهرة إلى البرنامج عند مزامنة المتاجر والمستخدمين. يمكن إدراج رابط فيديو يوتيوب ضمن الإجابة.</p>
+</div>
+{% endif %}
+{{ block.super }}
+{% endblock %}
