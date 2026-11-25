@@ -1,4 +1,4 @@
-{% load static %}
+{% load static display_numbers %}
 
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
@@ -144,7 +144,7 @@
         {% if not local_config %}
         {% for item in items %}
             <p class="info-row">
-                {{ item.quantity }} × {{ item.product.name }}
+                {{ item.quantity|display_number }} × {{ item.product.name }}
                 —
                 {% if store.pricing_currency == "USD" %}
                     <span dir="ltr">{{ item.product.price|floatformat:2 }} $</span>

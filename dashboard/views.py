@@ -36,6 +36,7 @@ from orders.models import Order, OrderItem
 from accounts.models import PointsTransaction, AccountingClient, SystemNotification, DeleteSync, StoreUser
 from accounts.store_user_forms import StoreUserForm
 from .user_sync_notice import notify_user_sync_required
+from .store_user_deletion import has_store_documents
 from .account_views import OwnerAccountForm, save_owner_account
 from django.contrib.auth import update_session_auth_hash
 from django.views.decorators.debug import sensitive_post_parameters
@@ -539,8 +540,16 @@ def store_user_update(request, store_slug, user_id):
 @require_POST
 def store_user_delete(request, store_slug, user_id):
     store = _get_store_for_dashboard(request, store_slug)
-    obj = get_object_or_404(StoreUser, pk=user_id, store=store)
-    obj.delete()
+    with transaction.atomic():
+        obj = get_object_or_404(
+            StoreUser.objects.select_for_update(), pk=user_id, store=store,
+        )
+        if has_store_documents(obj):
+            messages.error(request,
+                "لا يمكن حذف المستخدم لأنه مرتبط بفواتير أو مستندات في المتجر. "
+                "يمكنك تعطيل حسابه بدلًا من حذفه للحفاظ على سجل المستندات.")
+            return redirect("dashboard:store_users_list", store_slug=store.slug)
+        obj.delete()
     messages.success(request, "تم حذف المستخدم.")
     notify_user_sync_required(request)
     return redirect("dashboard:store_users_list", store_slug=store.slug)

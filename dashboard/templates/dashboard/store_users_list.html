@@ -157,10 +157,10 @@
                                href="{% url 'dashboard:store_user_update' store.slug u.id %}">تعديل</a>
                             <form method="post"
                                   action="{% url 'dashboard:store_user_delete' store.slug u.id %}"
-                                  class="d-inline">
+                                  class="d-inline"
+                                  onsubmit="return confirm('حذف المستخدم نهائيًا؟ سيُمنع الحذف إذا كانت له مستندات مرتبطة في المتجر.\nتنبيه: قد توجد في التطبيق مستندات مرتبطة بهذا المستخدم لم تتم مزامنتها؛ المتجر لا يستطيع التحقق منها. تأكد منها قبل المتابعة، أو عطّل المستخدم بدلًا من حذفه.');">
                                 {% csrf_token %}
                                 <button class="btn btn-sm btn-outline-danger"
-                                        onclick="return confirm('حذف المستخدم؟');"
                                         type="submit">حذف</button>
                             </form>
                         </td>

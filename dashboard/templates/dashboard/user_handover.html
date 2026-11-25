@@ -1,4 +1,5 @@
 {% extends "dashboard/handover_base.html" %}
+{% load display_numbers %}
 {% block content %}
 <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap mb-3">
     <h3 class="mb-0">تسليم مستخدم</h3>
@@ -30,7 +31,7 @@
     <a class="handover-due d-block text-decoration-none mb-3" href="?{{ due_query }}#details">
         <strong>المطلوب تسليمه</strong>
         <div class="d-flex flex-wrap gap-4 mt-2">
-            {% for row in due_rows %}<span class="fs-3 fw-bold"><bdi>{{ row.value }}</bdi> {{ row.currency }}</span>{% endfor %}
+            {% for row in due_rows %}<span class="fs-3 fw-bold"><bdi>{{ row.value|display_number }}</bdi> {{ row.currency }}</span>{% endfor %}
         </div>
         <div class="small mt-2">عرض الحركات المؤثرة في التسليم</div>
     </a>
@@ -38,7 +39,7 @@
         {% for card in cards %}
             <a class="handover-card" href="{{ card.url }}">
                 <div>{{ card.label }}</div>
-                <div class="handover-value"><bdi>{{ card.value }}</bdi> {{ card.currency }}</div>
+                <div class="handover-value"><bdi>{{ card.value|display_number }}</bdi> {{ card.currency }}</div>
                 <div class="small text-muted">{{ card.count }} سجل — عرض التفاصيل</div>
             </a>
         {% endfor %}

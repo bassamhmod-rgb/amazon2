@@ -1,3 +1,4 @@
+{% load display_numbers %}
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
@@ -202,7 +203,7 @@
 
                                 </form>
 
-                                <span class="qty-value">{{ item.quantity }}</span>
+                                <span class="qty-value">{{ item.quantity|display_number }}</span>
 
                                 <form method="post" action="{% url 'cart:update_cart_item_quantity' store.slug item.id 'dec' %}" class="qty-control-form">
 

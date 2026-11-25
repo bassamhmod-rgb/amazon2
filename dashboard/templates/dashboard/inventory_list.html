@@ -1,4 +1,4 @@
-{% load static %}
+{% load static display_numbers %}
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
@@ -199,7 +199,7 @@
                             {% elif qty < 0 %}qty-neg
                             {% else %}qty-zero{% endif %}
                         ">
-                            {{ qty }}
+                            {{ qty|display_number }}
                         </td>
 
                         <td class="text-center">

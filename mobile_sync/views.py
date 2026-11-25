@@ -3772,12 +3772,14 @@ def sync_push(request):
                             continue
                         obj._skip_delete_sync = True
                         obj.delete()
-                        applied.append({
-                            "entity": "warehouse",
-                            "action": "deleted",
-                            "local_id": local_id,
-                            "server_id": server_id,
-                        })
+                    # A retry after a lost acknowledgement or store reset has
+                    # the same successful result when the warehouse is absent.
+                    applied.append({
+                        "entity": "warehouse",
+                        "action": "deleted",
+                        "local_id": local_id,
+                        "server_id": server_id,
+                    })
                 elif entity == "warehouse_transfer":
                     obj = WarehouseTransfer.objects.filter(id=server_id, store_id=merchant_id).first()
                     if obj:

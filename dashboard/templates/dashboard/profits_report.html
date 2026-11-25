@@ -1,4 +1,4 @@
-{% load static %}
+{% load static display_numbers %}
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
@@ -129,19 +129,19 @@
         <div class="col-md-4">
             <div class="card p-3 stat-card">
                 <div class="stat-title">إجمالي ربح البنود قبل الحسم</div>
-                <div class="stat-value text-primary">{{ items_profit }}</div>
+                <div class="stat-value text-primary">{{ items_profit|display_number }}</div>
             </div>
         </div>
         <div class="col-md-4">
             <div class="card p-3 stat-card">
                 <div class="stat-title">الحسم</div>
-                <div class="stat-value text-danger">{{ discount_total }}</div>
+                <div class="stat-value text-danger">{{ discount_total|display_number }}</div>
             </div>
         </div>
         <div class="col-md-4">
             <div class="card p-3 stat-card">
                 <div class="stat-title">الأرباح العامة (بعد الحسم)</div>
-                <div class="stat-value text-success">{{ general_profit }}</div>
+                <div class="stat-value text-success">{{ general_profit|display_number }}</div>
             </div>
         </div>
     </div>
@@ -150,19 +150,19 @@
         <div class="col-md-4">
             <div class="card p-3 stat-card">
                 <div class="stat-title">صرفيات العمل</div>
-                <div class="stat-value text-warning">{{ work_expenses }}</div>
+                <div class="stat-value text-warning">{{ work_expenses|display_number }}</div>
             </div>
         </div>
         <div class="col-md-4">
             <div class="card p-3 stat-card">
                 <div class="stat-title">رواتب الموظفين المقبوضة</div>
-                <div class="stat-value text-warning">{{ salaries_total }}</div>
+                <div class="stat-value text-warning">{{ salaries_total|display_number }}</div>
             </div>
         </div>
         <div class="col-md-4">
             <div class="card p-3 stat-card">
                 <div class="stat-title">الأرباح الفعلية</div>
-                <div class="stat-value text-success">{{ actual_profit }}</div>
+                <div class="stat-value text-success">{{ actual_profit|display_number }}</div>
             </div>
         </div>
     </div>
@@ -171,7 +171,7 @@
         <div class="col-md-4">
             <div class="card p-3 stat-card">
                 <div class="stat-title">صرفيات عامة</div>
-                <div class="stat-value text-warning">{{ general_expenses }}</div>
+                <div class="stat-value text-warning">{{ general_expenses|display_number }}</div>
             </div>
         </div>
     </div>
@@ -180,19 +180,19 @@
         <div class="col-md-4">
             <div class="card p-3 stat-card">
                 <div class="stat-title">فروقات الجرد</div>
-                <div class="stat-value {% if inventory_adjustments_total < 0 %}text-danger{% else %}text-success{% endif %}">{{ inventory_adjustments_total }}</div>
+                <div class="stat-value {% if inventory_adjustments_total < 0 %}text-danger{% else %}text-success{% endif %}">{{ inventory_adjustments_total|display_number }}</div>
             </div>
         </div>
         <div class="col-md-4">
             <div class="card p-3 stat-card">
                 <div class="stat-title">الإتلاف</div>
-                <div class="stat-value text-danger">{{ disposal_loss }}</div>
+                <div class="stat-value text-danger">{{ disposal_loss|display_number }}</div>
             </div>
         </div>
         <div class="col-md-4">
             <div class="card p-3 stat-card">
                 <div class="stat-title">الأرباح الصافية</div>
-                <div class="stat-value text-success">{{ net_profit }}</div>
+                <div class="stat-value text-success">{{ net_profit|display_number }}</div>
             </div>
         </div>
     </div>

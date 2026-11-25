@@ -1,3 +1,4 @@
+{% load display_numbers %}
 <style>
     .stock-alert-bell {
         position: relative;
@@ -72,7 +73,7 @@
         {% for product in low_stock_alert_products %}
             <div class="stock-alert-item">
                 <strong>{{ product.name }}</strong>
-                <small>المتوفر: {{ product.real_stock }} · حد التنبيه: {{ product.stock_alert_threshold }}</small>
+                <small>المتوفر: {{ product.real_stock|display_number }} · حد التنبيه: {{ product.stock_alert_threshold|display_number }}</small>
             </div>
         {% empty %}
             <div class="stock-alert-item text-muted small">لا توجد تنبيهات كميات حاليًا.</div>

@@ -1,4 +1,4 @@
-{% load static %}
+{% load static display_numbers %}
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
@@ -87,7 +87,7 @@
         <div>
             <h3 class="mb-1">💸 الصرفيات</h3>
             <div class="text-muted">
-                إجمالي الصرفيات (حسب الفلترة): <strong>{{ total_amount }}</strong>
+                إجمالي الصرفيات (حسب الفلترة): <strong>{{ total_amount|display_number }}</strong>
             </div>
         </div>
         <a href="{% url 'dashboard:expense_settings' store.slug %}" class="btn btn-outline-primary">
@@ -188,7 +188,7 @@
                 <tbody>
                     {% for expense in expenses %}
                     <tr>
-                        <td>{{ expense.amount }}</td>
+                        <td>{{ expense.amount|display_number }}</td>
                         <td>{{ expense.date|date:"Y-m-d" }}</td>
                         <td>{{ expense.expense_type.name|default:"-" }}</td>
                         <td>{{ expense.expense_reason.name|default:"-" }}</td>
