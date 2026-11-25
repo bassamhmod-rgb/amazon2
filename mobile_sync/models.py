@@ -50,6 +50,15 @@ class CustomerSyncOrigin(models.Model):
             fields=["merchant_id", "origin_key"], name="unique_customer_sync_origin")]
 
 
+class PullSnapshot(models.Model):
+    """Immutable content receipts shared by all server workers."""
+    token = models.CharField(max_length=64, primary_key=True)
+    merchant_id = models.IntegerField()
+    resource = models.CharField(max_length=20)
+    fingerprints = models.JSONField(default=dict)
+    expires_at = models.DateTimeField(db_index=True)
+
+
 class MobileDeleteSync(models.Model):
     merchant_id = models.IntegerField(db_index=True)
     store_record_id = models.BigIntegerField(blank=True, null=True)

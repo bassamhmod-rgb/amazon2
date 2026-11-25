@@ -1,5 +1,6 @@
 from accounts.support import support_questions_payload
 from .movement_attribution import serialize_attributed, apply_attributed, repair_attribution
+from .pull_snapshot import changed_rows
 from .input_money import validate_input_data
 from .order_identity import OrderIdentityCollision, resolve_document, bind_document, document_key, verify_legacy_retry
 from .customer_resolution import CustomerIdentityCollision
@@ -2657,14 +2658,18 @@ def products_pull(request):
             "active",
             "update_time",
             "mobile_update_time",
+            "input_data",
         )
     ]
 
+    max_update_time = max((x["update_time"] for x in data), default=0)
+    data, snapshot_token = changed_rows(request, "products", merchant_id_int, data)
     return Response(
         {
             "merchant_id": merchant_id_int,
             "items": data,
-            "max_update_time": max((x["update_time"] for x in data), default=0),
+            "max_update_time": max_update_time,
+            "snapshot_token": snapshot_token,
         }
     )
 
@@ -4606,7 +4611,9 @@ def orders_pull(request):
                     "accounting_invoice_number": getattr(order, "accounting_invoice_number", None),
                     "error": str(exc),
                 })
+        data, snapshot_token = changed_rows(request, "orders", merchant_id_int, data)
         return Response({
+            "snapshot_token": snapshot_token,
             "merchant_id": merchant_id_int,
             "items": data,
             "max_update_time": max((_mobile_time(order) for order in page_rows[:limit]), default=0),

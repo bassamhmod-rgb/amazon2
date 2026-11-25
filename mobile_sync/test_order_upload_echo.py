@@ -7,6 +7,19 @@ from .views import orders_pull
 
 
 class OrderUploadEchoTests(_InvoiceTests):
+    def test_other_device_does_not_reimport_received_orders_but_gets_line_edits(self):
+        item = self.push()
+        first = self.pull_orders('other')
+        token = first['snapshot_token']
+        since = first['max_update_time']
+        self.assertEqual(self.pull_orders('other', since, snapshot_token=token)['items'], [])
+        item.line_note = 'Changed in same minute'
+        item.save()
+        changed = self.pull_orders('other', since, snapshot_token=token)
+        self.assertEqual(changed['items'][0]['items'][0]['line_note'], item.line_note)
+        self.assertEqual(self.pull_orders('other', changed['max_update_time'],
+                                         snapshot_token=changed['snapshot_token'])['items'], [])
+
     def pull_orders(self, client="line-note-client", since=None, **extra):
         params = {"merchant_id": self.store.id, "sync_client_id": client, **extra}
         if since is not None:
