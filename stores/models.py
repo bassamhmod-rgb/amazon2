@@ -378,6 +378,9 @@ class WarehouseTransfer(models.Model):
 
     def clean(self):
         if self.from_warehouse_id and self.to_warehouse_id:
+            if Warehouse.objects.filter(pk=self.from_warehouse_id,
+                    is_representative=True, sales_from_main=True).exists():
+                raise ValidationError("مندوب البيع المباشر لا يمكن أن يكون مصدر مناقلة.")
             if Warehouse.objects.filter(pk=self.to_warehouse_id,
                     is_representative=True, sales_from_main=True).exists():
                 raise ValidationError("هذا المندوب يبيع من المستودع الرئيسي مباشرة ولا يستقبل مخزوناً بمناقلة.")

@@ -1564,6 +1564,8 @@ def _apply_warehouse_transfer_change(store, payload, server_id=None, product_res
             to_warehouse = Warehouse.objects.filter(store=store, identifier=to_identifier).first()
     if not from_warehouse or not to_warehouse:
         raise ValueError("Transfer warehouses are required")
+    if from_warehouse.is_representative and from_warehouse.sales_from_main:
+        raise ValueError("مندوب البيع المباشر لا يمكن أن يكون مصدر مناقلة.")
     if to_warehouse.is_representative and to_warehouse.sales_from_main:
         raise ValueError("هذا المندوب يبيع من المستودع الرئيسي مباشرة ولا يستقبل مخزوناً بمناقلة.")
     if from_warehouse.id == to_warehouse.id:

@@ -273,6 +273,9 @@ class Order(models.Model):
         return f"Order #{self.id} â€“ {self.store.name}"
 
     def save(self, *args, **kwargs):
+        if (self.transaction_type == "purchase" and self.warehouse_id
+                and self.warehouse.is_representative and self.warehouse.sales_from_main):
+            raise ValueError("لا يمكن إدخال بضاعة لمندوب البيع المباشر بفاتورة شراء.")
         _touch_mobile_update_time(self, kwargs)
         if not getattr(self, "_skip_update_time_touch", False):
             should_touch = False
@@ -411,6 +414,10 @@ class OrderItem(models.Model):
         return self.subtotal - self.buy_price * self.stock_quantity
 
     def save(self, *args, **kwargs):
+        if self.order_id and self.order.transaction_type == "purchase":
+            selected = self.warehouse or self.order.warehouse
+            if selected and selected.is_representative and selected.sales_from_main:
+                raise ValueError("لا يمكن إدخال بضاعة لمندوب البيع المباشر بفاتورة شراء.")
         if not self.pk and self.representative_warehouse_id is None and self.order_id:
             selected = self.warehouse or self.order.warehouse
             if (self.order.transaction_type in ("sale", "sale_return") and selected
