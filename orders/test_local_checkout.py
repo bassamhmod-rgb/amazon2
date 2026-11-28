@@ -180,3 +180,28 @@ class LocalCheckoutTests(TestCase):
         response = self.confirm(rows=[{"id": str(self.product.pk), "quantity": 2, "price": None}])
         self.assertEqual(response.status_code, 302)
         self.assertEqual(Order.objects.get().amount, Decimal("20"))
+
+    def test_checkout_restores_payment_when_returning_from_review(self):
+        self.store.allow_full_payment = True
+        self.store.save(update_fields=["allow_full_payment"])
+        response = self.client.post(reverse("orders:checkout", args=[self.store.slug]) + "?local=1", {
+            "customer_address": "Delivery address", "payment_type": "full",
+            "payment_transaction_id": "123456",
+        })
+        self.assertEqual(response.status_code, 302)
+        response = self.client.get(reverse("orders:checkout", args=[self.store.slug]) + "?local=1")
+        self.assertContains(response, '<option value="full" selected>')
+        self.assertEqual(response.context["checkout_data"]["payment_transaction_id"], "123456")
+
+    def test_checkout_defaults_to_previous_customer_order_payment(self):
+        self.confirm()
+        response = self.client.get(reverse("orders:checkout", args=[self.store.slug]) + "?local=1")
+        self.assertContains(response, '<option value="cod" selected>')
+
+    def test_review_hides_items_and_keeps_confirmation_form(self):
+        self.prepare()
+        response = self.client.get(reverse("orders:review_order", args=[self.store.slug]))
+        self.assertNotContains(response, 'id="local-cart-items"')
+        self.assertContains(response, 'id="local-confirm-form"')
+        self.assertContains(response, 'class="review-actions"')
+        self.assertContains(response, 'data-local-total')

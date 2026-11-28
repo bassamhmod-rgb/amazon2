@@ -273,7 +273,9 @@ class Order(models.Model):
         return f"Order #{self.id} â€“ {self.store.name}"
 
     def save(self, *args, **kwargs):
-        if (self.transaction_type == "purchase" and self.warehouse_id
+        if self.document_kind == 2 and (not Decimal(str(self.discount)).is_finite() or Decimal(str(self.discount)) < 0):
+            raise ValueError("Invalid notice discount")
+        if (self.document_kind == 1 and self.transaction_type == "purchase" and self.warehouse_id
                 and self.warehouse.is_representative and self.warehouse.sales_from_main):
             raise ValueError("لا يمكن إدخال بضاعة لمندوب البيع المباشر بفاتورة شراء.")
         _touch_mobile_update_time(self, kwargs)

@@ -135,15 +135,15 @@
                 <option value="">— اختر طريقة الدفع —</option>
 
                 {% if store.allow_full_payment %}
-                    <option value="full">تحويل كامل المبلغ</option>
+                    <option value="full" {% if checkout_data.payment_type == "full" %}selected{% endif %}>تحويل كامل المبلغ</option>
                 {% endif %}
 
                 {% if store.allow_partial_payment %}
-                    <option value="partial">دفعة مسبقة + باقي عند التسليم</option>
+                    <option value="partial" {% if checkout_data.payment_type == "partial" %}selected{% endif %}>دفعة مسبقة + باقي عند التسليم</option>
                 {% endif %}
 
                 {% if store.allow_cash_on_delivery %}
-                    <option value="cod">الدفع عند الاستلام</option>
+                    <option value="cod" {% if checkout_data.payment_type == "cod" %}selected{% endif %}>الدفع عند الاستلام</option>
                 {% endif %}
             </select>
 
@@ -175,6 +175,7 @@
                value="{{ method.id }}"
                id="method{{ method.id }}"
                class="form-check-input"
+               {% if checkout_data.payment_method_id|stringformat:"s" == method.id|stringformat:"s" or checkout_data.payment_method|stringformat:"s" == method.id|stringformat:"s" %}checked{% endif %}
                onclick="showDetails({{ method.id }})">
 
         <label for="method{{ method.id }}"
@@ -229,7 +230,7 @@
 
                 <div class="mb-3">
                     <label class="form-label">أو رقم عملية الدفع</label>
-                    <input type="text" name="payment_transaction_id" class="form-control"
+                    <input type="text" name="payment_transaction_id" class="form-control" value="{{ checkout_data.payment_transaction_id }}"
                            placeholder="مثال: 9853721">
                 </div>
 
@@ -268,6 +269,9 @@
         proofBox.style.display = (this.value === "full" || this.value === "partial") ? "block" : "none";
         partialInfo.style.display = (this.value === "partial") ? "block" : "none";
     });
+    paymentTypeSelect.dispatchEvent(new Event("change"));
+    const selectedMethod = document.querySelector('input[name="payment_method"]:checked');
+    if (selectedMethod) showDetails(selectedMethod.value);
 </script>
 
 </body>

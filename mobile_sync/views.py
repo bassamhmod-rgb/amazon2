@@ -4169,6 +4169,9 @@ def orders_push(request):
                     created_at = timezone.make_aware(created_at)
 
                 discount = _to_float(order_payload.get("discount"), 0.0)
+                if document_kind == 2 and (not math.isfinite(discount) or discount < 0):
+                    errors.append({"detail": "Invalid notice discount", "local_order_id": local_order_id})
+                    continue
                 shipping_cost = _to_float(order_payload.get("shipping_cost"), 0.0)
                 if not math.isfinite(shipping_cost) or shipping_cost < 0:
                     errors.append({"detail": "Invalid shipping cost", "local_order_id": local_order_id})

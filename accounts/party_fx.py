@@ -116,9 +116,11 @@ def _calculate(snapshot):
         notice = document['document_kind'] == 2
         sign = Decimal('-1') if not notice and document['transaction_type'].endswith('_return') else Decimal('1')
         amount = number(values['subtotal']) if 'subtotal' in values else original(document['amount'])
-        discount = ZERO if notice else (number(values['discount']) if 'discount' in values else original(document['discount']))
-        charge = amount if notice else max(ZERO, amount - discount)
-        base = number(document['amount']) if notice else max(ZERO, number(document['amount']) - number(document['discount']))
+        discount = number(values['discount']) if 'discount' in values else original(document['discount'])
+        charge = amount - discount if notice else max(ZERO, amount - discount)
+        base = number(document['amount']) - number(document['discount'])
+        if not notice:
+            base = max(ZERO, base)
         post(document, currency, charge * sign, base * sign)
         payment = number(values['payment']) if 'payment' in values else (
             number(document['amount_payment_currency']) or original(document['payment']))

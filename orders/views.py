@@ -78,6 +78,14 @@ def checkout(request, store_slug):
     payment_methods = StorePaymentMethod.objects.filter(store=store, is_active=True)
 
     checkout_data = request.session.get("checkout_data", {})
+    if (checkout_data.get("store_id") != store.pk
+            or checkout_data.get("customer_phone") != normalize_phone_number(customer.phone)):
+        checkout_data = {}
+    previous_order = Order.objects.filter(store=store, customer=customer).order_by("-created_at", "-pk").first()
+    payment_defaults = {
+        "payment_type": previous_order.payment_type if previous_order else "",
+        "payment_method_id": str(previous_order.payment_method_id or "") if previous_order else "",
+    }
     # Old quick registrations used the phone itself as a placeholder name.
     customer_name = customer.name.strip()
     if normalize_phone_number(customer_name) == normalize_phone_number(customer.phone):
@@ -194,6 +202,8 @@ def checkout(request, store_slug):
             "customer_phone": customer.phone,
             "customer_address": customer.address or "",
             "customer_note": "",
+            **payment_defaults,
+            **checkout_data,
         },
         "required_percent": required_percent,
           "required_amount": required_amount,

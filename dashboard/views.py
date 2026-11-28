@@ -150,7 +150,8 @@ def _delete_reset_sync_rows(store, main_warehouse_id):
 
 
 def _order_balance_delta(order):
-    amount = order.net_total if order.document_kind == 1 else (order.amount or Decimal("0"))
+    amount = order.net_total if order.document_kind == 1 else (
+        (order.amount or Decimal("0")) - (order.discount or Decimal("0")))
     payment = order.payment or Decimal("0")
     delta = amount - payment
     if order.transaction_type in ("sale_return", "purchase_return"):
@@ -2235,17 +2236,19 @@ def notice_create(request, store_slug):
         try:
             amount_raw = request.POST.get("amount")
             payment_raw = request.POST.get("payment")
+            discount_raw = request.POST.get("discount") or "0"
+            discount = Decimal(discount_raw)
             amount = Decimal(amount_raw) if amount_raw not in [None, ""] else Decimal("0")
             payment = Decimal(payment_raw) if payment_raw not in [None, ""] else Decimal("0")
         except InvalidOperation:
             messages.error(request, "قيمة المبلغ غير صحيحة.")
             return redirect("dashboard:notice_create", store_slug=store.slug)
 
-        if amount < 0 or payment < 0:
+        if not all(value.is_finite() and value >= 0 for value in (amount, payment, discount)):
             messages.error(request, "القيم يجب أن تكون موجبة.")
             return redirect("dashboard:notice_create", store_slug=store.slug)
 
-        if amount == 0 and payment == 0:
+        if amount == 0 and payment == 0 and discount == 0:
             messages.error(request, "يرجى إدخال دفعة أو مبلغ.")
             return redirect("dashboard:notice_create", store_slug=store.slug)
 
@@ -2263,14 +2266,14 @@ def notice_create(request, store_slug):
         Order.objects.create(
             store=store,
             document_kind=2,
-            input_data=json.dumps(dict(version=1, currency=store.pricing_currency, values={'subtotal': amount_raw or '0', 'payment': payment_raw or '0'})),
+            input_data=json.dumps(dict(version=1, currency=store.pricing_currency, values={'subtotal': amount_raw or '0', 'payment': payment_raw or '0', 'discount': discount_raw})),
             base_currency=store.pricing_currency, payment_currency=store.pricing_currency,
             exchange_rate=store.exchange_rate, amount_payment_currency=payment,
             transaction_type=transaction_type,
             customer=customer,
             supplier=supplier,
             amount=amount,
-            discount=Decimal("0"),
+            discount=discount,
             payment=payment,
             status="confirmed",
             created_by=request.user,
@@ -3704,6 +3707,18 @@ def profits_report(request, store_slug):
         Sum(discount_expr),
         Value(0, output_field=DecimalField(max_digits=14, decimal_places=2))
     ))["total"]
+    notice_discounts = Order.objects.filter(store=store, status="confirmed", document_kind=2,
+                                            transaction_type__in=["sale", "purchase"])
+    if date_from:
+        notice_discounts = notice_discounts.filter(created_at__date__gte=date_from)
+    if date_to:
+        notice_discounts = notice_discounts.filter(created_at__date__lte=date_to)
+    notice_discount_expr = ExpressionWrapper(F("discount") * Case(
+        When(transaction_type="purchase", then=Value(-1)), default=Value(1),
+        output_field=DecimalField(max_digits=14, decimal_places=2)),
+        output_field=DecimalField(max_digits=14, decimal_places=2))
+    discount_total += notice_discounts.aggregate(total=Coalesce(Sum(notice_discount_expr),
+        Value(0, output_field=DecimalField(max_digits=14, decimal_places=2))))["total"]
 
     general_profit = items_profit - discount_total
 

@@ -24,7 +24,9 @@
     </td>
 
     <td>{{ notice.amount|floatformat:2 }} $</td>
-    <td>{{ notice.payment|floatformat:2 }} $</td>
+    <td>{{ notice.payment|floatformat:2 }} $
+        {% if notice.discount %}<br><small>حسم: {{ notice.input_discount|floatformat:2 }}</small>{% endif %}
+    </td>
     <td>{{ notice.created_at|date:"Y-m-d H:i" }}</td>
     {% if can_delete_notice %}
         <td>
